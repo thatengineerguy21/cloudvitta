@@ -2,8 +2,9 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 
-# Agent files
+# Agent files and skills lock(as this is local)
 .agents/
+skills-lock.json 
 
 # Binaries for programs and plugins
 *.exe
@@ -61,4 +62,4 @@ tsconfig.tsbuildinfo
 .turbo
 .vscode
 
-go-prod-lightweight
+cloudvitta

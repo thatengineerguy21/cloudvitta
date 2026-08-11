@@ -1,55 +1,70 @@
 package config
 
 import (
-	"fmt"
-	"os"
+	"strings"
+
+	"github.com/go-playground/validator/v10"
+	_ "github.com/joho/godotenv/autoload"
+	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/v2"
 )
 
 type Config struct {
-	Port        string
-	Env         string
-	DatabaseURL string
-	RedisURL    string
-	JWTSecret   string
+	Primary  PrimaryConfig  `koanf:"primary" validate:"required"`
+	Server   ServerConfig   `koanf:"server" validate:"required"`
+	Database DatabaseConfig `koanf:"database" validate:"required"`
+	Redis    RedisConfig    `koanf:"redis" validate:"required"`
+	Storage  StorageConfig  `koanf:"storage" validate:"required"`
+}
+
+type PrimaryConfig struct {
+	Environment string `koanf:"environment" validate:"required"`
+	LogLevel    string `koanf:"log_level" validate:"required"`
+}
+
+type ServerConfig struct {
+	Port int `koanf:"port" validate:"required"`
+}
+
+type DatabaseConfig struct {
+	URL string `koanf:"url" validate:"required"`
+}
+
+type RedisConfig struct {
+	URL string `koanf:"url" validate:"required"`
+}
+
+type StorageConfig struct {
+	GCSBucketName string `koanf:"gcs_bucket_name" validate:"required"`
 }
 
 func Load() (*Config, error) {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	k := koanf.New(".")
 
-	env := os.Getenv("ENV")
-	if env == "" {
-		env = "development"
-	}
-
-	dbURL := os.Getenv("DATABASE_URL")
-	redisURL := os.Getenv("REDIS_URL")
-	jwtSecret := os.Getenv("JWT_SECRET")
-
-	cfg := &Config{
-		Port:        port,
-		Env:         env,
-		DatabaseURL: dbURL,
-		RedisURL:    redisURL,
-		JWTSecret:   jwtSecret,
-	}
-
-	return cfg, nil
-}
-
-func (c *Config) Validate() error {
-	if c.Env == "production" {
-		if c.DatabaseURL == "" {
-			return fmt.Errorf("DATABASE_URL is required in production")
+	// Prefix environment variables with the application name to avoid conflicts.
+	err := k.Load(env.Provider("CLOUDVITTA_", ".", func(s string) string {
+		s = strings.TrimPrefix(s, "CLOUDVITTA_")
+		parts := strings.SplitN(s, "_", 2)
+		if len(parts) == 2 {
+			return strings.ToLower(parts[0] + "." + parts[1])
 		}
-		if c.RedisURL == "" {
-			return fmt.Errorf("REDIS_URL is required in production")
-		}
-		if c.JWTSecret == "" {
-			return fmt.Errorf("JWT_SECRET is required in production")
-		}
+		return strings.ToLower(s)
+	}), nil)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	mainConfig := &Config{}
+	err = k.Unmarshal("", mainConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	validate := validator.New()
+	err = validate.Struct(mainConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return mainConfig, nil
 }
