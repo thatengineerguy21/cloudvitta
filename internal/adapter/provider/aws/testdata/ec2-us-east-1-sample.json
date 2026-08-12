@@ -1,0 +1,87 @@
+{
+  "formatVersion": "v1.0",
+  "disclaimer": "Sample recorded test fixture for AWS EC2 us-east-1 pricing (Recorded: 2026-08-12)",
+  "offerCode": "AmazonEC2",
+  "products": {
+    "SKU-C5-XLARGE": {
+      "sku": "SKU-C5-XLARGE",
+      "productFamily": "Compute Instance",
+      "attributes": {
+        "servicecode": "AmazonEC2",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "instanceType": "c5.xlarge",
+        "vcpu": "4",
+        "memory": "8 GiB",
+        "operatingSystem": "Linux",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-M5-LARGE": {
+      "sku": "SKU-M5-LARGE",
+      "productFamily": "Compute Instance",
+      "attributes": {
+        "servicecode": "AmazonEC2",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "instanceType": "m5.large",
+        "vcpu": "2",
+        "memory": "8 GiB",
+        "operatingSystem": "Linux",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-WINDOWS-IGNORED": {
+      "sku": "SKU-WINDOWS-IGNORED",
+      "productFamily": "Compute Instance",
+      "attributes": {
+        "servicecode": "AmazonEC2",
+        "location": "US East (N. Virginia)",
+        "instanceType": "c5.xlarge",
+        "operatingSystem": "Windows",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+        "regionCode": "us-east-1"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-C5-XLARGE": {
+        "SKU-C5-XLARGE.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-C5-XLARGE",
+          "priceDimensions": {
+            "SKU-C5-XLARGE.TERM1.DIM1": {
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "0.1700000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-M5-LARGE": {
+        "SKU-M5-LARGE.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-M5-LARGE",
+          "priceDimensions": {
+            "SKU-M5-LARGE.TERM1.DIM1": {
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "0.0960000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

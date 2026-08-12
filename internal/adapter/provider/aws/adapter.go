@@ -1,0 +1,75 @@
+package aws
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/storage"
+	"golang.org/x/sync/errgroup"
+)
+
+// Adapter handles fetching, persisting raw response to GCS, and normalizing AWS EC2 compute pricing.
+type Adapter struct {
+	client  *Client
+	storage storage.RawStorage
+}
+
+// NewAdapter constructs a new AWS provider adapter.
+func NewAdapter(client *Client, st storage.RawStorage) *Adapter {
+	return &Adapter{
+		client:  client,
+		storage: st,
+	}
+}
+
+// Fetch retrieves the AWS price list, concurrently streams raw JSON to storage and normalizes it.
+// Returns the slice of normalized PriceObservation records only if storage upload and normalization succeed.
+func (a *Adapter) Fetch(ctx context.Context) ([]domain.PriceObservation, error) {
+	fetchedAt := time.Now().UTC()
+	fetchID := uuid.New().String()
+	dateStr := fetchedAt.Format("2006-01-02")
+	gcsPath := fmt.Sprintf("raw/aws/compute/%s/%s.json", dateStr, fetchID)
+
+	body, err := a.client.FetchPriceList(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("aws adapter: fetch price list: %w", err)
+	}
+	defer func() { _ = body.Close() }()
+
+	pr, pw := io.Pipe()
+	tee := io.TeeReader(body, pw)
+
+	var observations []domain.PriceObservation
+	g, gctx := errgroup.WithContext(ctx)
+
+	// Goroutine 1: Write raw payload stream to storage
+	g.Go(func() error {
+		if err := a.storage.WriteStream(gctx, gcsPath, pr); err != nil {
+			_ = pr.CloseWithError(err)
+			return fmt.Errorf("aws adapter: storage write: %w", err)
+		}
+		return nil
+	})
+
+	// Goroutine 2: Parse and normalize streamed JSON
+	g.Go(func() error {
+		var normErr error
+		observations, normErr = Normalize(tee, fetchedAt)
+		if normErr != nil {
+			_ = pw.CloseWithError(normErr)
+			return fmt.Errorf("aws adapter: normalize: %w", normErr)
+		}
+		_ = pw.Close()
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return observations, nil
+}
