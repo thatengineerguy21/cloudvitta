@@ -38,12 +38,5 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	if err := store.Migrate(ctx, dbPool); err != nil {
-		slog.Error("database migration failed", "error", err)
-		os.Exit(1)
-	}
-
-	_ = store.New(dbPool)
-
 	slog.Info("ingestion job completed successfully")
 }

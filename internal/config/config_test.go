@@ -11,7 +11,11 @@ func TestLoad_Success(t *testing.T) {
 	t.Setenv("CLOUDVITTA_SERVER_PORT", "8080")
 	t.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
 	t.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
-	t.Setenv("CLOUDVITTA_DATABASE_URL", "postgres://test")
+	t.Setenv("CLOUDVITTA_DATABASE_HOST", "localhost")
+	t.Setenv("CLOUDVITTA_DATABASE_PORT", "5432")
+	t.Setenv("CLOUDVITTA_DATABASE_USER", "postgres")
+	t.Setenv("CLOUDVITTA_DATABASE_NAME", "cloudvitta")
+	t.Setenv("CLOUDVITTA_DATABASE_SSL_MODE", "disable")
 	t.Setenv("CLOUDVITTA_REDIS_URL", "redis://test")
 	t.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "bucket")
 
@@ -29,7 +33,11 @@ func TestLoad_MissingVar(t *testing.T) {
 	// Set everything except PORT
 	t.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
 	t.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
-	t.Setenv("CLOUDVITTA_DATABASE_URL", "postgres://test")
+	t.Setenv("CLOUDVITTA_DATABASE_HOST", "localhost")
+	t.Setenv("CLOUDVITTA_DATABASE_PORT", "5432")
+	t.Setenv("CLOUDVITTA_DATABASE_USER", "postgres")
+	t.Setenv("CLOUDVITTA_DATABASE_NAME", "cloudvitta")
+	t.Setenv("CLOUDVITTA_DATABASE_SSL_MODE", "disable")
 	t.Setenv("CLOUDVITTA_REDIS_URL", "redis://test")
 	t.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "bucket")
 

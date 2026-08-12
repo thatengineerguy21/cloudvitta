@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
+	"strconv"
 	"time"
 
-	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 )
@@ -15,21 +17,30 @@ import (
 // It attaches an OpenTelemetry tracer for observability, applies
 // conservative pool limits, and verifies connectivity with a short ping.
 func NewPool(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
-	poolCfg, err := pgxpool.ParseConfig(cfg.URL)
+	hostPort := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
+	encodedPassword := url.QueryEscape(cfg.Password)
+
+	// Data Source Name (DSN) format for PostgreSQL connection string.
+	dsn := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s",
+		cfg.User,
+		encodedPassword,
+		hostPort,
+		cfg.Name,
+		cfg.SSLMode,
+	)
+
+	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("store: parse database URL: %w", err)
 	}
-
-	// Attach OpenTelemetry tracing to every connection.
-	poolCfg.ConnConfig.Tracer = otelpgx.NewTracer()
 
 	// Conservative pool sizing — Cloud Run scales horizontally,
 	// so each instance keeps a small pool to avoid exhausting
 	// the Neon connection budget.
 	poolCfg.MaxConns = int32(cfg.MaxOpenConns)
 	poolCfg.MinConns = int32(cfg.MaxIdleConns)
-	poolCfg.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetimeSeconds) * time.Second
-	poolCfg.MaxConnIdleTime = time.Duration(cfg.ConnMaxIdleTimeSeconds) * time.Second
+	poolCfg.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
+	poolCfg.MaxConnIdleTime = time.Duration(cfg.ConnMaxIdleTime) * time.Second
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {

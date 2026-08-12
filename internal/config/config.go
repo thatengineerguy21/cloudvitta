@@ -27,11 +27,26 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	URL                    string `koanf:"url" validate:"required"`
-	MaxOpenConns           int    `koanf:"max_open_conns"`
-	MaxIdleConns           int    `koanf:"max_idle_conns"`
-	ConnMaxLifetimeSeconds int    `koanf:"conn_max_lifetime_seconds"`
-	ConnMaxIdleTimeSeconds int    `koanf:"conn_max_idle_time_seconds"`
+	// Host specifies the database host address.
+	Host string `koanf:"host" validate:"required"`
+	// Port specifies the database network port.
+	Port int `koanf:"port" validate:"required"`
+	// User specifies the database user name.
+	User string `koanf:"user" validate:"required"`
+	// Password specifies the database password.
+	Password string `koanf:"password"`
+	// Name specifies the database name.
+	Name string `koanf:"name" validate:"required"`
+	// SSLMode specifies the SSL connection mode.
+	SSLMode string `koanf:"ssl_mode" validate:"required"`
+	// MaxOpenConns specifies maximum open database connections.
+	MaxOpenConns int `koanf:"max_open_conns" validate:"required"`
+	// MaxIdleConns specifies maximum idle database connections.
+	MaxIdleConns int `koanf:"max_idle_conns" validate:"required"`
+	// ConnMaxLifetime specifies maximum connection lifetime in seconds.
+	ConnMaxLifetime int `koanf:"conn_max_lifetime" validate:"required"`
+	// ConnMaxIdleTime specifies maximum idle time in seconds.
+	ConnMaxIdleTime int `koanf:"conn_max_idle_time" validate:"required"`
 }
 
 // applyDefaults sets conservative pool defaults when no override is provided.
@@ -43,11 +58,11 @@ func (d *DatabaseConfig) applyDefaults() {
 	if d.MaxIdleConns == 0 {
 		d.MaxIdleConns = 2
 	}
-	if d.ConnMaxLifetimeSeconds == 0 {
-		d.ConnMaxLifetimeSeconds = 1800 // 30 minutes
+	if d.ConnMaxLifetime == 0 {
+		d.ConnMaxLifetime = 1800 // 30 minutes
 	}
-	if d.ConnMaxIdleTimeSeconds == 0 {
-		d.ConnMaxIdleTimeSeconds = 300 // 5 minutes
+	if d.ConnMaxIdleTime == 0 {
+		d.ConnMaxIdleTime = 300 // 5 minutes
 	}
 }
 

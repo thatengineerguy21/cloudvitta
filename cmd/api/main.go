@@ -40,15 +40,6 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	if err := store.Migrate(ctx, dbPool); err != nil {
-		slog.Error("database migration failed", "error", err)
-		os.Exit(1)
-	}
-
-	// The generated Queries type is the direct data-access interface
-	// consumed by internal/service — no repository wrapper.
-	_ = store.New(dbPool)
-
 	// --- HTTP Server ---
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {

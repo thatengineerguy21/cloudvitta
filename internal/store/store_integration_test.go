@@ -2,7 +2,10 @@ package store_test
 
 import (
 	"context"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,12 +33,27 @@ func TestInsertAndQueryRoundTrip(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	u, err := url.Parse(dbURL)
+	if err != nil {
+		t.Fatalf("parse db url: %v", err)
+	}
+	pwd, _ := u.User.Password()
+	port, _ := strconv.Atoi(u.Port())
+	if port == 0 {
+		port = 5432
+	}
+
 	cfg := config.DatabaseConfig{
-		URL:                    dbURL,
-		MaxOpenConns:           2,
-		MaxIdleConns:           1,
-		ConnMaxLifetimeSeconds: 60,
-		ConnMaxIdleTimeSeconds: 30,
+		Host:            u.Hostname(),
+		Port:            port,
+		User:            u.User.Username(),
+		Password:        pwd,
+		Name:            strings.TrimPrefix(u.Path, "/"),
+		SSLMode:         u.Query().Get("sslmode"),
+		MaxOpenConns:    2,
+		MaxIdleConns:    1,
+		ConnMaxLifetime: 60,
+		ConnMaxIdleTime: 30,
 	}
 
 	pool, err := store.NewPool(ctx, cfg)
@@ -43,11 +61,6 @@ func TestInsertAndQueryRoundTrip(t *testing.T) {
 		t.Fatalf("NewPool: %v", err)
 	}
 	defer pool.Close()
-
-	// Run migrations to ensure the schema exists.
-	if err := store.Migrate(ctx, pool); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
 
 	queries := store.New(pool)
 
@@ -135,38 +148,5 @@ func TestInsertAndQueryRoundTrip(t *testing.T) {
 	_, err = pool.Exec(ctx, "DELETE FROM price_observations WHERE id = $1", id)
 	if err != nil {
 		t.Logf("cleanup: failed to delete test row: %v", err)
-	}
-}
-
-// TestMigrationIdempotency verifies that running migrations twice
-// does not produce errors (tern tracks schema_version).
-func TestMigrationIdempotency(t *testing.T) {
-	dbURL := testDatabaseURL(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	cfg := config.DatabaseConfig{
-		URL:                    dbURL,
-		MaxOpenConns:           2,
-		MaxIdleConns:           1,
-		ConnMaxLifetimeSeconds: 60,
-		ConnMaxIdleTimeSeconds: 30,
-	}
-
-	pool, err := store.NewPool(ctx, cfg)
-	if err != nil {
-		t.Fatalf("NewPool: %v", err)
-	}
-	defer pool.Close()
-
-	// First run.
-	if err := store.Migrate(ctx, pool); err != nil {
-		t.Fatalf("Migrate (first): %v", err)
-	}
-
-	// Second run — must be a no-op, not an error.
-	if err := store.Migrate(ctx, pool); err != nil {
-		t.Fatalf("Migrate (second): %v", err)
 	}
 }
