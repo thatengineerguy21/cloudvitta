@@ -3,17 +3,17 @@ package config_test
 import (
 	"os"
 	"testing"
+
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 )
 
 func TestLoad_Success(t *testing.T) {
-	os.Setenv("CLOUDVITTA_SERVER_PORT", "8080")
-	os.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
-	os.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
-	os.Setenv("CLOUDVITTA_DATABASE_URL", "postgres://test")
-	os.Setenv("CLOUDVITTA_REDIS_URL", "redis://test")
-	os.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "bucket")
-	defer os.Clearenv()
+	t.Setenv("CLOUDVITTA_SERVER_PORT", "8080")
+	t.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
+	t.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
+	t.Setenv("CLOUDVITTA_DATABASE_URL", "postgres://test")
+	t.Setenv("CLOUDVITTA_REDIS_URL", "redis://test")
+	t.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "bucket")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -27,12 +27,12 @@ func TestLoad_Success(t *testing.T) {
 func TestLoad_MissingVar(t *testing.T) {
 	os.Clearenv()
 	// Set everything except PORT
-	os.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
-	os.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
-	os.Setenv("CLOUDVITTA_DATABASE_URL", "postgres://test")
-	os.Setenv("CLOUDVITTA_REDIS_URL", "redis://test")
-	os.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "bucket")
-	
+	t.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
+	t.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
+	t.Setenv("CLOUDVITTA_DATABASE_URL", "postgres://test")
+	t.Setenv("CLOUDVITTA_REDIS_URL", "redis://test")
+	t.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "bucket")
+
 	_, err := config.Load()
 	if err == nil {
 		t.Fatal("expected error for missing PORT, got nil")
@@ -41,8 +41,8 @@ func TestLoad_MissingVar(t *testing.T) {
 
 func TestLoad_MalformedVar(t *testing.T) {
 	os.Clearenv()
-	os.Setenv("CLOUDVITTA_SERVER_PORT", "not-a-number")
-	
+	t.Setenv("CLOUDVITTA_SERVER_PORT", "not-a-number")
+
 	_, err := config.Load()
 	if err == nil {
 		t.Fatal("expected error for malformed PORT, got nil")

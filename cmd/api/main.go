@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"context"
 	"fmt"
 	"log/slog"
@@ -10,6 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/store"
 )
 
 func main() {
@@ -28,11 +30,31 @@ func main() {
 
 	slog.Info("starting CloudVitta API server", "port", cfg.Server.Port, "environment", cfg.Primary.Environment)
 
+	// --- Database ---
+	ctx := context.Background()
+
+	dbPool, err := store.NewPool(ctx, cfg.Database)
+	if err != nil {
+		slog.Error("database connection failed", "error", err)
+		os.Exit(1)
+	}
+	defer dbPool.Close()
+
+	if err := store.Migrate(ctx, dbPool); err != nil {
+		slog.Error("database migration failed", "error", err)
+		os.Exit(1)
+	}
+
+	// The generated Queries type is the direct data-access interface
+	// consumed by internal/service — no repository wrapper.
+	_ = store.New(dbPool)
+
+	// --- HTTP Server ---
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok","service":"cloudvitta-api"}`))
+		_, _ = w.Write([]byte(`{"status":"ok","service":"cloudvitta-api"}`))
 	})
 
 	server := &http.Server{
@@ -56,10 +78,10 @@ func main() {
 	<-shutdown
 	slog.Info("shutting down CloudVitta API server gracefully...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server forced to shutdown", "error", err)
 	}
 

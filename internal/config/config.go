@@ -27,7 +27,28 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	URL string `koanf:"url" validate:"required"`
+	URL                    string `koanf:"url" validate:"required"`
+	MaxOpenConns           int    `koanf:"max_open_conns"`
+	MaxIdleConns           int    `koanf:"max_idle_conns"`
+	ConnMaxLifetimeSeconds int    `koanf:"conn_max_lifetime_seconds"`
+	ConnMaxIdleTimeSeconds int    `koanf:"conn_max_idle_time_seconds"`
+}
+
+// applyDefaults sets conservative pool defaults when no override is provided.
+// Cloud Run scales horizontally, so each instance keeps a small pool.
+func (d *DatabaseConfig) applyDefaults() {
+	if d.MaxOpenConns == 0 {
+		d.MaxOpenConns = 5
+	}
+	if d.MaxIdleConns == 0 {
+		d.MaxIdleConns = 2
+	}
+	if d.ConnMaxLifetimeSeconds == 0 {
+		d.ConnMaxLifetimeSeconds = 1800 // 30 minutes
+	}
+	if d.ConnMaxIdleTimeSeconds == 0 {
+		d.ConnMaxIdleTimeSeconds = 300 // 5 minutes
+	}
 }
 
 type RedisConfig struct {
@@ -59,6 +80,8 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	mainConfig.Database.applyDefaults()
 
 	validate := validator.New()
 	err = validate.Struct(mainConfig)

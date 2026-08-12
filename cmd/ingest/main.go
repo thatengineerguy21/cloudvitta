@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/store"
 )
 
 func main() {
@@ -28,6 +30,20 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
-	_ = ctx
+	// --- Database ---
+	dbPool, err := store.NewPool(ctx, cfg.Database)
+	if err != nil {
+		slog.Error("database connection failed", "error", err)
+		os.Exit(1)
+	}
+	defer dbPool.Close()
+
+	if err := store.Migrate(ctx, dbPool); err != nil {
+		slog.Error("database migration failed", "error", err)
+		os.Exit(1)
+	}
+
+	_ = store.New(dbPool)
+
 	slog.Info("ingestion job completed successfully")
 }
