@@ -12,7 +12,7 @@ import (
 func NewClient(redisURL string) (*redis.Client, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
-		return nil, fmt.Errorf("cache: parse redis url: %w", err)
+		return nil, fmt.Errorf("cache: parse redis url failed (invalid format)")
 	}
 
 	client := redis.NewClient(opts)

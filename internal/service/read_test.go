@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -68,16 +69,15 @@ func TestPricingService_GetComputePrices_CacheHit(t *testing.T) {
 	}
 }
 
-// spyDBQuerier implements a spy over store DB queries to count database calls.
-type spyDBQuerier struct {
+// spyDBTX implements a spy over store.DBTX to count database calls.
+type spyDBTX struct {
+	store.DBTX
 	callCount int64
-	rows      []store.PriceObservation
 }
 
-func (s *spyDBQuerier) Query(ctx context.Context, provider, category, regionGroup string) ([]store.PriceObservation, error) {
+func (s *spyDBTX) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
 	atomic.AddInt64(&s.callCount, 1)
-	time.Sleep(50 * time.Millisecond) // simulate DB latency
-	return s.rows, nil
+	return s.DBTX.Query(ctx, sql, args...)
 }
 
 func setupTestDBPool(t *testing.T, ctx context.Context, dbURL string) (*url.URL, *pgxpool.Pool) {
@@ -131,10 +131,16 @@ func TestPricingService_GetComputePrices_SingleflightCollapse(t *testing.T) {
 	_ = u
 	defer pool.Close()
 
-	queries := store.New(pool)
+	// Start a transaction that we will roll back at the end of the test.
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("pool.Begin: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Clean test table and insert a row
-	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE provider = 'aws' AND sku_id = 'SKU-SINGLEFLIGHT'")
+	// Wrap tx in our spy to verify singleflight works
+	spy := &spyDBTX{DBTX: tx}
+	queries := store.New(spy)
 
 	var priceAmt pgtype.Numeric
 	_ = priceAmt.Scan("0.05")
@@ -161,9 +167,6 @@ func TestPricingService_GetComputePrices_SingleflightCollapse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InsertPriceObservation failed: %v", err)
 	}
-	defer func() {
-		_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE provider = 'aws' AND sku_id = 'SKU-SINGLEFLIGHT'")
-	}()
 
 	svc := service.NewPricingService(queries, rdb)
 
@@ -199,5 +202,92 @@ func TestPricingService_GetComputePrices_SingleflightCollapse(t *testing.T) {
 	}
 	if len(cached) == 0 {
 		t.Fatalf("expected cached rows in Redis, got 0")
+	}
+
+	// Wait for singleflight context background jobs (warming) to finish
+	time.Sleep(100 * time.Millisecond)
+
+	// Singleflight must ensure exactly 1 database call happened
+	// Note: callCount includes both the InsertPriceObservation and GetPriceObservations queries.
+	// Since we inserted 1 row, callCount should be 2.
+	if spy.callCount != 2 {
+		t.Fatalf("expected exactly 2 DB calls (1 insert, 1 query), got %d", spy.callCount)
+	}
+}
+
+func TestPricingService_GetComputePrices_CacheMissTTLFallback(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	dbURL := testDatabaseURL(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	u, pool := setupTestDBPool(t, ctx, dbURL)
+	_ = u
+	defer pool.Close()
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("pool.Begin: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	queries := store.New(tx)
+
+	var priceAmt pgtype.Numeric
+	_ = priceAmt.Scan("0.05")
+
+	now := time.Now().Truncate(time.Microsecond)
+	params := store.InsertPriceObservationParams{
+		Provider:        "aws",
+		ServiceCategory: "compute",
+		SkuID:           "SKU-MISS",
+		DisplayName:     "t3.miss",
+		Region:          "us-east-1",
+		RegionGroup:     "us-east",
+		Unit:            "Hrs",
+		PriceAmount:     priceAmt,
+		PriceCurrency:   "USD",
+		PricingModel:    "OnDemand",
+		Attributes:      []byte(`{"vcpu":2,"ram_gb":4,"family":"t3"}`),
+		RawResponseRef:  pgtype.Text{String: "raw/aws/miss.json", Valid: true},
+		FetchedAt:       pgtype.Timestamptz{Time: now, Valid: true},
+		LastSeenAt:      pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	_, err = queries.InsertPriceObservation(ctx, params)
+	if err != nil {
+		t.Fatalf("InsertPriceObservation failed: %v", err)
+	}
+
+	svc := service.NewPricingService(queries, rdb)
+
+	// Fetch without cache warming first (trigger miss & fallback)
+	got, err := svc.GetComputePrices(ctx, "aws", "compute", "us-east-1")
+	if err != nil {
+		t.Fatalf("GetComputePrices failed: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatalf("expected rows from DB fallback, got 0")
+	}
+
+	// Wait for cache warming to complete in background
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify key was set with TTL
+	key := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1")
+	ttl, err := rdb.TTL(ctx, key).Result()
+	if err != nil {
+		t.Fatalf("rdb.TTL failed: %v", err)
+	}
+	if ttl <= 0 {
+		t.Fatalf("expected positive TTL, got %v", ttl)
 	}
 }

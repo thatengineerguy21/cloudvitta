@@ -84,7 +84,7 @@ func TestIngestionService_RunAWSComputeIngestion(t *testing.T) {
 	awsClient := aws.NewClient(aws.WithURL(ts.URL), aws.WithHTTPClient(ts.Client()))
 	awsAdapter := aws.NewAdapter(awsClient, memStorage)
 
-	ingestSvc := service.NewIngestionService(queries, awsAdapter)
+	ingestSvc := service.NewIngestionService(queries, awsAdapter, nil)
 
 	// First ingestion run
 	count1, err := ingestSvc.RunAWSComputeIngestion(ctx)

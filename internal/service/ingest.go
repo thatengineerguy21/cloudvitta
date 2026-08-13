@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
@@ -26,26 +27,13 @@ type IngestionService struct {
 	redisClient redis.Cmdable
 }
 
-// IngestionOption allows configuring optional dependencies for IngestionService.
-type IngestionOption func(*IngestionService)
-
-// WithRedisClient configures Redis cache warming for the IngestionService.
-func WithRedisClient(redisClient redis.Cmdable) IngestionOption {
-	return func(s *IngestionService) {
-		s.redisClient = redisClient
-	}
-}
-
 // NewIngestionService constructs a new IngestionService.
-func NewIngestionService(queries *store.Queries, fetcher Fetcher, opts ...IngestionOption) *IngestionService {
-	s := &IngestionService{
-		queries: queries,
-		fetcher: fetcher,
+func NewIngestionService(queries *store.Queries, fetcher Fetcher, redisClient redis.Cmdable) *IngestionService {
+	return &IngestionService{
+		queries:     queries,
+		fetcher:     fetcher,
+		redisClient: redisClient,
 	}
-	for _, opt := range opts {
-		opt(s)
-	}
-	return s
 }
 
 // RunAWSComputeIngestion triggers the AWS EC2 compute pricing ingestion pipeline:
@@ -80,9 +68,11 @@ func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, err
 
 		for region, obsList := range byRegion {
 			key := cache.BuildKey(cache.SchemaVersion, "aws", "compute", region)
-			if warmErr := cache.Warm(ctx, s.redisClient, key, obsList, cache.DefaultTTL); warmErr != nil {
+			warmCtx, warmCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if warmErr := cache.Warm(warmCtx, s.redisClient, key, obsList, cache.DefaultTTL); warmErr != nil {
 				slog.Warn("failed to warm redis cache after ingestion", "key", key, "error", warmErr)
 			}
+			warmCancel()
 		}
 	}
 

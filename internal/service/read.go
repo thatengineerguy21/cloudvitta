@@ -52,21 +52,20 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 	}
 
 	// 2. Singleflight Collapse on Cache Miss
-	val, err, _ := s.sfGroup.Do(cacheKey, func() (interface{}, error) {
-		// Resolve region to region_group for DB query (cache is per-region, DB index is per-region-group)
-		var regionGroup string
-		var regErr error
-		switch provider {
-		case "aws":
-			regionGroup, regErr = regionmap.MapAWSRegion(region)
-		default:
-			regionGroup = region
-		}
+	// Use DoChan to prevent the first caller's context cancellation from failing the DB query
+	// for all other concurrent waiters.
+	ch := s.sfGroup.DoChan(cacheKey, func() (interface{}, error) {
+		// Resolve region to region_group for DB query
+		regionGroup, regErr := regionmap.MapRegion(provider, region)
 		if regErr != nil {
 			return nil, fmt.Errorf("pricing service: resolve region group: %w", regErr)
 		}
 
-		dbRows, dbErr := s.queries.GetPriceObservations(ctx, store.GetPriceObservationsParams{
+		// Use a standalone bounded context for the actual database fetch
+		dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer dbCancel()
+
+		dbRows, dbErr := s.queries.GetPriceObservations(dbCtx, store.GetPriceObservationsParams{
 			Provider:        provider,
 			ServiceCategory: category,
 			RegionGroup:     regionGroup,
@@ -91,22 +90,30 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 
 		// 3. Event-driven cache warming after DB fetch
 		if s.redisClient != nil && len(regionObs) > 0 {
-			_ = cache.Warm(ctx, s.redisClient, cacheKey, regionObs, cache.DefaultTTL)
+			// Use background context for warming so caller cancellation doesn't stop the cache write
+			warmCtx, warmCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer warmCancel()
+			_ = cache.Warm(warmCtx, s.redisClient, cacheKey, regionObs, cache.DefaultTTL)
 		}
 
 		return regionObs, nil
 	})
 
-	if err != nil {
-		return nil, err
-	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
 
-	obs, ok := val.([]domain.PriceObservation)
-	if !ok {
-		return nil, fmt.Errorf("pricing service: unexpected singleflight return type %T", val)
-	}
+		obs, ok := res.Val.([]domain.PriceObservation)
+		if !ok {
+			return nil, fmt.Errorf("pricing service: unexpected singleflight return type %T", res.Val)
+		}
 
-	return obs, nil
+		return obs, nil
+	}
 }
 
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {

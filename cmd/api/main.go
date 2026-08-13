@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -46,7 +47,12 @@ func main() {
 	if cfg.Redis.URL != "" {
 		rc, err := cache.NewClient(cfg.Redis.URL)
 		if err != nil {
-			slog.Warn("failed to connect to redis, proceeding with database-only read path", "error", err)
+			safeURL := "<invalid-url>"
+			if parsed, pErr := url.Parse(cfg.Redis.URL); pErr == nil {
+				parsed.User = nil
+				safeURL = parsed.String()
+			}
+			slog.Warn("failed to connect to redis, proceeding with database-only read path", "url", safeURL, "error", err)
 		} else {
 			defer func() { _ = rc.Close() }()
 			redisClient = rc

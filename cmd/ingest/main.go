@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"time"
 
@@ -62,7 +63,12 @@ func run() error {
 	if cfg.Redis.URL != "" {
 		rc, err := cache.NewClient(cfg.Redis.URL)
 		if err != nil {
-			slog.Warn("failed to connect to redis, proceeding without cache warming", "error", err)
+			safeURL := "<invalid-url>"
+			if parsed, pErr := url.Parse(cfg.Redis.URL); pErr == nil {
+				parsed.User = nil
+				safeURL = parsed.String()
+			}
+			slog.Warn("failed to connect to redis, proceeding without cache warming", "url", safeURL, "error", err)
 		} else {
 			defer func() { _ = rc.Close() }()
 			redisClient = rc
@@ -73,7 +79,7 @@ func run() error {
 	queries := store.New(dbPool)
 	awsClient := aws.NewClient()
 	awsAdapter := aws.NewAdapter(awsClient, rawStorage)
-	ingestSvc := service.NewIngestionService(queries, awsAdapter, service.WithRedisClient(redisClient))
+	ingestSvc := service.NewIngestionService(queries, awsAdapter, redisClient)
 
 	// --- Execution ---
 	slog.Info("executing AWS compute pricing ingestion...")
