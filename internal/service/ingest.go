@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/redis/go-redis/v9"
+	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 )
@@ -16,23 +19,38 @@ type Fetcher interface {
 }
 
 // IngestionService orchestrates fetching, normalizing, storage persistence,
-// and database insertion of provider pricing observations.
+// database insertion, and Redis cache warming of provider pricing observations.
 type IngestionService struct {
-	queries *store.Queries
-	fetcher Fetcher
+	queries     *store.Queries
+	fetcher     Fetcher
+	redisClient redis.Cmdable
+}
+
+// IngestionOption allows configuring optional dependencies for IngestionService.
+type IngestionOption func(*IngestionService)
+
+// WithRedisClient configures Redis cache warming for the IngestionService.
+func WithRedisClient(redisClient redis.Cmdable) IngestionOption {
+	return func(s *IngestionService) {
+		s.redisClient = redisClient
+	}
 }
 
 // NewIngestionService constructs a new IngestionService.
-func NewIngestionService(queries *store.Queries, fetcher Fetcher) *IngestionService {
-	return &IngestionService{
+func NewIngestionService(queries *store.Queries, fetcher Fetcher, opts ...IngestionOption) *IngestionService {
+	s := &IngestionService{
 		queries: queries,
 		fetcher: fetcher,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // RunAWSComputeIngestion triggers the AWS EC2 compute pricing ingestion pipeline:
 // fetches AWS price list, streams raw payload to storage, normalizes pricing records,
-// and inserts each observation into Postgres via sqlc queries.
+// inserts each observation into Postgres via sqlc queries, and immediately warms Redis cache keys.
 // Returns the total number of inserted records.
 func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, error) {
 	result, err := s.fetcher.Fetch(ctx)
@@ -51,6 +69,21 @@ func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, err
 			return insertedCount, fmt.Errorf("ingest service: insert observation for sku %s: %w", obs.SkuID, err)
 		}
 		insertedCount++
+	}
+
+	// Event-driven cache warming
+	if s.redisClient != nil && len(result.Observations) > 0 {
+		byRegion := make(map[string][]domain.PriceObservation)
+		for _, obs := range result.Observations {
+			byRegion[obs.Region] = append(byRegion[obs.Region], obs)
+		}
+
+		for region, obsList := range byRegion {
+			key := cache.BuildKey(cache.SchemaVersion, "aws", "compute", region)
+			if warmErr := cache.Warm(ctx, s.redisClient, key, obsList, cache.DefaultTTL); warmErr != nil {
+				slog.Warn("failed to warm redis cache after ingestion", "key", key, "error", warmErr)
+			}
+		}
 	}
 
 	return insertedCount, nil

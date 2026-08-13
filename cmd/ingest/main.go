@@ -8,7 +8,9 @@ import (
 	"time"
 
 	gcsstorage "cloud.google.com/go/storage"
+	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
+	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
@@ -55,11 +57,23 @@ func run() error {
 	defer func() { _ = gcsClient.Close() }()
 	rawStorage := storage.NewGCSStorage(gcsClient, cfg.Storage.GCSBucketName)
 
+	// --- Cache ---
+	var redisClient *redis.Client
+	if cfg.Redis.URL != "" {
+		rc, err := cache.NewClient(cfg.Redis.URL)
+		if err != nil {
+			slog.Warn("failed to connect to redis, proceeding without cache warming", "error", err)
+		} else {
+			defer func() { _ = rc.Close() }()
+			redisClient = rc
+		}
+	}
+
 	// --- Dependencies & Wiring ---
 	queries := store.New(dbPool)
 	awsClient := aws.NewClient()
 	awsAdapter := aws.NewAdapter(awsClient, rawStorage)
-	ingestSvc := service.NewIngestionService(queries, awsAdapter)
+	ingestSvc := service.NewIngestionService(queries, awsAdapter, service.WithRedisClient(redisClient))
 
 	// --- Execution ---
 	slog.Info("executing AWS compute pricing ingestion...")

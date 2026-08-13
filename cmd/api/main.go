@@ -10,7 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 )
 
@@ -38,7 +41,21 @@ func main() {
 		slog.Error("database connection failed", "error", err)
 		os.Exit(1)
 	}
-	defer dbPool.Close()
+	// --- Redis Cache ---
+	var redisClient *redis.Client
+	if cfg.Redis.URL != "" {
+		rc, err := cache.NewClient(cfg.Redis.URL)
+		if err != nil {
+			slog.Warn("failed to connect to redis, proceeding with database-only read path", "error", err)
+		} else {
+			defer func() { _ = rc.Close() }()
+			redisClient = rc
+		}
+	}
+
+	// --- Services ---
+	queries := store.New(dbPool)
+	_ = service.NewPricingService(queries, redisClient)
 
 	// --- HTTP Server ---
 	mux := http.NewServeMux()
