@@ -13,24 +13,49 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/singleflight"
 )
 
 // PricingService handles reading cloud pricing data using a singleflight-wrapped
 // cache-aside pattern (Redis cache first, Postgres query miss fallback).
 type PricingService struct {
-	queries     *store.Queries
-	redisClient redis.Cmdable
-	sfGroup     singleflight.Group
+	queries      *store.Queries
+	redisClient  redis.Cmdable
+	tracer       trace.Tracer
+	cacheMetrics *observability.CacheMetrics
+	sfGroup      singleflight.Group
+}
+
+// PricingOption allows configuring optional dependencies for PricingService.
+type PricingOption func(*PricingService)
+
+// WithTracer attaches an OpenTelemetry Tracer to PricingService.
+func WithTracer(tracer trace.Tracer) PricingOption {
+	return func(s *PricingService) {
+		s.tracer = tracer
+	}
+}
+
+// WithCacheMetrics attaches CacheMetrics to PricingService for hit/miss recording.
+func WithCacheMetrics(metrics *observability.CacheMetrics) PricingOption {
+	return func(s *PricingService) {
+		s.cacheMetrics = metrics
+	}
 }
 
 // NewPricingService constructs a new PricingService.
-func NewPricingService(queries *store.Queries, redisClient redis.Cmdable) *PricingService {
-	return &PricingService{
+func NewPricingService(queries *store.Queries, redisClient redis.Cmdable, opts ...PricingOption) *PricingService {
+	s := &PricingService{
 		queries:     queries,
 		redisClient: redisClient,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // GetComputePrices retrieves compute pricing observations for provider, category, and regionGroup.
@@ -39,15 +64,28 @@ func NewPricingService(queries *store.Queries, redisClient redis.Cmdable) *Prici
 func (s *PricingService) GetComputePrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
 	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, regionGroup)
 
+	if s.tracer != nil {
+		var span trace.Span
+		ctx, span = s.tracer.Start(ctx, "Cache Read")
+		defer span.End()
+	}
+
 	// 1. Try Cache-Aside Read from Redis
 	if s.redisClient != nil {
 		cachedObs, err := cache.Get(ctx, s.redisClient, cacheKey)
 		if err == nil {
+			if s.cacheMetrics != nil {
+				s.cacheMetrics.RecordHit(ctx)
+			}
 			return cachedObs, nil
 		}
 		if !errors.Is(err, cache.ErrCacheMiss) {
 			slog.Warn("cache read error, proceeding to DB fallback", "key", cacheKey, "error", err)
 		}
+	}
+
+	if s.cacheMetrics != nil {
+		s.cacheMetrics.RecordMiss(ctx)
 	}
 
 	// 2. Singleflight Collapse on Cache Miss
@@ -56,6 +94,12 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 		// doesn't fail the underlying shared query for all waiting requests.
 		dbCtx, dbCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer dbCancel()
+
+		if s.tracer != nil {
+			var dbSpan trace.Span
+			dbCtx, dbSpan = s.tracer.Start(dbCtx, "Postgres Fallback Query")
+			defer dbSpan.End()
+		}
 
 		dbRows, dbErr := s.queries.GetPriceObservations(dbCtx, store.GetPriceObservationsParams{
 			Provider:        provider,

@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
@@ -26,23 +27,47 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := context.Background()
+
+	// --- Observability & OpenTelemetry Setup ---
+	otelProviders, err := observability.InitOTel(ctx, observability.Config{
+		ServiceName: "cloudvitta-api",
+		Endpoint:    os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		Headers:     os.Getenv("OTEL_EXPORTER_OTLP_HEADERS"),
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "OpenTelemetry initialization error: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelProviders.Shutdown(shutdownCtx)
+	}()
+
 	var level slog.Level
 	if err := level.UnmarshalText([]byte(cfg.Primary.LogLevel)); err != nil {
 		level = slog.LevelInfo
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	logger := observability.SetupLogger(level, otelProviders.LoggerProvider, os.Stdout)
 	slog.SetDefault(logger)
 
 	slog.Info("starting CloudVitta API server", "port", cfg.Server.Port, "environment", cfg.Primary.Environment)
 
-	// --- Database ---
-	ctx := context.Background()
+	// --- Cache Metrics ---
+	cacheMetrics, err := observability.NewCacheMetrics(otelProviders.Meter)
+	if err != nil {
+		slog.Error("failed to create cache metrics", "error", err)
+	}
 
+	// --- Database ---
 	dbPool, err := store.NewPool(ctx, cfg.Database)
 	if err != nil {
 		slog.Error("database connection failed", "error", err)
 		os.Exit(1)
 	}
+	defer dbPool.Close()
+
 	// --- Redis Cache ---
 	var redisClient *redis.Client
 	if cfg.Redis.URL != "" {
@@ -62,7 +87,12 @@ func main() {
 
 	// --- Services & Router ---
 	queries := store.New(dbPool)
-	pricingSvc := service.NewPricingService(queries, redisClient)
+	pricingSvc := service.NewPricingService(
+		queries,
+		redisClient,
+		service.WithTracer(otelProviders.Tracer),
+		service.WithCacheMetrics(cacheMetrics),
+	)
 	router := rest.NewRouter(pricingSvc, dbPool, redisClient)
 
 	// --- HTTP Server ---

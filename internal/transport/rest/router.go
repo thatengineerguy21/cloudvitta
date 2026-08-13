@@ -4,21 +4,25 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	_ "github.com/thatengineerguy21/CloudVitta/internal/transport/rest/openapi"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
+	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
 
-// NewRouter constructs a net/http.ServeMux with all API routes, health probes, and middlewares wired.
+// NewRouter constructs a net/http.ServeMux with all API routes, health probes, metrics, and middlewares wired.
 func NewRouter(pricingSvc *service.PricingService, dbPool *pgxpool.Pool, redisClient redis.Cmdable) http.Handler {
 	mux := http.NewServeMux()
 
-	// Probes (unlimited)
+	// Probes & Metrics (unlimited)
 	mux.HandleFunc("GET /healthz", HandleHealthz)
 	mux.HandleFunc("GET /readyz", HandleReadyz(dbPool, redisClient))
+	mux.Handle("GET /metrics", promhttp.Handler())
 
 	// OpenAPI Documentation (unlimited)
 	mux.Handle("GET /docs/", httpSwagger.WrapHandler)
@@ -29,5 +33,7 @@ func NewRouter(pricingSvc *service.PricingService, dbPool *pgxpool.Pool, redisCl
 
 	mux.Handle("GET /api/v1/prices/compute", limiter.Handler(computeHandler))
 
-	return mux
+	// Wrap with recovery middleware and OpenTelemetry HTTP instrumentation
+	recoveredHandler := middleware.RecoverMiddleware(mux)
+	return otelhttp.NewHandler(recoveredHandler, "CloudVittaAPI")
 }

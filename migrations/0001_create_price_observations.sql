@@ -24,8 +24,3 @@ CREATE TABLE IF NOT EXISTS price_observations (
 CREATE INDEX IF NOT EXISTS idx_price_lookup
     ON price_observations (provider, service_category, region_group, fetched_at DESC);
 
----- create above / drop below ----
-
-DROP INDEX IF EXISTS idx_price_lookup;
-DROP TABLE IF EXISTS price_observations;
-
