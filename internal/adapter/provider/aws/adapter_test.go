@@ -37,23 +37,23 @@ func TestAdapter_Fetch_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	obs, gcsPath, err := adapter.Fetch(ctx)
+	result, err := adapter.Fetch(ctx)
 	if err != nil {
 		t.Fatalf("Fetch() unexpected error: %v", err)
 	}
-	if gcsPath == "" {
+	if result.RawGCSPath == "" {
 		t.Fatalf("Fetch() returned empty gcsPath")
 	}
 
-	if len(obs) != 2 {
-		t.Fatalf("Fetch() returned %d observations, want 2", len(obs))
+	if len(result.Observations) != 2 {
+		t.Fatalf("Fetch() returned %d observations, want 2", len(result.Observations))
 	}
 
 	// Verify c5.xlarge instance
 	var c5Obs *domain.PriceObservation
-	for i := range obs {
-		if obs[i].SkuID == "SKU-C5-XLARGE" {
-			c5Obs = &obs[i]
+	for i := range result.Observations {
+		if result.Observations[i].SkuID == "SKU-C5-XLARGE" {
+			c5Obs = &result.Observations[i]
 			break
 		}
 	}
@@ -149,7 +149,7 @@ func TestAdapter_Fetch_UnmappedProduct_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := NewAdapter(client, memStorage)
 
-	_, _, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background())
 	if err == nil {
 		t.Fatalf("Fetch() expected error for unmapped product, got nil")
 	}
@@ -200,7 +200,7 @@ func TestAdapter_Fetch_UnmappedRegion_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := NewAdapter(client, memStorage)
 
-	_, _, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background())
 	if err == nil {
 		t.Fatalf("Fetch() expected error for unmapped region, got nil")
 	}
@@ -219,7 +219,7 @@ func TestAdapter_Fetch_HTTPError_FailsCleanly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := NewAdapter(client, memStorage)
 
-	_, _, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background())
 	if err == nil {
 		t.Fatalf("Fetch() expected error for HTTP 500, got nil")
 	}

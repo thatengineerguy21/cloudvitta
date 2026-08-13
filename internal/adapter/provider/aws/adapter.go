@@ -27,8 +27,8 @@ func NewAdapter(client *Client, st storage.RawStorage) *Adapter {
 }
 
 // Fetch retrieves the AWS price list, concurrently streams raw JSON to storage and normalizes it.
-// Returns normalized PriceObservation records, the GCS object path, and any error.
-func (a *Adapter) Fetch(ctx context.Context) ([]domain.PriceObservation, string, error) {
+// Returns a domain.FetchResult containing the observations and raw GCS path, and any error.
+func (a *Adapter) Fetch(ctx context.Context) (domain.FetchResult, error) {
 	fetchedAt := time.Now().UTC()
 	fetchID := uuid.New().String()
 	dateStr := fetchedAt.Format("2006-01-02")
@@ -36,7 +36,7 @@ func (a *Adapter) Fetch(ctx context.Context) ([]domain.PriceObservation, string,
 
 	body, err := a.client.FetchPriceList(ctx)
 	if err != nil {
-		return nil, "", fmt.Errorf("aws adapter: fetch price list: %w", err)
+		return domain.FetchResult{}, fmt.Errorf("aws adapter: fetch price list: %w", err)
 	}
 	defer func() { _ = body.Close() }()
 
@@ -68,8 +68,11 @@ func (a *Adapter) Fetch(ctx context.Context) ([]domain.PriceObservation, string,
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, "", err
+		return domain.FetchResult{}, err
 	}
 
-	return observations, gcsPath, nil
+	return domain.FetchResult{
+		Observations: observations,
+		RawGCSPath:   gcsPath,
+	}, nil
 }

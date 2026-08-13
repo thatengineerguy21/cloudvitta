@@ -28,3 +28,9 @@ type PriceObservation struct {
 	Attributes      ComputeAttributes `json:"attributes"`
 	FetchedAt       time.Time         `json:"fetched_at"`
 }
+
+// FetchResult bundles a batch of observations and the storage path of their raw payload.
+type FetchResult struct {
+	Observations []PriceObservation
+	RawGCSPath   string
+}

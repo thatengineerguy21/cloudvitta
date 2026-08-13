@@ -16,10 +16,16 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		slog.Error("ingestion job failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	var level slog.Level
@@ -37,26 +43,17 @@ func main() {
 	// --- Database ---
 	dbPool, err := store.NewPool(ctx, cfg.Database)
 	if err != nil {
-		slog.Error("database connection failed", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("database connection failed: %w", err)
 	}
 	defer dbPool.Close()
 
 	// --- Storage ---
-	var rawStorage storage.RawStorage
-	if cfg.Primary.Environment == "production" || os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
-		gcsClient, err := gcsstorage.NewClient(ctx)
-		if err != nil {
-			slog.Error("failed to create GCS client, falling back to memory storage", "error", err)
-			rawStorage = storage.NewMemoryRawStorage()
-		} else {
-			defer func() { _ = gcsClient.Close() }()
-			rawStorage = storage.NewGCSStorage(gcsClient, cfg.Storage.GCSBucketName)
-		}
-	} else {
-		slog.Info("using in-memory raw storage for local development")
-		rawStorage = storage.NewMemoryRawStorage()
+	gcsClient, err := gcsstorage.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create GCS client: %w", err)
 	}
+	defer func() { _ = gcsClient.Close() }()
+	rawStorage := storage.NewGCSStorage(gcsClient, cfg.Storage.GCSBucketName)
 
 	// --- Dependencies & Wiring ---
 	queries := store.New(dbPool)
@@ -68,9 +65,9 @@ func main() {
 	slog.Info("executing AWS compute pricing ingestion...")
 	count, err := ingestSvc.RunAWSComputeIngestion(ctx)
 	if err != nil {
-		slog.Error("AWS compute ingestion failed", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("aws compute ingestion failed: %w", err)
 	}
 
 	slog.Info("ingestion job completed successfully", "inserted_count", count)
+	return nil
 }
