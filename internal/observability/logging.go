@@ -64,13 +64,16 @@ func (m *MultiHandler) WithGroup(name string) slog.Handler {
 }
 
 // SetupLogger builds a multi-handler slog.Logger that outputs JSON to stdout and sends logs to OTel.
-func SetupLogger(level slog.Level, lp *sdklog.LoggerProvider, out io.Writer) *slog.Logger {
+func SetupLogger(serviceName string, level slog.Level, lp *sdklog.LoggerProvider, out io.Writer) *slog.Logger {
+	if serviceName == "" {
+		serviceName = "cloudvitta"
+	}
 	if out == nil {
 		out = os.Stdout
 	}
 
 	stdoutHandler := slog.NewJSONHandler(out, &slog.HandlerOptions{Level: level})
-	otelHandler := otelslog.NewHandler("cloudvitta", otelslog.WithLoggerProvider(lp))
+	otelHandler := otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))
 
 	multi := NewMultiHandler(stdoutHandler, otelHandler)
 	return slog.New(multi)

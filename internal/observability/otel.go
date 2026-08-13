@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
@@ -34,12 +38,19 @@ type Providers struct {
 	Shutdown       func(context.Context) error
 }
 
-// InitOTel initializes OpenTelemetry tracing, metrics, and log providers.
-// If endpoint is empty, exporters fall back safely to in-memory/no-op implementations for local development.
+// InitOTel initializes OpenTelemetry tracing, dual metrics (Prometheus local + OTLP remote), and log providers.
+// If endpoint is empty, OTLP exporters fall back safely to in-memory/no-op implementations for local development.
 func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 	if cfg.ServiceName == "" {
 		cfg.ServiceName = "cloudvitta"
 	}
+
+	// Set global OpenTelemetry error handler so OTLP background export failures (e.g. auth errors) get logged
+	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+		slog.Error("opentelemetry runtime error", "error", err)
+	}))
+
+	headers := parseHeaders(cfg.Headers)
 
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
@@ -53,10 +64,13 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 	// 1. Tracer Provider Setup
 	var tp *sdktrace.TracerProvider
 	if cfg.Endpoint != "" {
-		opts := []otlptracehttp.Option{
+		traceOpts := []otlptracehttp.Option{
 			otlptracehttp.WithEndpointURL(cfg.Endpoint),
 		}
-		traceExporter, err := otlptracehttp.New(ctx, opts...)
+		if len(headers) > 0 {
+			traceOpts = append(traceOpts, otlptracehttp.WithHeaders(headers))
+		}
+		traceExporter, err := otlptracehttp.New(ctx, traceOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("observability: create OTLP trace exporter: %w", err)
 		}
@@ -68,20 +82,44 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 		tp = sdktrace.NewTracerProvider(sdktrace.WithResource(res))
 	}
 
-	// 2. Meter Provider & Prometheus Exporter Setup
+	// 2. Dual Meter Provider Setup (Prometheus for local /metrics + OTLP PeriodicReader when endpoint is configured)
 	promExporter, err := prometheus.New()
 	if err != nil {
 		return nil, fmt.Errorf("observability: create prometheus exporter: %w", err)
 	}
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(promExporter),
-		sdkmetric.WithResource(res),
-	)
+
+	meterReaders := []sdkmetric.Reader{promExporter}
+	if cfg.Endpoint != "" {
+		metricOpts := []otlpmetrichttp.Option{
+			otlpmetrichttp.WithEndpointURL(cfg.Endpoint),
+		}
+		if len(headers) > 0 {
+			metricOpts = append(metricOpts, otlpmetrichttp.WithHeaders(headers))
+		}
+		otlpMetricExporter, err := otlpmetrichttp.New(ctx, metricOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("observability: create OTLP metric exporter: %w", err)
+		}
+		meterReaders = append(meterReaders, sdkmetric.NewPeriodicReader(otlpMetricExporter))
+	}
+
+	meterOpts := make([]sdkmetric.Option, 0, len(meterReaders)+1)
+	for _, r := range meterReaders {
+		meterOpts = append(meterOpts, sdkmetric.WithReader(r))
+	}
+	meterOpts = append(meterOpts, sdkmetric.WithResource(res))
+	mp := sdkmetric.NewMeterProvider(meterOpts...)
 
 	// 3. Logger Provider Setup
 	var lp *sdklog.LoggerProvider
 	if cfg.Endpoint != "" {
-		logExporter, err := otlploghttp.New(ctx, otlploghttp.WithEndpointURL(cfg.Endpoint))
+		logOpts := []otlploghttp.Option{
+			otlploghttp.WithEndpointURL(cfg.Endpoint),
+		}
+		if len(headers) > 0 {
+			logOpts = append(logOpts, otlploghttp.WithHeaders(headers))
+		}
+		logExporter, err := otlploghttp.New(ctx, logOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("observability: create OTLP log exporter: %w", err)
 		}
@@ -118,4 +156,19 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 		LoggerProvider: lp,
 		Shutdown:       shutdown,
 	}, nil
+}
+
+func parseHeaders(raw string) map[string]string {
+	headers := make(map[string]string)
+	if raw == "" {
+		return headers
+	}
+	pairs := strings.Split(raw, ",")
+	for _, pair := range pairs {
+		k, v, found := strings.Cut(strings.TrimSpace(pair), "=")
+		if found {
+			headers[strings.TrimSpace(k)] = strings.TrimSpace(v)
+		}
+	}
+	return headers
 }

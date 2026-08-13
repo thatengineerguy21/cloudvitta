@@ -33,16 +33,17 @@ func NewCacheMetrics(meter metric.Meter) (*CacheMetrics, error) {
 
 // RecordHit increments the cache_requests_total counter with result="hit".
 func (c *CacheMetrics) RecordHit(ctx context.Context) {
-	if c == nil || c.counter == nil {
-		return
-	}
-	c.counter.Add(ctx, 1, metric.WithAttributes(attribute.String("result", "hit")))
+	c.record(ctx, "hit")
 }
 
 // RecordMiss increments the cache_requests_total counter with result="miss".
 func (c *CacheMetrics) RecordMiss(ctx context.Context) {
+	c.record(ctx, "miss")
+}
+
+func (c *CacheMetrics) record(ctx context.Context, result string) {
 	if c == nil || c.counter == nil {
 		return
 	}
-	c.counter.Add(ctx, 1, metric.WithAttributes(attribute.String("result", "miss")))
+	c.counter.Add(ctx, 1, metric.WithAttributes(attribute.String("result", result)))
 }

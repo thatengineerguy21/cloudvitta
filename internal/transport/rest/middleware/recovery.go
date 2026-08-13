@@ -13,7 +13,7 @@ func RecoverMiddleware(next http.Handler) http.Handler {
 		defer func() {
 			if rec := recover(); rec != nil {
 				stack := string(debug.Stack())
-				slog.Error("panic recovered in HTTP handler", "panic", rec, "stack", stack, "path", r.URL.Path)
+				slog.ErrorContext(r.Context(), "panic recovered in HTTP handler", "panic", rec, "stack", stack, "path", r.URL.Path)
 
 				WriteJSONError(
 					w, r,

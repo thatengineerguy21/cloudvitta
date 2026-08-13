@@ -39,6 +39,28 @@ func TestInitOTel_LocalFallback(t *testing.T) {
 	}
 }
 
+func TestInitOTel_WithHeadersConfig(t *testing.T) {
+	ctx := context.Background()
+
+	// Verify InitOTel parses headers correctly and initializes without panic
+	providers, err := observability.InitOTel(ctx, observability.Config{
+		ServiceName: "cloudvitta-test-headers",
+		Endpoint:    "http://localhost:4318",
+		Headers:     "api-key=testkey,tenant-id=testtenant",
+	})
+	if err != nil {
+		t.Fatalf("InitOTel with headers failed: %v", err)
+	}
+	if providers == nil {
+		t.Fatal("expected non-nil providers")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_ = providers.Shutdown(shutdownCtx)
+}
+
 func TestSetupLogger(t *testing.T) {
 	ctx := context.Background()
 	providers, err := observability.InitOTel(ctx, observability.Config{ServiceName: "test"})
@@ -48,7 +70,7 @@ func TestSetupLogger(t *testing.T) {
 	defer func() { _ = providers.Shutdown(ctx) }()
 
 	var buf bytes.Buffer
-	logger := observability.SetupLogger(slog.LevelInfo, providers.LoggerProvider, &buf)
+	logger := observability.SetupLogger("test-service", slog.LevelInfo, providers.LoggerProvider, &buf)
 
 	logger.Info("test log message", "key", "value")
 

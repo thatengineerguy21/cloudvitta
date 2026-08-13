@@ -29,9 +29,11 @@ func main() {
 
 	ctx := context.Background()
 
+	serviceName := "cloudvitta-api"
+
 	// --- Observability & OpenTelemetry Setup ---
 	otelProviders, err := observability.InitOTel(ctx, observability.Config{
-		ServiceName: "cloudvitta-api",
+		ServiceName: serviceName,
 		Endpoint:    os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		Headers:     os.Getenv("OTEL_EXPORTER_OTLP_HEADERS"),
 	})
@@ -49,21 +51,21 @@ func main() {
 	if err := level.UnmarshalText([]byte(cfg.Primary.LogLevel)); err != nil {
 		level = slog.LevelInfo
 	}
-	logger := observability.SetupLogger(level, otelProviders.LoggerProvider, os.Stdout)
+	logger := observability.SetupLogger(serviceName, level, otelProviders.LoggerProvider, os.Stdout)
 	slog.SetDefault(logger)
 
-	slog.Info("starting CloudVitta API server", "port", cfg.Server.Port, "environment", cfg.Primary.Environment)
+	slog.InfoContext(ctx, "starting CloudVitta API server", "port", cfg.Server.Port, "environment", cfg.Primary.Environment)
 
 	// --- Cache Metrics ---
 	cacheMetrics, err := observability.NewCacheMetrics(otelProviders.Meter)
 	if err != nil {
-		slog.Error("failed to create cache metrics", "error", err)
+		slog.ErrorContext(ctx, "failed to create cache metrics", "error", err)
 	}
 
 	// --- Database ---
 	dbPool, err := store.NewPool(ctx, cfg.Database)
 	if err != nil {
-		slog.Error("database connection failed", "error", err)
+		slog.ErrorContext(ctx, "database connection failed", "error", err)
 		os.Exit(1)
 	}
 	defer dbPool.Close()
@@ -78,7 +80,7 @@ func main() {
 				parsed.User = nil
 				safeURL = parsed.String()
 			}
-			slog.Warn("failed to connect to redis, proceeding with database-only read path", "url", safeURL, "error", err)
+			slog.WarnContext(ctx, "failed to connect to redis, proceeding with database-only read path", "url", safeURL, "error", err)
 		} else {
 			defer func() { _ = rc.Close() }()
 			redisClient = rc
@@ -109,20 +111,20 @@ func main() {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server failed", "error", err)
+			slog.ErrorContext(ctx, "server failed", "error", err)
 			os.Exit(1)
 		}
 	}()
 
 	<-shutdown
-	slog.Info("shutting down CloudVitta API server gracefully...")
+	slog.InfoContext(ctx, "shutting down CloudVitta API server gracefully...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		slog.Error("server forced to shutdown", "error", err)
+		slog.ErrorContext(shutdownCtx, "server forced to shutdown", "error", err)
 	}
 
-	slog.Info("server exited cleanly")
+	slog.InfoContext(ctx, "server exited cleanly")
 }

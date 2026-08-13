@@ -64,15 +64,20 @@ func NewPricingService(queries *store.Queries, redisClient redis.Cmdable, opts .
 func (s *PricingService) GetComputePrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
 	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, regionGroup)
 
-	if s.tracer != nil {
-		var span trace.Span
-		ctx, span = s.tracer.Start(ctx, "Cache Read")
-		defer span.End()
-	}
-
 	// 1. Try Cache-Aside Read from Redis
 	if s.redisClient != nil {
-		cachedObs, err := cache.Get(ctx, s.redisClient, cacheKey)
+		cacheCtx := ctx
+		var cacheSpan trace.Span
+		if s.tracer != nil {
+			cacheCtx, cacheSpan = s.tracer.Start(ctx, "Cache Read")
+		}
+
+		cachedObs, err := cache.Get(cacheCtx, s.redisClient, cacheKey)
+
+		if cacheSpan != nil {
+			cacheSpan.End()
+		}
+
 		if err == nil {
 			if s.cacheMetrics != nil {
 				s.cacheMetrics.RecordHit(ctx)
@@ -80,7 +85,7 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 			return cachedObs, nil
 		}
 		if !errors.Is(err, cache.ErrCacheMiss) {
-			slog.Warn("cache read error, proceeding to DB fallback", "key", cacheKey, "error", err)
+			slog.WarnContext(ctx, "cache read error, proceeding to DB fallback", "key", cacheKey, "error", err)
 		}
 	}
 
