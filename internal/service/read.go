@@ -51,8 +51,13 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 	}
 
 	// 2. Singleflight Collapse on Cache Miss
-	val, err, _ := s.sfGroup.Do(cacheKey, func() (interface{}, error) {
-		dbRows, dbErr := s.queries.GetPriceObservations(ctx, store.GetPriceObservationsParams{
+	ch := s.sfGroup.DoChan(cacheKey, func() (interface{}, error) {
+		// Detach DB context from caller's context so single request cancellation
+		// doesn't fail the underlying shared query for all waiting requests.
+		dbCtx, dbCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer dbCancel()
+
+		dbRows, dbErr := s.queries.GetPriceObservations(dbCtx, store.GetPriceObservationsParams{
 			Provider:        provider,
 			ServiceCategory: category,
 			RegionGroup:     regionGroup,
@@ -72,22 +77,27 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 
 		// 3. Event-driven cache warming after DB fetch
 		if s.redisClient != nil && len(regionObs) > 0 {
-			_ = cache.Warm(ctx, s.redisClient, cacheKey, regionObs, cache.DefaultTTL)
+			warmCtx, warmCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = cache.Warm(warmCtx, s.redisClient, cacheKey, regionObs, cache.DefaultTTL)
+			warmCancel()
 		}
 
 		return regionObs, nil
 	})
 
-	if err != nil {
-		return nil, err
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		obs, ok := res.Val.([]domain.PriceObservation)
+		if !ok {
+			return nil, fmt.Errorf("pricing service: unexpected singleflight return type %T", res.Val)
+		}
+		return obs, nil
 	}
-
-	obs, ok := val.([]domain.PriceObservation)
-	if !ok {
-		return nil, fmt.Errorf("pricing service: unexpected singleflight return type %T", val)
-	}
-
-	return obs, nil
 }
 
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {

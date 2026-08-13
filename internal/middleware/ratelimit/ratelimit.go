@@ -1,4 +1,4 @@
-package middleware
+package ratelimit
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
 
 // RateLimiter holds configuration for the Redis-backed per-IP rate limiter.
@@ -90,7 +91,7 @@ func (rl *RateLimiter) Handler(next http.Handler) http.Handler {
 			}
 
 			w.Header().Set("Retry-After", strconv.FormatInt(secondsRemaining, 10))
-			WriteJSONError(
+			middleware.WriteJSONError(
 				w, r,
 				http.StatusTooManyRequests,
 				"https://cloudvitta.dev/errors/rate-limit-exceeded",

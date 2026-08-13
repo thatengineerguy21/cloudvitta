@@ -34,3 +34,11 @@ type FetchResult struct {
 	Observations []PriceObservation
 	RawGCSPath   string
 }
+
+// ScoredComputeObservation represents a scored and filtered observation.
+type ScoredComputeObservation struct {
+	Observation       PriceObservation
+	MatchQuality      string
+	MatchDeltaPct     float64
+	MissingAttributes []string
+}

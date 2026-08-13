@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strconv"
 	"strings"
@@ -289,5 +290,75 @@ func TestPricingService_GetComputePrices_CacheMissTTLFallback(t *testing.T) {
 	}
 	if ttl <= 0 {
 		t.Fatalf("expected positive TTL, got %v", ttl)
+	}
+}
+
+func TestPricingService_GetComputePrices_SingleflightCancellation(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	dbURL := testDatabaseURL(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	u, pool := setupTestDBPool(t, ctx, dbURL)
+	_ = u
+	defer pool.Close()
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("pool.Begin: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	spy := &spyDBTX{DBTX: tx}
+	queries := store.New(spy)
+
+	// We don't necessarily need to insert data; getting a valid empty result or any result is fine
+	// as long as the second caller completes successfully despite the first caller canceling.
+	svc := service.NewPricingService(queries, rdb)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Caller 1 context will be cancelled almost immediately
+	ctx1, cancel1 := context.WithCancel(ctx)
+
+	var err1 error
+	go func() {
+		defer wg.Done()
+		_, err1 = svc.GetComputePrices(ctx1, "aws", "compute", "us-cancel-test")
+	}()
+
+	// Caller 2 context remains live
+	ctx2, cancel2 := context.WithCancel(ctx)
+	defer cancel2()
+
+	var err2 error
+	go func() {
+		defer wg.Done()
+		// Sleep slightly to ensure Caller 1 starts the singleflight block first
+		time.Sleep(10 * time.Millisecond)
+		_, err2 = svc.GetComputePrices(ctx2, "aws", "compute", "us-cancel-test")
+	}()
+
+	// Cancel Caller 1 after giving it a chance to enter Singleflight DoChan
+	time.Sleep(20 * time.Millisecond)
+	cancel1()
+
+	wg.Wait()
+
+	if err1 == nil || !errors.Is(err1, context.Canceled) {
+		t.Errorf("expected caller 1 to fail with context.Canceled, got %v", err1)
+	}
+
+	if err2 != nil {
+		t.Errorf("expected caller 2 to succeed despite caller 1 cancellation, got error: %v", err2)
 	}
 }

@@ -1,4 +1,4 @@
-package middleware_test
+package ratelimit_test
 
 import (
 	"net/http"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
-	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
+	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 )
 
 func TestExtractClientIP(t *testing.T) {
@@ -30,30 +30,30 @@ func TestExtractClientIP(t *testing.T) {
 			wantIP:     "203.0.113.195",
 		},
 		{
-			name:       "No XFF header falls back to RemoteAddr host",
-			headers:    map[string]string{},
-			remoteAddr: "192.0.2.1:54321",
-			wantIP:     "192.0.2.1",
+			name:       "X-Forwarded-For chain takes last element",
+			headers:    map[string]string{"X-Forwarded-For": "1.2.3.4, 5.6.7.8, 9.10.11.12"},
+			remoteAddr: "10.0.0.1:1234",
+			wantIP:     "9.10.11.12",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.RemoteAddr = tt.remoteAddr
-			for k, v := range tt.headers {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			for k, v := range tc.headers {
 				req.Header.Set(k, v)
 			}
+			req.RemoteAddr = tc.remoteAddr
 
-			got := middleware.ExtractClientIP(req)
-			if got != tt.wantIP {
-				t.Errorf("ExtractClientIP() = %q, want %q", got, tt.wantIP)
+			ip := ratelimit.ExtractClientIP(req)
+			if ip != tc.wantIP {
+				t.Errorf("expected %q, got %q", tc.wantIP, ip)
 			}
 		})
 	}
 }
 
-func TestRateLimiter_ExceedLimit(t *testing.T) {
+func TestRateLimiter(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -63,13 +63,13 @@ func TestRateLimiter_ExceedLimit(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	defer func() { _ = rdb.Close() }()
 
-	limiter := middleware.NewRateLimiter(rdb, 2) // limit to 2 req/min
+	rl := ratelimit.NewRateLimiter(rdb, 2) // limit to 2 requests/min
 
 	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handlerToTest := limiter.Handler(dummyHandler)
+	handlerToTest := rl.Handler(dummyHandler)
 
 	for i := 1; i <= 2; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute", nil)

@@ -2,11 +2,11 @@ package rest
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
@@ -21,9 +21,9 @@ type ComputeComparisonMeta struct {
 
 // PriceDetail represents price details in a result entry.
 type PriceDetail struct {
-	Amount   float64 `json:"amount"`
-	Unit     string  `json:"unit"`
-	Currency string  `json:"currency"`
+	Amount   decimal.Decimal `json:"amount"`
+	Unit     string          `json:"unit"`
+	Currency string          `json:"currency"`
 }
 
 // ComputeResultEntry represents a single provider result item in the comparison response envelope.
@@ -35,7 +35,7 @@ type ComputeResultEntry struct {
 	MatchDeltaPct       float64                  `json:"match_delta_pct"`
 	MissingAttributes   []string                 `json:"missing_attributes"`
 	Price               PriceDetail              `json:"price"`
-	NormalizedHourlyUSD float64                  `json:"normalized_hourly_usd"`
+	NormalizedHourlyUSD decimal.Decimal          `json:"normalized_hourly_usd"`
 	FetchedAt           time.Time                `json:"fetched_at"`
 	Stale               bool                     `json:"stale"`
 }
@@ -94,9 +94,35 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		region = "us-east"
 	}
 
+	// Build warnings array for Stage 0 (only AWS ingested)
+	warnings := []ProviderWarning{
+		{Provider: "azure", Code: "not_yet_ingested", Message: "Azure ingestion lands in stage 1."},
+		{Provider: "gcp", Code: "not_yet_ingested", Message: "GCP ingestion lands in stage 1."},
+		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
+		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
+		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
+		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
+	}
+
 	currency := q.Get("currency")
-	if currency == "" {
-		currency = "USD"
+	reqCurrency := currency
+	if reqCurrency == "" {
+		reqCurrency = "USD"
+	}
+	if currency != "" && currency != "USD" {
+		warnings = append(warnings, ProviderWarning{
+			Provider: "system",
+			Code:     "currency_conversion_not_yet_supported",
+			Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
+		})
+	}
+	currency = "USD"
+
+	strictFamily := false
+	if strictStr := q.Get("strict_family"); strictStr != "" {
+		if b, err := strconv.ParseBool(strictStr); err == nil {
+			strictFamily = b
+		}
 	}
 
 	var reqVCPU float64
@@ -122,73 +148,38 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Fetch compute prices from PricingService (which uses cache-aside + singleflight)
 	obsList, err := h.pricingSvc.GetComputePrices(r.Context(), "aws", "compute", region)
 	if err != nil {
-		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-server-error", "Internal Server Error", err.Error())
+		status, errType, title := middleware.MapServiceError(err)
+		middleware.WriteJSONError(w, r, status, errType, title, err.Error())
 		return
 	}
 
-	// Score & filter results
+	// Score & filter results using the service layer
+	scoredList := service.ScoreComputeObservations(reqVCPU, reqRAMGB, strictFamily, obsList)
+
 	var results []ComputeResultEntry
-	for _, obs := range obsList {
-		quality := "exact"
-		deltaPct := 0.0
-
-		if reqVCPU > 0 || reqRAMGB > 0 {
-			var vcpuDelta float64
-			if reqVCPU > 0 {
-				vcpuDelta = math.Abs(obs.Attributes.VCPU-reqVCPU) / reqVCPU
-			}
-
-			var ramDelta float64
-			if reqRAMGB > 0 {
-				ramDelta = math.Abs(obs.Attributes.RAMGB-reqRAMGB) / reqRAMGB
-			}
-
-			deltaPct = (vcpuDelta + ramDelta) * 100.0
-			if deltaPct == 0.0 {
-				quality = "exact"
-			} else if deltaPct <= 50.0 {
-				quality = "close"
-			} else {
-				// Delta too high, skip candidate
-				continue
-			}
-		}
-
-		priceFloat, _ := obs.PriceAmount.Float64()
-		missingAttrs := []string{}
-
+	for _, scored := range scoredList {
 		results = append(results, ComputeResultEntry{
-			Provider:          obs.Provider,
-			SkuID:             obs.SkuID,
-			MatchedSpec:       obs.Attributes,
-			MatchQuality:      quality,
-			MatchDeltaPct:     math.Round(deltaPct*100) / 100,
-			MissingAttributes: missingAttrs,
+			Provider:          scored.Observation.Provider,
+			SkuID:             scored.Observation.SkuID,
+			MatchedSpec:       scored.Observation.Attributes,
+			MatchQuality:      scored.MatchQuality,
+			MatchDeltaPct:     scored.MatchDeltaPct,
+			MissingAttributes: scored.MissingAttributes,
 			Price: PriceDetail{
-				Amount:   priceFloat,
+				Amount:   scored.Observation.PriceAmount,
 				Unit:     "hour",
 				Currency: currency,
 			},
-			NormalizedHourlyUSD: priceFloat,
-			FetchedAt:           obs.FetchedAt,
+			NormalizedHourlyUSD: scored.Observation.PriceAmount,
+			FetchedAt:           scored.Observation.FetchedAt,
 			Stale:               false,
 		})
-	}
-
-	// Build warnings array for Stage 0 (only AWS ingested)
-	warnings := []ProviderWarning{
-		{Provider: "azure", Code: "not_yet_ingested", Message: "Azure ingestion lands in stage 1."},
-		{Provider: "gcp", Code: "not_yet_ingested", Message: "GCP ingestion lands in stage 1."},
-		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
-		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
-		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
-		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
 	}
 
 	queryMeta := map[string]interface{}{
 		"category": "compute",
 		"region":   region,
-		"currency": currency,
+		"currency": reqCurrency,
 	}
 	if reqVCPU > 0 {
 		queryMeta["vcpu"] = reqVCPU
