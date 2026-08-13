@@ -16,6 +16,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
+	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
 )
 
 func main() {
@@ -59,21 +60,15 @@ func main() {
 		}
 	}
 
-	// --- Services ---
+	// --- Services & Router ---
 	queries := store.New(dbPool)
-	_ = service.NewPricingService(queries, redisClient)
+	pricingSvc := service.NewPricingService(queries, redisClient)
+	router := rest.NewRouter(pricingSvc, dbPool, redisClient)
 
 	// --- HTTP Server ---
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok","service":"cloudvitta-api"}`))
-	})
-
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      mux,
+		Handler:      router,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,

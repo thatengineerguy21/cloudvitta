@@ -13,7 +13,6 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"golang.org/x/sync/singleflight"
 )
@@ -34,11 +33,11 @@ func NewPricingService(queries *store.Queries, redisClient redis.Cmdable) *Prici
 	}
 }
 
-// GetComputePrices retrieves compute pricing observations for provider, category, and region.
+// GetComputePrices retrieves compute pricing observations for provider, category, and regionGroup.
 // It attempts a Redis read first; on miss, it uses singleflight to collapse concurrent DB queries,
-// queries Postgres by region_group, filters for the region, and warms the cache before returning.
-func (s *PricingService) GetComputePrices(ctx context.Context, provider, category, region string) ([]domain.PriceObservation, error) {
-	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, region)
+// queries Postgres by regionGroup, and warms the cache before returning.
+func (s *PricingService) GetComputePrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
+	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, regionGroup)
 
 	// 1. Try Cache-Aside Read from Redis
 	if s.redisClient != nil {
@@ -52,20 +51,8 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 	}
 
 	// 2. Singleflight Collapse on Cache Miss
-	// Use DoChan to prevent the first caller's context cancellation from failing the DB query
-	// for all other concurrent waiters.
-	ch := s.sfGroup.DoChan(cacheKey, func() (interface{}, error) {
-		// Resolve region to region_group for DB query
-		regionGroup, regErr := regionmap.MapRegion(provider, region)
-		if regErr != nil {
-			return nil, fmt.Errorf("pricing service: resolve region group: %w", regErr)
-		}
-
-		// Use a standalone bounded context for the actual database fetch
-		dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer dbCancel()
-
-		dbRows, dbErr := s.queries.GetPriceObservations(dbCtx, store.GetPriceObservationsParams{
+	val, err, _ := s.sfGroup.Do(cacheKey, func() (interface{}, error) {
+		dbRows, dbErr := s.queries.GetPriceObservations(ctx, store.GetPriceObservationsParams{
 			Provider:        provider,
 			ServiceCategory: category,
 			RegionGroup:     regionGroup,
@@ -76,11 +63,6 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 
 		var regionObs []domain.PriceObservation
 		for _, row := range dbRows {
-			// DB queries by region_group, so filter for exact requested region
-			if row.Region != region {
-				continue
-			}
-
 			obs, mapErr := mapStoreToDomain(row)
 			if mapErr != nil {
 				return nil, fmt.Errorf("pricing service: map store row: %w", mapErr)
@@ -90,30 +72,22 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 
 		// 3. Event-driven cache warming after DB fetch
 		if s.redisClient != nil && len(regionObs) > 0 {
-			// Use background context for warming so caller cancellation doesn't stop the cache write
-			warmCtx, warmCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer warmCancel()
-			_ = cache.Warm(warmCtx, s.redisClient, cacheKey, regionObs, cache.DefaultTTL)
+			_ = cache.Warm(ctx, s.redisClient, cacheKey, regionObs, cache.DefaultTTL)
 		}
 
 		return regionObs, nil
 	})
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case res := <-ch:
-		if res.Err != nil {
-			return nil, res.Err
-		}
-
-		obs, ok := res.Val.([]domain.PriceObservation)
-		if !ok {
-			return nil, fmt.Errorf("pricing service: unexpected singleflight return type %T", res.Val)
-		}
-
-		return obs, nil
+	if err != nil {
+		return nil, err
 	}
+
+	obs, ok := val.([]domain.PriceObservation)
+	if !ok {
+		return nil, fmt.Errorf("pricing service: unexpected singleflight return type %T", val)
+	}
+
+	return obs, nil
 }
 
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {
