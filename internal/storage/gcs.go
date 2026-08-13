@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"cloud.google.com/go/storage"
 )
 
 // RawStorage defines the interface for persisting raw provider responses to storage.
@@ -55,4 +57,34 @@ func (m *MemoryRawStorage) GetFiles() map[string][]byte {
 		copyMap[k] = v
 	}
 	return copyMap
+}
+
+// GCSStorage is a Google Cloud Storage implementation of RawStorage.
+type GCSStorage struct {
+	client     *storage.Client
+	bucketName string
+}
+
+// NewGCSStorage constructs a new GCSStorage instance.
+func NewGCSStorage(client *storage.Client, bucketName string) *GCSStorage {
+	return &GCSStorage{
+		client:     client,
+		bucketName: bucketName,
+	}
+}
+
+// WriteStream streams data from r into the specified GCS object path within bucketName.
+func (g *GCSStorage) WriteStream(ctx context.Context, path string, r io.Reader) error {
+	if g.bucketName == "" {
+		return fmt.Errorf("gcs storage: bucket name is empty")
+	}
+	wc := g.client.Bucket(g.bucketName).Object(path).NewWriter(ctx)
+	if _, err := io.Copy(wc, r); err != nil {
+		_ = wc.Close()
+		return fmt.Errorf("gcs storage: copy to object %s failed: %w", path, err)
+	}
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("gcs storage: close writer for object %s failed: %w", path, err)
+	}
+	return nil
 }
