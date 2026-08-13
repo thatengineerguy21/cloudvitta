@@ -10,11 +10,12 @@ import (
 )
 
 type Config struct {
-	Primary  PrimaryConfig  `koanf:"primary" validate:"required"`
-	Server   ServerConfig   `koanf:"server" validate:"required"`
-	Database DatabaseConfig `koanf:"database" validate:"required"`
-	Redis    RedisConfig    `koanf:"redis" validate:"required"`
-	Storage  StorageConfig  `koanf:"storage" validate:"required"`
+	Primary       PrimaryConfig       `koanf:"primary" validate:"required"`
+	Server        ServerConfig        `koanf:"server" validate:"required"`
+	Database      DatabaseConfig      `koanf:"database" validate:"required"`
+	Redis         RedisConfig         `koanf:"redis" validate:"required"`
+	Storage       StorageConfig       `koanf:"storage" validate:"required"`
+	Observability ObservabilityConfig `koanf:"observability"`
 }
 
 type PrimaryConfig struct {
@@ -40,13 +41,13 @@ type DatabaseConfig struct {
 	// SSLMode specifies the SSL connection mode.
 	SSLMode string `koanf:"ssl_mode" validate:"required"`
 	// MaxOpenConns specifies maximum open database connections.
-	MaxOpenConns int `koanf:"max_open_conns" validate:"required"`
+	MaxOpenConns int `koanf:"max_open_conns"`
 	// MaxIdleConns specifies maximum idle database connections.
-	MaxIdleConns int `koanf:"max_idle_conns" validate:"required"`
+	MaxIdleConns int `koanf:"max_idle_conns"`
 	// ConnMaxLifetime specifies maximum connection lifetime in seconds.
-	ConnMaxLifetime int `koanf:"conn_max_lifetime" validate:"required"`
+	ConnMaxLifetime int `koanf:"conn_max_lifetime"`
 	// ConnMaxIdleTime specifies maximum idle time in seconds.
-	ConnMaxIdleTime int `koanf:"conn_max_idle_time" validate:"required"`
+	ConnMaxIdleTime int `koanf:"conn_max_idle_time"`
 }
 
 // applyDefaults sets conservative pool defaults when no override is provided.
@@ -72,6 +73,11 @@ type RedisConfig struct {
 
 type StorageConfig struct {
 	GCSBucketName string `koanf:"gcs_bucket_name" validate:"required"`
+}
+
+type ObservabilityConfig struct {
+	OTLPEndpoint string `koanf:"otlp_endpoint"`
+	OTLPHeaders  string `koanf:"otlp_headers"`
 }
 
 func Load() (*Config, error) {

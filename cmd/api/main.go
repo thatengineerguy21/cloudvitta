@@ -34,8 +34,8 @@ func main() {
 	// --- Observability & OpenTelemetry Setup ---
 	otelProviders, err := observability.InitOTel(ctx, observability.Config{
 		ServiceName: serviceName,
-		Endpoint:    os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
-		Headers:     os.Getenv("OTEL_EXPORTER_OTLP_HEADERS"),
+		Endpoint:    cfg.Observability.OTLPEndpoint,
+		Headers:     cfg.Observability.OTLPHeaders,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "OpenTelemetry initialization error: %v\n", err)

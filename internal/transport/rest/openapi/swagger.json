@@ -1,0 +1,215 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/api/v1/prices/compute": {
+            "get": {
+                "description": "Returns normalized compute pricing across cloud providers for requested specs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "prices"
+                ],
+                "summary": "Get compute pricing comparison",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Requested vCPU count (e.g. 4)",
+                        "name": "vcpu",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Requested RAM in GB (e.g. 16)",
+                        "name": "ram_gb",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Canonical region group (default: us-east)",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency code (default: USD)",
+                        "name": "currency",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Strict instance family matching",
+                        "name": "strict_family",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rest.ComputeComparisonResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "domain.ComputeAttributes": {
+            "type": "object",
+            "properties": {
+                "family": {
+                    "type": "string"
+                },
+                "ram_gb": {
+                    "type": "number"
+                },
+                "vcpu": {
+                    "type": "number"
+                }
+            }
+        },
+        "middleware.RFC7807Error": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string"
+                },
+                "instance": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.ComputeComparisonMeta": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "query": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "rest.ComputeComparisonResponse": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/rest.ComputeComparisonMeta"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.ComputeResultEntry"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.ProviderWarning"
+                    }
+                }
+            }
+        },
+        "rest.ComputeResultEntry": {
+            "type": "object",
+            "properties": {
+                "fetched_at": {
+                    "type": "string"
+                },
+                "match_delta_pct": {
+                    "type": "number"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "matched_spec": {
+                    "$ref": "#/definitions/domain.ComputeAttributes"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
+                "price": {
+                    "$ref": "#/definitions/rest.PriceDetail"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "rest.PriceDetail": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.ProviderWarning": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

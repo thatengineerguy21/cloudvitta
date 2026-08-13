@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 // DefaultEC2PriceListURL is the standard AWS Price List API URL for EC2 us-east-1.
@@ -37,7 +36,7 @@ func WithURL(url string) Option {
 // NewClient constructs a new AWS client.
 func NewClient(opts ...Option) *Client {
 	c := &Client{
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: &http.Client{},
 		url:        DefaultEC2PriceListURL,
 	}
 	for _, opt := range opts {
