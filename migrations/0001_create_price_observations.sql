@@ -1,5 +1,6 @@
 -- 0001_create_price_observations.sql
--- Creates the price_observations table and its primary lookup index.
+-- Strategy: Forward-Only Migration (No rollback/down migration script).
+-- Purpose: Creates the price_observations table and its primary lookup index.
 
 CREATE TABLE IF NOT EXISTS price_observations (
     id               BIGSERIAL PRIMARY KEY,
@@ -23,4 +24,3 @@ CREATE TABLE IF NOT EXISTS price_observations (
 
 CREATE INDEX IF NOT EXISTS idx_price_lookup
     ON price_observations (provider, service_category, region_group, fetched_at DESC);
-

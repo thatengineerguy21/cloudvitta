@@ -9,3 +9,4 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 ## Index of ADRs
 
 - [0001-record-architecture-decisions.md](file:///docs/adr/0001-record-architecture-decisions.md): Record architecture decisions using ADRs
+- [0028-forward-only-database-migrations.md](file:///docs/adr/0028-forward-only-database-migrations.md): Forward-Only Database Migrations
