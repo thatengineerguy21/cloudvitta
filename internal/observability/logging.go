@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/lmittmann/tint"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/trace"
@@ -63,7 +64,7 @@ func (m *MultiHandler) WithGroup(name string) slog.Handler {
 	return &MultiHandler{handlers: newHandlers}
 }
 
-// SetupLogger builds a multi-handler slog.Logger that outputs JSON to stdout and sends logs to OTel.
+// SetupLogger builds a multi-handler slog.Logger that outputs colored text to stdout and sends logs to OTel.
 func SetupLogger(serviceName string, level slog.Level, lp *sdklog.LoggerProvider, out io.Writer) *slog.Logger {
 	if serviceName == "" {
 		serviceName = "cloudvitta"
@@ -72,7 +73,9 @@ func SetupLogger(serviceName string, level slog.Level, lp *sdklog.LoggerProvider
 		out = os.Stdout
 	}
 
-	stdoutHandler := slog.NewJSONHandler(out, &slog.HandlerOptions{Level: level})
+	stdoutHandler := tint.NewHandler(out, &tint.Options{
+		Level: level,
+	})
 	otelHandler := otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))
 
 	multi := NewMultiHandler(stdoutHandler, otelHandler)

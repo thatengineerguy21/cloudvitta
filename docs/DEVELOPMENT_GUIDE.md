@@ -196,3 +196,35 @@ go test -race ./...
 go vet ./...
 golangci-lint run
 ```
+
+---
+
+## 8. Exploring Observability Data in Grafana Cloud
+
+CloudVitta exports standard OpenTelemetry traces, metrics, and logs to Grafana Cloud. Here is how to navigate the Grafana UI to understand your application data:
+
+### 1. Traces (Tempo)
+Distributed traces show you exactly how long a specific HTTP request took and break down the internal operations (e.g., Cache Read vs. Postgres Query).
+* **How to view**:
+  1. Open the **Explore** tab (compass icon) in Grafana.
+  2. Select your traces data source (e.g., `grafanacloud-<name>-traces`).
+  3. Use the "Search" tab, filter by Service Name: `cloudvitta-api`.
+  4. Click **Run Query**. Click on any Trace ID to see the waterfall visualization of operations and their durations.
+
+### 2. Logs (Loki)
+Structured logs are forwarded automatically with `trace_id` attached, allowing you to correlate a log line directly to a slow request.
+* **How to view**:
+  1. Open the **Explore** tab.
+  2. Select your logs data source (e.g., `grafanacloud-<name>-logs`).
+  3. In the query builder, use the label filter: `{service_name="cloudvitta-api"}` or `{service_name="cloudvitta"}`.
+  4. Click **Run Query** to see live, structured logs.
+
+### 3. Application Metrics (Prometheus)
+Metrics track aggregated health indicators like Request Rate (RPS), Error Rate, Request Duration, and custom metrics (e.g., `cache_requests_total`).
+* **How to view Application Dashboards**:
+  1. Go to **Observability > Application > Services** in the left sidebar.
+  2. Select `cloudvitta-api`. Grafana automatically generates RED (Rate, Errors, Duration) dashboards based on OpenTelemetry HTTP metrics.
+* **How to query Custom Metrics manually**:
+  1. Open the **Explore** tab.
+  2. Select your metrics data source (e.g., `grafanacloud-<name>-prom`).
+  3. Run the query: `cache_requests_total` to see the breakdown of cache hits vs. misses.
