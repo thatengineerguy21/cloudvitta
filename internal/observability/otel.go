@@ -64,8 +64,12 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 	// 1. Tracer Provider Setup
 	var tp *sdktrace.TracerProvider
 	if cfg.Endpoint != "" {
+		traceEndpoint := strings.TrimRight(cfg.Endpoint, "/")
+		if !strings.HasSuffix(traceEndpoint, "/v1/traces") {
+			traceEndpoint += "/v1/traces"
+		}
 		traceOpts := []otlptracehttp.Option{
-			otlptracehttp.WithEndpointURL(cfg.Endpoint),
+			otlptracehttp.WithEndpointURL(traceEndpoint),
 		}
 		if len(headers) > 0 {
 			traceOpts = append(traceOpts, otlptracehttp.WithHeaders(headers))
@@ -90,8 +94,12 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 
 	meterReaders := []sdkmetric.Reader{promExporter}
 	if cfg.Endpoint != "" {
+		metricEndpoint := strings.TrimRight(cfg.Endpoint, "/")
+		if !strings.HasSuffix(metricEndpoint, "/v1/metrics") {
+			metricEndpoint += "/v1/metrics"
+		}
 		metricOpts := []otlpmetrichttp.Option{
-			otlpmetrichttp.WithEndpointURL(cfg.Endpoint),
+			otlpmetrichttp.WithEndpointURL(metricEndpoint),
 		}
 		if len(headers) > 0 {
 			metricOpts = append(metricOpts, otlpmetrichttp.WithHeaders(headers))
@@ -113,8 +121,12 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 	// 3. Logger Provider Setup
 	var lp *sdklog.LoggerProvider
 	if cfg.Endpoint != "" {
+		logEndpoint := strings.TrimRight(cfg.Endpoint, "/")
+		if !strings.HasSuffix(logEndpoint, "/v1/logs") {
+			logEndpoint += "/v1/logs"
+		}
 		logOpts := []otlploghttp.Option{
-			otlploghttp.WithEndpointURL(cfg.Endpoint),
+			otlploghttp.WithEndpointURL(logEndpoint),
 		}
 		if len(headers) > 0 {
 			logOpts = append(logOpts, otlploghttp.WithHeaders(headers))
@@ -133,6 +145,10 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 
 	tracer := tp.Tracer(cfg.ServiceName)
 	meter := mp.Meter(cfg.ServiceName)
+
+	// Set global providers so instrumentation libraries like otelhttp can use them
+	otel.SetTracerProvider(tp)
+	otel.SetMeterProvider(mp)
 
 	shutdown := func(shutdownCtx context.Context) error {
 		var errs []error
