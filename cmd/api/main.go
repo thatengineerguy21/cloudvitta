@@ -71,7 +71,7 @@ func main() {
 	defer dbPool.Close()
 
 	// --- Redis Cache ---
-	var redisClient *redis.Client
+	var redisClient redis.Cmdable
 	if cfg.Redis.URL != "" {
 		rc, err := cache.NewClient(cfg.Redis.URL)
 		if err != nil {

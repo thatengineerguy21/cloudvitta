@@ -58,8 +58,8 @@ func run() error {
 	defer func() { _ = gcsClient.Close() }()
 	rawStorage := storage.NewGCSStorage(gcsClient, cfg.Storage.GCSBucketName)
 
-	// --- Cache ---
-	var redisClient *redis.Client
+	// --- Redis Cache ---
+	var redisClient redis.Cmdable
 	if cfg.Redis.URL != "" {
 		rc, err := cache.NewClient(cfg.Redis.URL)
 		if err != nil {
@@ -68,7 +68,7 @@ func run() error {
 				parsed.User = nil
 				safeURL = parsed.String()
 			}
-			slog.Warn("failed to connect to redis, proceeding without cache warming", "url", safeURL, "error", err)
+			slog.WarnContext(ctx, "failed to connect to redis, proceeding without DLQ/Cache", "url", safeURL, "error", err)
 		} else {
 			defer func() { _ = rc.Close() }()
 			redisClient = rc

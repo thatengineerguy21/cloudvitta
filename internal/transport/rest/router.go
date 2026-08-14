@@ -20,12 +20,12 @@ func NewRouter(pricingSvc *service.PricingService, dbPool *pgxpool.Pool, redisCl
 	mux := http.NewServeMux()
 
 	// Probes & Metrics (unlimited)
-	mux.HandleFunc("GET /healthz", HandleHealthz)
-	mux.HandleFunc("GET /readyz", HandleReadyz(dbPool, redisClient))
-	mux.Handle("GET /metrics", promhttp.Handler())
+	mux.HandleFunc("/healthz", HandleHealthz)
+	mux.HandleFunc("/readyz", HandleReadyz(dbPool, redisClient))
+	mux.Handle("/metrics", promhttp.Handler())
 
 	// OpenAPI Documentation (unlimited)
-	mux.Handle("GET /docs/", httpSwagger.WrapHandler)
+	mux.Handle("/docs/", httpSwagger.WrapHandler)
 
 	// Setup standard middlewares
 	limiter := ratelimit.NewRateLimiter(redisClient, 60) // 60 req/min/IP
