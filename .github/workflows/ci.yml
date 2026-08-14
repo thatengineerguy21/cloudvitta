@@ -55,7 +55,7 @@ jobs:
           PGUSER: user
           PGPASSWORD: password
         run: |
-          cd internal/store/migrations
+          cd migrations
           # We echo a minimal tern config to ensure it reads from env vars
           echo "[database]" > tern.conf
           tern migrate

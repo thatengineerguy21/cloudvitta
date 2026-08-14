@@ -56,7 +56,7 @@ jobs:
 
       - name: Run Production Database Migrations
         run: |
-          cd internal/store/migrations
+          cd migrations
           # We create a temporary tern.conf to use the connection string from the secret
           echo "[database]" > tern.conf
           echo "conn_string = env.DATABASE_URL" >> tern.conf
