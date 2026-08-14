@@ -73,7 +73,7 @@ func SetupLogger(serviceName string, level slog.Level, lp *sdklog.LoggerProvider
 		out = os.Stdout
 	}
 
-	stdoutHandler := tint.NewHandler(out, &tint.Options{
+	stdoutHandler := tint.NewTextHandler(out, &tint.Options{
 		Level: level,
 	})
 	otelHandler := otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))
