@@ -29,4 +29,5 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Run the API by default
+USER nonroot:nonroot
 ENTRYPOINT ["/api"]
