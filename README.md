@@ -9,19 +9,19 @@ Comparing cloud costs today means visiting each provider's calculator or pricing
 
 ```mermaid
 flowchart TD
-    Client([Client]) --> RateLimiter[Rate Limiter (Redis)]
+    Client([Client]) --> RateLimiter["Rate Limiter (Redis)"]
     RateLimiter --> Router[HTTP Router]
     
     subgraph CloudVitta
         Router --> Service[Pricing Service]
-        Service --> Cache[(Redis Cache)]
+        Service --> Cache[("Redis Cache")]
         Service --> Singleflight[Singleflight]
-        Singleflight --> Postgres[(Neon Postgres)]
+        Singleflight --> Postgres[("Neon Postgres")]
     end
     
     subgraph Ingestion
         Job[Cloud Scheduler Job] --> Fetcher[Provider Adapters]
-        Fetcher --> GCS[(GCS Raw Storage)]
+        Fetcher --> GCS[("GCS Raw Storage")]
         Fetcher --> Postgres
     end
 ```
