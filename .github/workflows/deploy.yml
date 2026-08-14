@@ -39,19 +39,33 @@ jobs:
         run: |-
           gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and Push Docker Image
-        env:
-          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-        run: |
-          docker build -t $IMAGE_NAME .
-          docker push $IMAGE_NAME
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Set up Go (for Tern)
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache: true
+
+      - name: Cache Tern
+        id: cache-tern
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/tern
+          key: ${{ runner.os }}-tern-v2
 
       - name: Install Tern
+        if: steps.cache-tern.outputs.cache-hit != 'true'
         run: go install github.com/jackc/tern/v2@latest
 
       - name: Run Production Database Migrations
@@ -67,7 +81,9 @@ jobs:
         with:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.GCP_REGION }}
-          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
           env_vars: |
             DATABASE_URL=${{ secrets.NEON_PROD_DSN }}
             REDIS_URL=${{ secrets.REDIS_URL }}
+            CLOUDVITTA_PRIMARY_ENVIRONMENT=production
+            CLOUDVITTA_PRIMARY_LOG_LEVEL=info

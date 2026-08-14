@@ -51,6 +51,9 @@ func run() error {
 	defer dbPool.Close()
 
 	// --- Storage ---
+	if cfg.Storage.GCSBucketName == "" {
+		return fmt.Errorf("storage error: GCS bucket name is required for ingestion (set CLOUDVITTA_STORAGE_GCS_BUCKET_NAME or GCS_BUCKET_NAME)")
+	}
 	gcsClient, err := gcsstorage.NewClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create GCS client: %w", err)

@@ -22,8 +22,8 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
+          --health-interval 2s
+          --health-timeout 2s
           --health-retries 5
 
     steps:
@@ -34,6 +34,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache: true
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -43,7 +44,15 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      - name: Cache Tern
+        id: cache-tern
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/tern
+          key: ${{ runner.os }}-tern-v2
+
       - name: Install Tern
+        if: steps.cache-tern.outputs.cache-hit != 'true'
         run: go install github.com/jackc/tern/v2@latest
 
       - name: Run Database Migrations (Tern)
