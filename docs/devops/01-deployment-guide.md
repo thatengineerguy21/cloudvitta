@@ -112,15 +112,14 @@ gcloud iam service-accounts add-iam-policy-binding "${SERVICE_ACCOUNT_EMAIL}" \
 
 ---
 
-## Phase 3: GitHub Secrets Configuration
+## Phase 3: GitHub Secrets and Variables Configuration
 
-Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**.
+### 1. Repository Secrets (Required)
+Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Secrets** -> **New repository secret**.
 
-You need to add the following 4 secrets:
-
-1. **`GCP_PROJECT_ID`**: Your Google Cloud Project ID.
+1. **`GCP_PROJECT_ID`**: Your Google Cloud Project ID (e.g., `cloudvitta-prod`).
 2. **`GCP_SERVICE_ACCOUNT`**: The email of the service account you created (e.g., `cloudvitta-deployer@your-project-id.iam.gserviceaccount.com`).
-3. **`GCP_WORKLOAD_IDENTITY_PROVIDER`**: You can get this exact string by running:
+3. **`GCP_WORKLOAD_IDENTITY_PROVIDER`**: The Workload Identity Provider resource name obtained via:
    ```bash
    gcloud iam workload-identity-pools providers describe "github-provider" \
      --project="${PROJECT_ID}" \
@@ -129,6 +128,14 @@ You need to add the following 4 secrets:
    ```
 4. **`NEON_PROD_DSN`**: The connection string to your production Neon Postgres database (e.g., `postgres://user:password@ep-cool-db-1234.us-east-2.aws.neon.tech/neondb?sslmode=require`).
 5. **`REDIS_URL`**: The connection string for Upstash/Redis (e.g., `rediss://default:password@us1-cool-redis-1234.upstash.io:32451`).
+
+### 2. Repository Variables (Optional Overrides)
+Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Variables** -> **New repository variable**.
+
+* **`GCP_REGION`**: Target GCP region for Cloud Run and Artifact Registry (default: `asia-southeast1`).
+* **`GAR_LOCATION`**: Specific Artifact Registry location if different from `GCP_REGION` (default: value of `GCP_REGION`).
+* **`GAR_REPO`**: Artifact Registry Docker repository name (default: `cloudvitta-repo`).
+* **`SERVICE_NAME`**: Cloud Run service name (default: `cloudvitta-api`).
 
 ---
 

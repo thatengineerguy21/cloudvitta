@@ -6,10 +6,10 @@ on:
       - main
 
 env:
-  GCP_REGION: asia-southeast1
-  GAR_LOCATION: asia-southeast1
-  GAR_REPO: cloudvitta-repo
-  SERVICE_NAME: cloudvitta-api
+  GCP_REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION || 'asia-southeast1' }}
+  GAR_LOCATION: ${{ vars.GAR_LOCATION || secrets.GAR_LOCATION || vars.GCP_REGION || secrets.GCP_REGION || 'asia-southeast1' }}
+  GAR_REPO: ${{ vars.GAR_REPO || secrets.GAR_REPO || 'cloudvitta-repo' }}
+  SERVICE_NAME: ${{ vars.SERVICE_NAME || secrets.SERVICE_NAME || 'cloudvitta-api' }}
 
 jobs:
   deploy:
@@ -41,7 +41,7 @@ jobs:
 
       - name: Build and Push Docker Image
         env:
-          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
         run: |
           docker build -t $IMAGE_NAME .
           docker push $IMAGE_NAME
