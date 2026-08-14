@@ -17,7 +17,7 @@ You will need the `gcloud` CLI installed and authenticated.
 Run this in your terminal:
 ```bash
 export PROJECT_ID="your-google-cloud-project-id"
-export REGION="us-central1"
+export REGION="asia-southeast1"
 export REPO_NAME="cloudvitta-repo"
 export SERVICE_ACCOUNT_NAME="cloudvitta-deployer"
 export GITHUB_REPO="yourusername/CloudVitta"

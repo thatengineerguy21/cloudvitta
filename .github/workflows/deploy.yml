@@ -6,8 +6,8 @@ on:
       - main
 
 env:
-  GCP_REGION: us-central1
-  GAR_LOCATION: us-central1
+  GCP_REGION: asia-southeast1
+  GAR_LOCATION: asia-southeast1
   GAR_REPO: cloudvitta-repo
   SERVICE_NAME: cloudvitta-api
 
