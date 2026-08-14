@@ -57,9 +57,9 @@ jobs:
       - name: Run Production Database Migrations
         run: |
           cd migrations
-          # We create a temporary tern.conf to use the connection string from the secret
-          echo "[database]" > tern.conf
-          echo "conn_string = env.DATABASE_URL" >> tern.conf
+          # We create a temporary tern.conf using Go template syntax for env var interpolation
+          echo '[database]' > tern.conf
+          echo 'conn_string = {{env "DATABASE_URL"}}' >> tern.conf
           DATABASE_URL="${{ secrets.NEON_PROD_DSN }}" tern migrate
 
       - name: Deploy to Cloud Run
