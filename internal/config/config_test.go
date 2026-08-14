@@ -35,6 +35,7 @@ func TestLoad_FromDatabaseURLAndDefaults(t *testing.T) {
 	os.Clearenv()
 	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@ep-test.neon.tech:5432/neondb?sslmode=require")
 	t.Setenv("REDIS_URL", "redis://default:secret@redis.upstash.io:6379")
+	t.Setenv("GCS_BUCKET_NAME", "cloudvitta-raw-fixtures")
 	t.Setenv("PORT", "9090")
 
 	cfg, err := config.Load()
@@ -68,16 +69,61 @@ func TestLoad_FromDatabaseURLAndDefaults(t *testing.T) {
 	if cfg.Redis.URL != "redis://default:secret@redis.upstash.io:6379" {
 		t.Errorf("expected redis url, got %s", cfg.Redis.URL)
 	}
+	if cfg.Storage.GCSBucketName != "cloudvitta-raw-fixtures" {
+		t.Errorf("expected gcs bucket name, got %s", cfg.Storage.GCSBucketName)
+	}
 }
 
 func TestLoad_MissingDatabase(t *testing.T) {
 	os.Clearenv()
 	// No database host or DATABASE_URL provided
 	t.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
+	t.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
+	t.Setenv("CLOUDVITTA_SERVER_PORT", "8080")
+	t.Setenv("CLOUDVITTA_REDIS_URL", "redis://localhost:6379")
+	t.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "test-bucket")
 
 	_, err := config.Load()
 	if err == nil {
 		t.Fatal("expected error for missing database configuration, got nil")
+	}
+}
+
+func TestLoad_MissingRedisURL(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
+	t.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
+	t.Setenv("CLOUDVITTA_SERVER_PORT", "8080")
+	t.Setenv("CLOUDVITTA_DATABASE_HOST", "localhost")
+	t.Setenv("CLOUDVITTA_DATABASE_PORT", "5432")
+	t.Setenv("CLOUDVITTA_DATABASE_USER", "postgres")
+	t.Setenv("CLOUDVITTA_DATABASE_NAME", "cloudvitta")
+	t.Setenv("CLOUDVITTA_DATABASE_SSL_MODE", "disable")
+	t.Setenv("CLOUDVITTA_STORAGE_GCS_BUCKET_NAME", "test-bucket")
+	// Missing REDIS_URL and CLOUDVITTA_REDIS_URL
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing Redis URL, got nil")
+	}
+}
+
+func TestLoad_MissingStorageGCSBucketName(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("CLOUDVITTA_PRIMARY_ENVIRONMENT", "test")
+	t.Setenv("CLOUDVITTA_PRIMARY_LOG_LEVEL", "info")
+	t.Setenv("CLOUDVITTA_SERVER_PORT", "8080")
+	t.Setenv("CLOUDVITTA_DATABASE_HOST", "localhost")
+	t.Setenv("CLOUDVITTA_DATABASE_PORT", "5432")
+	t.Setenv("CLOUDVITTA_DATABASE_USER", "postgres")
+	t.Setenv("CLOUDVITTA_DATABASE_NAME", "cloudvitta")
+	t.Setenv("CLOUDVITTA_DATABASE_SSL_MODE", "disable")
+	t.Setenv("CLOUDVITTA_REDIS_URL", "redis://localhost:6379")
+	// Missing GCS_BUCKET_NAME and CLOUDVITTA_STORAGE_GCS_BUCKET_NAME
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing Storage GCS Bucket Name, got nil")
 	}
 }
 

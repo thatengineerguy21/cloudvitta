@@ -3,7 +3,10 @@
 ## Problem Statement
 Comparing cloud costs today means visiting each provider's calculator or pricing page separately and manually reconciling different units, currencies, and pricing models. There is no single tool for an apples-to-apples, live-data comparison across all major providers. CloudVitta solves this by pulling live pricing from official APIs, normalizing disparate models into comparable units, converting to a single currency, and providing a clean API for cross-cloud cost comparisons.
 
-**Live Demo:** `[TODO: Insert Cloud Run URL after Stage 0.8 deploys]`
+**Live Demo:** [https://cloudvitta-api-pelqqgz3mq-as.a.run.app](https://cloudvitta-api-pelqqgz3mq-as.a.run.app)
+* **Compute Endpoint**: `GET https://cloudvitta-api-pelqqgz3mq-as.a.run.app/api/v1/prices/compute?vcpu=2&ram_gb=8&region=us-east`
+* **Swagger Documentation**: [https://cloudvitta-api-pelqqgz3mq-as.a.run.app/docs/](https://cloudvitta-api-pelqqgz3mq-as.a.run.app/docs/)
+* **Health Check**: [https://cloudvitta-api-pelqqgz3mq-as.a.run.app/healthz](https://cloudvitta-api-pelqqgz3mq-as.a.run.app/healthz)
 
 ## Architecture
 

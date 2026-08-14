@@ -110,6 +110,17 @@ gcloud iam service-accounts add-iam-policy-binding "${SERVICE_ACCOUNT_EMAIL}" \
   --member="principalSet://iam.googleapis.com/${WORKLOAD_IDENTITY_POOL_ID}/attribute.repository/${GITHUB_REPO}"
 ```
 
+### 5. Allow Public Invocations for Cloud Run (One-Time Setup)
+To allow public users to call the CloudVitta API without authentication, grant the `Cloud Run Invoker` role to `allUsers`:
+```bash
+gcloud run services add-iam-policy-binding "${SERVICE_NAME:-cloudvitta-api}" \
+  --region="${REGION}" \
+  --member="allUsers" \
+  --role="roles/run.invoker" \
+  --project="${PROJECT_ID}"
+```
+*Note: The GitHub Actions deploy workflow also specifies `--allow-unauthenticated` on deployments.*
+
 ---
 
 ## Phase 3: GitHub Secrets and Variables Configuration
@@ -136,6 +147,7 @@ Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> 
 * **`GAR_LOCATION`**: Specific Artifact Registry location if different from `GCP_REGION` (default: value of `GCP_REGION`).
 * **`GAR_REPO`**: Artifact Registry Docker repository name (default: `cloudvitta-repo`).
 * **`SERVICE_NAME`**: Cloud Run service name (default: `cloudvitta-api`).
+* **`GCS_BUCKET_NAME`**: GCS raw fixtures bucket name (default: `cloudvitta-raw-fixtures`).
 
 ---
 

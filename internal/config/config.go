@@ -17,8 +17,8 @@ type Config struct {
 	Primary       PrimaryConfig       `koanf:"primary" validate:"required"`
 	Server        ServerConfig        `koanf:"server" validate:"required"`
 	Database      DatabaseConfig      `koanf:"database" validate:"required"`
-	Redis         RedisConfig         `koanf:"redis"`
-	Storage       StorageConfig       `koanf:"storage"`
+	Redis         RedisConfig         `koanf:"redis" validate:"required"`
+	Storage       StorageConfig       `koanf:"storage" validate:"required"`
 	Observability ObservabilityConfig `koanf:"observability"`
 }
 
@@ -54,9 +54,15 @@ type DatabaseConfig struct {
 	ConnMaxIdleTime int `koanf:"conn_max_idle_time"`
 }
 
-// applyDefaults sets conservative pool defaults when no override is provided.
+// applyDefaults sets conservative pool and connection defaults when no override is provided.
 // Cloud Run scales horizontally, so each instance keeps a small pool.
 func (d *DatabaseConfig) applyDefaults() {
+	if d.Port == 0 {
+		d.Port = 5432
+	}
+	if d.SSLMode == "" {
+		d.SSLMode = "require"
+	}
 	if d.MaxOpenConns == 0 {
 		d.MaxOpenConns = 5
 	}
@@ -72,11 +78,11 @@ func (d *DatabaseConfig) applyDefaults() {
 }
 
 type RedisConfig struct {
-	URL string `koanf:"url"`
+	URL string `koanf:"url" validate:"required"`
 }
 
 type StorageConfig struct {
-	GCSBucketName string `koanf:"gcs_bucket_name"`
+	GCSBucketName string `koanf:"gcs_bucket_name" validate:"required"`
 }
 
 type ObservabilityConfig struct {
@@ -106,61 +112,8 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	// 1. Resolve Primary defaults / env fallbacks
-	if mainConfig.Primary.Environment == "" {
-		if envVal := os.Getenv("ENVIRONMENT"); envVal != "" {
-			mainConfig.Primary.Environment = envVal
-		} else {
-			mainConfig.Primary.Environment = "production"
-		}
-	}
-	if mainConfig.Primary.LogLevel == "" {
-		if logVal := os.Getenv("LOG_LEVEL"); logVal != "" {
-			mainConfig.Primary.LogLevel = logVal
-		} else {
-			mainConfig.Primary.LogLevel = "info"
-		}
-	}
-
-	// 2. Resolve Server Port (Cloud Run injects PORT)
-	if mainConfig.Server.Port == 0 {
-		if portStr := os.Getenv("PORT"); portStr != "" {
-			if portVal, pErr := strconv.Atoi(portStr); pErr == nil && portVal > 0 {
-				mainConfig.Server.Port = portVal
-			}
-		}
-	}
-	if mainConfig.Server.Port == 0 {
-		mainConfig.Server.Port = 8080
-	}
-
-	// 3. Resolve Database URL fallback (e.g. DATABASE_URL or CLOUDVITTA_DATABASE_URL)
-	dbURL := os.Getenv("CLOUDVITTA_DATABASE_URL")
-	if dbURL == "" {
-		dbURL = os.Getenv("DATABASE_URL")
-	}
-	if dbURL != "" && (mainConfig.Database.Host == "" || mainConfig.Database.Name == "") {
-		if err := parseDatabaseURL(dbURL, &mainConfig.Database); err != nil {
-			return nil, fmt.Errorf("config: invalid database URL: %w", err)
-		}
-	}
-
-	// 4. Resolve Redis URL fallback
-	if mainConfig.Redis.URL == "" {
-		mainConfig.Redis.URL = os.Getenv("REDIS_URL")
-	}
-
-	// 5. Resolve Storage GCS Bucket Name fallback
-	if mainConfig.Storage.GCSBucketName == "" {
-		mainConfig.Storage.GCSBucketName = os.Getenv("GCS_BUCKET_NAME")
-	}
-
-	// 6. Resolve Observability fallbacks
-	if mainConfig.Observability.OTLPEndpoint == "" {
-		mainConfig.Observability.OTLPEndpoint = os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	}
-	if mainConfig.Observability.OTLPHeaders == "" {
-		mainConfig.Observability.OTLPHeaders = os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+	if err := resolveEnvFallbacks(mainConfig); err != nil {
+		return nil, err
 	}
 
 	mainConfig.Database.applyDefaults()
@@ -172,6 +125,77 @@ func Load() (*Config, error) {
 	}
 
 	return mainConfig, nil
+}
+
+// resolveEnvFallbacks populates configuration fields with standard environment variables
+// (e.g. PORT on Cloud Run, DATABASE_URL on Neon, REDIS_URL on Upstash).
+func resolveEnvFallbacks(cfg *Config) error {
+	// 1. Resolve Primary defaults / env fallbacks
+	if cfg.Primary.Environment == "" {
+		if envVal := os.Getenv("ENVIRONMENT"); envVal != "" {
+			cfg.Primary.Environment = envVal
+		} else {
+			cfg.Primary.Environment = "production"
+		}
+	}
+	if cfg.Primary.LogLevel == "" {
+		if logVal := os.Getenv("LOG_LEVEL"); logVal != "" {
+			cfg.Primary.LogLevel = logVal
+		} else {
+			cfg.Primary.LogLevel = "info"
+		}
+	}
+
+	// 2. Resolve Server Port (Cloud Run injects PORT)
+	if cfg.Server.Port == 0 {
+		if portStr := os.Getenv("PORT"); portStr != "" {
+			if portVal, pErr := strconv.Atoi(portStr); pErr == nil && portVal > 0 {
+				cfg.Server.Port = portVal
+			}
+		}
+	}
+	if cfg.Server.Port == 0 {
+		cfg.Server.Port = 8080
+	}
+
+	// 3. Resolve Database URL overrides
+	if err := resolveDatabaseURLOverrides(&cfg.Database); err != nil {
+		return err
+	}
+
+	// 4. Resolve Redis URL fallback
+	if cfg.Redis.URL == "" {
+		cfg.Redis.URL = os.Getenv("REDIS_URL")
+	}
+
+	// 5. Resolve Storage GCS Bucket Name fallback
+	if cfg.Storage.GCSBucketName == "" {
+		cfg.Storage.GCSBucketName = os.Getenv("GCS_BUCKET_NAME")
+	}
+
+	// 6. Resolve Observability fallbacks
+	if cfg.Observability.OTLPEndpoint == "" {
+		cfg.Observability.OTLPEndpoint = os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	}
+	if cfg.Observability.OTLPHeaders == "" {
+		cfg.Observability.OTLPHeaders = os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+	}
+
+	return nil
+}
+
+// resolveDatabaseURLOverrides parses DATABASE_URL or CLOUDVITTA_DATABASE_URL into target DatabaseConfig.
+func resolveDatabaseURLOverrides(target *DatabaseConfig) error {
+	dbURL := os.Getenv("CLOUDVITTA_DATABASE_URL")
+	if dbURL == "" {
+		dbURL = os.Getenv("DATABASE_URL")
+	}
+	if dbURL != "" && (target.Host == "" || target.Name == "") {
+		if err := parseDatabaseURL(dbURL, target); err != nil {
+			return fmt.Errorf("config: invalid database URL: %w", err)
+		}
+	}
+	return nil
 }
 
 func parseDatabaseURL(rawURL string, target *DatabaseConfig) error {
@@ -188,8 +212,6 @@ func parseDatabaseURL(rawURL string, target *DatabaseConfig) error {
 		if err == nil {
 			target.Port = port
 		}
-	} else if target.Port == 0 {
-		target.Port = 5432
 	}
 
 	if u.User != nil {
@@ -207,8 +229,6 @@ func parseDatabaseURL(rawURL string, target *DatabaseConfig) error {
 	sslMode := u.Query().Get("sslmode")
 	if sslMode != "" {
 		target.SSLMode = sslMode
-	} else if target.SSLMode == "" {
-		target.SSLMode = "require"
 	}
 
 	return nil

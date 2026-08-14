@@ -82,8 +82,10 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.GCP_REGION }}
           image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          flags: '--allow-unauthenticated'
           env_vars: |
             DATABASE_URL=${{ secrets.NEON_PROD_DSN }}
             REDIS_URL=${{ secrets.REDIS_URL }}
+            CLOUDVITTA_STORAGE_GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME || secrets.GCS_BUCKET_NAME || 'cloudvitta-raw-fixtures' }}
             CLOUDVITTA_PRIMARY_ENVIRONMENT=production
             CLOUDVITTA_PRIMARY_LOG_LEVEL=info
