@@ -1,0 +1,21 @@
+# Version control
+.git
+.github
+
+# Agent/Developer local state
+.agents
+.env
+.idea
+.vscode
+
+# Documentation
+docs/
+*.md
+
+# Tests and Mocks
+testdata/
+internal/adapter/provider/aws/testdata/
+
+# Temporary files
+tmp/
+*.log

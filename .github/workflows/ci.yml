@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-and-lint:
+    name: Lint, Test, and Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: cloudvitta_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Install Tern
+        run: go install github.com/jackc/tern/v2@latest
+
+      - name: Run Database Migrations (Tern)
+        env:
+          # Use standard Postgres environment variables for Tern
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: cloudvitta_test
+          PGUSER: user
+          PGPASSWORD: password
+        run: |
+          cd internal/store/migrations
+          # We echo a minimal tern config to ensure it reads from env vars
+          echo "[database]" > tern.conf
+          tern migrate
+
+      - name: Run Tests
+        env:
+          TEST_DB_URL: postgres://user:password@localhost:5432/cloudvitta_test?sslmode=disable
+        run: go test -race -v ./...
+
+      - name: Build
+        run: |
+          go build ./cmd/api
+          go build ./cmd/ingest
