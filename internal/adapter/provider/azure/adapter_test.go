@@ -293,3 +293,71 @@ func TestAdapter_Fetch_GCSCompletesOnNormalizeFailure(t *testing.T) {
 		t.Fatalf("Fetch() GCS payload mismatch.\nGot: %s\nWant: %s", string(storedBytes), invalidJSON)
 	}
 }
+
+func TestAdapter_Fetch_Storage_HappyPath(t *testing.T) {
+	fixtureBytes, err := os.ReadFile(filepath.Join("testdata", "azure-storage-eastus-sample.json"))
+	if err != nil {
+		t.Fatalf("failed to read test fixture: %v", err)
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixtureBytes)
+	}))
+	defer ts.Close()
+
+	client := azure.NewClient(azure.WithURL(ts.URL), azure.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := azure.NewAdapter(client, memStorage)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := adapter.Fetch(ctx, nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
+	}
+	if result.RawGCSPath == "" {
+		t.Fatalf("Fetch() returned empty gcsPath")
+	}
+
+	// In the storage sample fixture:
+	// - 1 Hot LRS -> included
+	// - 1 Cool LRS -> included
+	// - 1 Archive LRS -> included
+	// - 1 Reservation -> excluded
+	if len(result.Observations) != 3 {
+		t.Fatalf("Fetch() returned %d observations, want 3", len(result.Observations))
+	}
+
+	var hotObs *domain.PriceObservation
+	for i := range result.Observations {
+		if result.Observations[i].SkuID == "SKU-AZ-BLOB-HOT-001" {
+			hotObs = &result.Observations[i]
+			break
+		}
+	}
+	if hotObs == nil {
+		t.Fatalf("missing SKU-AZ-BLOB-HOT-001 observation")
+	}
+
+	if hotObs.Provider != "azure" {
+		t.Errorf("Provider = %q, want azure", hotObs.Provider)
+	}
+	if hotObs.ServiceCategory != "storage" {
+		t.Errorf("ServiceCategory = %q, want storage", hotObs.ServiceCategory)
+	}
+	if hotObs.RegionGroup != "us-east" {
+		t.Errorf("RegionGroup = %q, want us-east", hotObs.RegionGroup)
+	}
+	if hotObs.PriceAmount.String() != "0.0184" {
+		t.Errorf("PriceAmount = %s, want 0.0184", hotObs.PriceAmount.String())
+	}
+	if hotObs.StorageAttributes.StorageClass != "standard" {
+		t.Errorf("StorageAttributes.StorageClass = %q, want standard", hotObs.StorageAttributes.StorageClass)
+	}
+	if hotObs.StorageAttributes.SizeGB != 1 {
+		t.Errorf("StorageAttributes.SizeGB = %v, want 1", hotObs.StorageAttributes.SizeGB)
+	}
+}

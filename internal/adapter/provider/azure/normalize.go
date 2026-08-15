@@ -13,6 +13,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 )
 
 type azureItem struct {
@@ -105,12 +106,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 			return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 		}
 
-		// Filter 3: Compute instance filters (Linux PayG only)
-		if !isComputeInstance(item) {
-			continue
-		}
-
-		// Filter 4: Check region mapping (fails loudly if unmapped)
+		// Filter 3: Check region mapping (fails loudly if unmapped)
 		region := item.ArmRegionName
 		if region == "" {
 			region = item.Location
@@ -124,43 +120,83 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 		if err != nil {
 			return nil, "", fmt.Errorf("azure normalize sku %s: invalid unit price %q: %w", item.SkuID, item.UnitPrice, err)
 		}
-		vcpu, ram, family := parseAzureAttributes(item.ArmSkuName, item.SkuName, item.ProductName)
-
-		displayName := item.ArmSkuName
-		if displayName == "" {
-			displayName = item.SkuName
-		}
 
 		skuID := item.SkuID
 		if skuID == "" {
 			skuID = item.MeterID
 		}
 
-		unit := item.UnitOfMeasure
-		if unit == "1 Hour" || unit == "1 hour" {
-			unit = "Hrs"
-		}
+		if category == "compute" {
+			if !isComputeInstance(item) {
+				continue
+			}
+			vcpu, ram, family := parseAzureAttributes(item.ArmSkuName, item.SkuName, item.ProductName)
 
-		obs := domain.PriceObservation{
-			Provider:        "azure",
-			ServiceCategory: category,
-			SkuID:           skuID,
-			DisplayName:     displayName,
-			Region:          region,
-			RegionGroup:     regionGroup,
-			Unit:            unit,
-			PriceAmount:     priceAmount,
-			PriceCurrency:   item.CurrencyCode,
-			PricingModel:    "OnDemand",
-			Attributes: domain.ComputeAttributes{
-				VCPU:   vcpu,
-				RAMGB:  ram,
-				Family: family,
-			},
-			FetchedAt: fetchedAt,
-		}
+			displayName := item.ArmSkuName
+			if displayName == "" {
+				displayName = item.SkuName
+			}
 
-		observations = append(observations, obs)
+			unit := item.UnitOfMeasure
+			if unit == "1 Hour" || unit == "1 hour" {
+				unit = "Hrs"
+			}
+
+			obs := domain.PriceObservation{
+				Provider:        "azure",
+				ServiceCategory: category,
+				SkuID:           skuID,
+				DisplayName:     displayName,
+				Region:          region,
+				RegionGroup:     regionGroup,
+				Unit:            unit,
+				PriceAmount:     priceAmount,
+				PriceCurrency:   item.CurrencyCode,
+				PricingModel:    "OnDemand",
+				Attributes: domain.ComputeAttributes{
+					VCPU:   vcpu,
+					RAMGB:  ram,
+					Family: family,
+				},
+				FetchedAt: fetchedAt,
+			}
+			observations = append(observations, obs)
+
+		} else if category == "storage" {
+			storageClass, err := parseAzureStorageClass(item.SkuName, item.MeterName, item.ProductName)
+			if err != nil {
+				return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+			}
+
+			displayName := item.ProductName
+			if displayName == "" {
+				displayName = item.MeterName
+			}
+
+			unit := item.UnitOfMeasure
+			if strings.EqualFold(unit, "1 GB/Month") || strings.EqualFold(unit, "1 GB/month") || strings.EqualFold(unit, "1 GB/Mo") {
+				unit = "GB-Mo"
+			}
+
+			obs := domain.PriceObservation{
+				Provider:        "azure",
+				ServiceCategory: category,
+				SkuID:           skuID,
+				DisplayName:     displayName,
+				Region:          region,
+				RegionGroup:     regionGroup,
+				Unit:            unit,
+				PriceAmount:     priceAmount,
+				PriceCurrency:   item.CurrencyCode,
+				PricingModel:    "OnDemand",
+				StorageAttributes: domain.StorageAttributes{
+					SizeGB:       1,
+					StorageClass: storageClass,
+				},
+				FetchedAt: fetchedAt,
+			}
+			observations = append(observations, obs)
+		}
 	}
 
 	return observations, payload.NextPageLink, nil
@@ -186,6 +222,17 @@ func isComputeInstance(item azureItem) bool {
 	}
 
 	return true
+}
+
+func parseAzureStorageClass(skuName, meterName, productName string) (string, error) {
+	for _, text := range []string{skuName, meterName, productName} {
+		for _, candidate := range []string{"Hot", "Standard", "Cool", "Cold", "Archive"} {
+			if strings.Contains(text, candidate) {
+				return storageclassmap.MapAzureStorageClass(candidate)
+			}
+		}
+	}
+	return storageclassmap.MapAzureStorageClass(skuName)
 }
 
 var vmSizeRegex = regexp.MustCompile(`(?i)(?:Standard_)?([A-Za-z]+)(\d+)(?:[A-Za-z]*)?(?:_v(\d+))?`)

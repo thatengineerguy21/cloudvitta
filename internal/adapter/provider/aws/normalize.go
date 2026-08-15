@@ -13,6 +13,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 )
 
 type awsProduct struct {
@@ -30,15 +31,14 @@ type awsOfferTerm struct {
 	PriceDimensions map[string]awsPriceDimension `json:"priceDimensions"`
 }
 
-type computeProductMeta struct {
+type awsProductMeta struct {
 	sku          string
 	category     string
 	regionGroup  string
 	region       string
-	instanceType string
-	vcpu         float64
-	ram          float64
-	family       string
+	displayName  string
+	computeAttrs domain.ComputeAttributes
+	storageAttrs domain.StorageAttributes
 }
 
 // Normalize parses an AWS Price List JSON stream and returns normalized domain observations.
@@ -60,7 +60,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 
 	var offerCode string
 	var productsParsed bool
-	filteredProducts := make(map[string]computeProductMeta)
+	filteredProducts := make(map[string]awsProductMeta)
 	var observations []domain.PriceObservation
 
 	for dec.More() {
@@ -97,50 +97,97 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 					return nil, fmt.Errorf("aws normalize: decode product %s: %w", sku, err)
 				}
 
-				if !isComputeInstance(prod, prod.Attributes) {
-					continue
-				}
-
 				serviceCode := prod.Attributes["servicecode"]
 				if serviceCode == "" {
 					serviceCode = offerCode
 				}
-				category, err := catalogmap.MapAWSProduct(serviceCode)
-				if err != nil {
-					return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-				}
 
-				location := prod.Attributes["location"]
-				if location == "" {
-					location = prod.Attributes["regionCode"]
-				}
-				regionGroup, err := regionmap.MapAWSRegion(location)
-				if err != nil {
-					return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-				}
+				if isComputeInstance(prod, prod.Attributes) {
+					category, err := catalogmap.MapAWSProduct(serviceCode)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+					}
 
-				instanceType := prod.Attributes["instanceType"]
-				vcpu := parseVCPU(prod.Attributes["vcpu"])
-				ram := parseRAMGB(prod.Attributes["memory"])
-				family := parseFamily(instanceType)
+					location := prod.Attributes["location"]
+					if location == "" {
+						location = prod.Attributes["regionCode"]
+					}
+					regionGroup, err := regionmap.MapAWSRegion(location)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+					}
 
-				region := prod.Attributes["regionCode"]
-				if region == "" {
-					region = prod.Attributes["location"]
+					instanceType := prod.Attributes["instanceType"]
+					vcpu := parseVCPU(prod.Attributes["vcpu"])
+					ram := parseRAMGB(prod.Attributes["memory"])
+					family := parseFamily(instanceType)
+
+					region := prod.Attributes["regionCode"]
+					if region == "" {
+						region = prod.Attributes["location"]
+					}
+
+					meta := awsProductMeta{
+						sku:         sku,
+						category:    category,
+						regionGroup: regionGroup,
+						region:      region,
+						displayName: instanceType,
+						computeAttrs: domain.ComputeAttributes{
+							VCPU:   vcpu,
+							RAMGB:  ram,
+							Family: family,
+						},
+					}
+					filteredProducts[sku] = meta
+
+				} else if isStorageProduct(prod, prod.Attributes) {
+					category, err := catalogmap.MapAWSProduct(serviceCode)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+					}
+
+					location := prod.Attributes["location"]
+					if location == "" {
+						location = prod.Attributes["regionCode"]
+					}
+					regionGroup, err := regionmap.MapAWSRegion(location)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+					}
+
+					rawStorageClass := prod.Attributes["storageClass"]
+					if rawStorageClass == "" {
+						rawStorageClass = prod.Attributes["volumeType"]
+					}
+					storageClass, err := storageclassmap.MapAWSStorageClass(rawStorageClass)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+					}
+
+					region := prod.Attributes["regionCode"]
+					if region == "" {
+						region = prod.Attributes["location"]
+					}
+
+					displayName := prod.Attributes["description"]
+					if displayName == "" {
+						displayName = fmt.Sprintf("S3 %s Storage", rawStorageClass)
+					}
+
+					meta := awsProductMeta{
+						sku:         sku,
+						category:    category,
+						regionGroup: regionGroup,
+						region:      region,
+						displayName: displayName,
+						storageAttrs: domain.StorageAttributes{
+							SizeGB:       1,
+							StorageClass: storageClass,
+						},
+					}
+					filteredProducts[sku] = meta
 				}
-
-				meta := computeProductMeta{
-					sku:          sku,
-					category:     category,
-					regionGroup:  regionGroup,
-					region:       region,
-					instanceType: instanceType,
-					vcpu:         vcpu,
-					ram:          ram,
-					family:       family,
-				}
-
-				filteredProducts[sku] = meta
 			}
 
 			// Consume closing '}' of products map
@@ -201,7 +248,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 								}
 							}
 						} else {
-							// Discard non-compute terms without memory allocation
+							// Discard non-matching terms without memory allocation
 							if err := skipValue(dec); err != nil {
 								return nil, fmt.Errorf("aws normalize: skip sku terms for %s: %w", sku, err)
 							}
@@ -266,24 +313,21 @@ func skipValue(dec *json.Decoder) error {
 	return nil
 }
 
-func buildObservation(meta computeProductMeta, unit string, price decimal.Decimal, fetchedAt time.Time) domain.PriceObservation {
+func buildObservation(meta awsProductMeta, unit string, price decimal.Decimal, fetchedAt time.Time) domain.PriceObservation {
 	return domain.PriceObservation{
-		Provider:        "aws",
-		ServiceCategory: meta.category,
-		SkuID:           meta.sku,
-		DisplayName:     meta.instanceType,
-		Region:          meta.region,
-		RegionGroup:     meta.regionGroup,
-		Unit:            unit,
-		PriceAmount:     price,
-		PriceCurrency:   "USD",
-		PricingModel:    "OnDemand",
-		Attributes: domain.ComputeAttributes{
-			VCPU:   meta.vcpu,
-			RAMGB:  meta.ram,
-			Family: meta.family,
-		},
-		FetchedAt: fetchedAt,
+		Provider:          "aws",
+		ServiceCategory:   meta.category,
+		SkuID:             meta.sku,
+		DisplayName:       meta.displayName,
+		Region:            meta.region,
+		RegionGroup:       meta.regionGroup,
+		Unit:              unit,
+		PriceAmount:       price,
+		PriceCurrency:     "USD",
+		PricingModel:      "OnDemand",
+		Attributes:        meta.computeAttrs,
+		StorageAttributes: meta.storageAttrs,
+		FetchedAt:         fetchedAt,
 	}
 }
 
@@ -333,6 +377,27 @@ func isComputeInstance(product awsProduct, attrs map[string]string) bool {
 		return false
 	}
 
+	return true
+}
+
+func isStorageProduct(product awsProduct, attrs map[string]string) bool {
+	if attrs == nil {
+		return false
+	}
+	if product.ProductFamily != "Storage" {
+		return false
+	}
+	rawClass := attrs["storageClass"]
+	if rawClass == "" {
+		rawClass = attrs["volumeType"]
+	}
+	if rawClass == "" {
+		return false
+	}
+	usageType := attrs["usagetype"]
+	if usageType != "" && !strings.Contains(usageType, "ByteHrs") && !strings.Contains(usageType, "Storage") {
+		return false
+	}
 	return true
 }
 

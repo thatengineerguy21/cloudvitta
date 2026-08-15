@@ -10,6 +10,7 @@ var ErrUnmappedProduct = errors.New("catalogmap: unmapped product code")
 
 var awsCatalogMap = map[string]string{
 	"AmazonEC2": "compute",
+	"AmazonS3":  "storage",
 }
 
 // MapAWSProduct resolves an AWS product code to a normalized service category.

@@ -25,8 +25,20 @@ func TestMapGCPProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
-			name:         "unmapped service fails loudly",
+			name:         "valid Cloud Storage service display name",
 			serviceName:  "Cloud Storage",
+			wantCategory: "storage",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Cloud Storage service ID",
+			serviceName:  "95FF-2EF5-5EA1",
+			wantCategory: "storage",
+			wantErr:      nil,
+		},
+		{
+			name:         "unmapped service fails loudly",
+			serviceName:  "Cloud Bigtable",
 			wantCategory: "",
 			wantErr:      ErrUnmappedProduct,
 		},

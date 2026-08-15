@@ -112,6 +112,17 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsAdapter)
 
+	// Register AWS storage adapter with rate limiting and retry config
+	awsStorageClient := aws.NewClient(aws.WithURL(aws.DefaultS3PriceListURL))
+	awsStorageAdapter := aws.NewAdapter(awsStorageClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "storage",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsStorageAdapter)
+
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
 	azureAdapter := azure.NewAdapter(azureClient, rawStorage)
@@ -122,6 +133,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureAdapter)
+
+	// Register Azure storage adapter with rate limiting and retry config
+	azureStorageClient := azure.NewClient(azure.WithURL("https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20%27Storage%27"))
+	azureStorageAdapter := azure.NewAdapter(azureStorageClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "storage",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureStorageAdapter)
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
@@ -137,6 +159,21 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpAdapter)
+
+	// Register GCP storage adapter with rate limiting and retry config
+	gcpStorageOpts := []gcp.Option{gcp.WithURL(gcp.DefaultStorageBillingCatalogURL)}
+	if cfg.GCP.APIKey != "" {
+		gcpStorageOpts = append(gcpStorageOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpStorageClient := gcp.NewClient(gcpStorageOpts...)
+	gcpStorageAdapter := gcp.NewAdapter(gcpStorageClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "storage",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpStorageAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

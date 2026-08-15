@@ -30,8 +30,10 @@ func NewRouter(pricingSvc *service.PricingService, dbPool *pgxpool.Pool, redisCl
 	// Setup standard middlewares
 	limiter := ratelimit.NewRateLimiter(redisClient, 60) // 60 req/min/IP
 	computeHandler := NewComputeHandler(pricingSvc)
+	storageHandler := NewStorageHandler(pricingSvc)
 
 	mux.Handle("GET /api/v1/prices/compute", limiter.Handler(computeHandler))
+	mux.Handle("GET /api/v1/prices/storage", limiter.Handler(storageHandler))
 
 	// Wrap with recovery middleware and OpenTelemetry HTTP instrumentation
 	recoveredHandler := middleware.RecoverMiddleware(mux)

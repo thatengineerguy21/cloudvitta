@@ -7,6 +7,8 @@ import (
 var gcpCatalogMap = map[string]string{
 	"Compute Engine": "compute",
 	"6F81-5844-456A": "compute",
+	"Cloud Storage":  "storage",
+	"95FF-2EF5-5EA1": "storage",
 }
 
 // MapGCPProduct resolves a GCP service display name or service ID to a normalized service category.

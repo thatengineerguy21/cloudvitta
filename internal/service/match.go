@@ -3,6 +3,7 @@ package service
 import (
 	"math"
 
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
@@ -63,6 +64,35 @@ func ScoreComputeObservations(reqVCPU, reqRAMGB float64, strictFamily bool, obsL
 			MatchQuality:      quality,
 			MatchDeltaPct:     math.Round(deltaPct*100) / 100,
 			MissingAttributes: []string{}, // No optional attributes implemented yet
+		})
+	}
+
+	return scored
+}
+
+// ScoreStorageObservations evaluates a slice of storage observations against requested storage size and class.
+func ScoreStorageObservations(reqSizeGB float64, reqStorageClass string, obsList []domain.PriceObservation) []domain.ScoredStorageObservation {
+	var scored []domain.ScoredStorageObservation
+
+	for _, obs := range obsList {
+		quality := "exact"
+		if reqStorageClass != "" && obs.StorageAttributes.StorageClass != reqStorageClass {
+			quality = "close"
+		}
+
+		sizeGB := reqSizeGB
+		if sizeGB <= 0 {
+			sizeGB = 1.0
+		}
+
+		monthlyCost := obs.PriceAmount.Mul(decimal.NewFromFloat(sizeGB))
+
+		scored = append(scored, domain.ScoredStorageObservation{
+			Observation:       obs,
+			MatchQuality:      quality,
+			MatchDeltaPct:     0.0,
+			MissingAttributes: []string{},
+			MonthlyCost:       monthlyCost,
 		})
 	}
 

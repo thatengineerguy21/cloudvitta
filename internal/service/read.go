@@ -149,11 +149,23 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 	}
 }
 
+// GetStoragePrices retrieves storage pricing observations for provider, category, and regionGroup.
+func (s *PricingService) GetStoragePrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
+	return s.GetComputePrices(ctx, provider, category, regionGroup)
+}
+
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {
-	var attrs domain.ComputeAttributes
+	var computeAttrs domain.ComputeAttributes
+	var storageAttrs domain.StorageAttributes
 	if len(row.Attributes) > 0 {
-		if err := json.Unmarshal(row.Attributes, &attrs); err != nil {
-			return domain.PriceObservation{}, fmt.Errorf("unmarshal attributes: %w", err)
+		if row.ServiceCategory == "storage" {
+			if err := json.Unmarshal(row.Attributes, &storageAttrs); err != nil {
+				return domain.PriceObservation{}, fmt.Errorf("unmarshal storage attributes: %w", err)
+			}
+		} else {
+			if err := json.Unmarshal(row.Attributes, &computeAttrs); err != nil {
+				return domain.PriceObservation{}, fmt.Errorf("unmarshal compute attributes: %w", err)
+			}
 		}
 	}
 
@@ -168,18 +180,19 @@ func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, erro
 	}
 
 	return domain.PriceObservation{
-		Provider:        row.Provider,
-		ServiceCategory: row.ServiceCategory,
-		SkuID:           row.SkuID,
-		DisplayName:     row.DisplayName,
-		Region:          row.Region,
-		RegionGroup:     row.RegionGroup,
-		Unit:            row.Unit,
-		PriceAmount:     priceDec,
-		PriceCurrency:   row.PriceCurrency,
-		PricingModel:    row.PricingModel,
-		Attributes:      attrs,
-		FetchedAt:       fetchedAtTime,
+		Provider:          row.Provider,
+		ServiceCategory:   row.ServiceCategory,
+		SkuID:             row.SkuID,
+		DisplayName:       row.DisplayName,
+		Region:            row.Region,
+		RegionGroup:       row.RegionGroup,
+		Unit:              row.Unit,
+		PriceAmount:       priceDec,
+		PriceCurrency:     row.PriceCurrency,
+		PricingModel:      row.PricingModel,
+		Attributes:        computeAttrs,
+		StorageAttributes: storageAttrs,
+		FetchedAt:         fetchedAtTime,
 	}, nil
 }
 

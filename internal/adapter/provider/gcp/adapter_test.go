@@ -239,7 +239,78 @@ func TestSupportedCategories(t *testing.T) {
 	if !gcp.IsCategorySupported("compute") {
 		t.Errorf("expected compute to be supported")
 	}
+	if !gcp.IsCategorySupported("storage") {
+		t.Errorf("expected storage to be supported")
+	}
 	if gcp.IsCategorySupported("unknown-category") {
 		t.Errorf("expected unknown-category to not be supported")
+	}
+}
+
+func TestAdapter_Fetch_Storage_HappyPath(t *testing.T) {
+	fixtureBytes, err := os.ReadFile(filepath.Join("testdata", "gcp-storage-us-east-sample.json"))
+	if err != nil {
+		t.Fatalf("failed to read test fixture: %v", err)
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixtureBytes)
+	}))
+	defer ts.Close()
+
+	client := gcp.NewClient(gcp.WithURL(ts.URL), gcp.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := gcp.NewAdapter(client, memStorage)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := adapter.Fetch(ctx, nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
+	}
+	if result.RawGCSPath == "" {
+		t.Fatalf("Fetch() returned empty gcsPath")
+	}
+
+	// In the storage sample fixture:
+	// - 1 Standard Storage -> included
+	// - 1 Nearline Storage -> included
+	// - 1 Archive Storage -> included
+	// - 1 Operations -> excluded
+	if len(result.Observations) != 3 {
+		t.Fatalf("Fetch() returned %d observations, want 3", len(result.Observations))
+	}
+
+	var stdObs *domain.PriceObservation
+	for i := range result.Observations {
+		if result.Observations[i].SkuID == "SKU-GCP-GCS-STD-001" {
+			stdObs = &result.Observations[i]
+			break
+		}
+	}
+	if stdObs == nil {
+		t.Fatalf("missing SKU-GCP-GCS-STD-001 observation")
+	}
+
+	if stdObs.Provider != "gcp" {
+		t.Errorf("Provider = %q, want gcp", stdObs.Provider)
+	}
+	if stdObs.ServiceCategory != "storage" {
+		t.Errorf("ServiceCategory = %q, want storage", stdObs.ServiceCategory)
+	}
+	if stdObs.RegionGroup != "us-east" {
+		t.Errorf("RegionGroup = %q, want us-east", stdObs.RegionGroup)
+	}
+	if stdObs.PriceAmount.String() != "0.02" {
+		t.Errorf("PriceAmount = %s, want 0.02", stdObs.PriceAmount.String())
+	}
+	if stdObs.StorageAttributes.StorageClass != "standard" {
+		t.Errorf("StorageAttributes.StorageClass = %q, want standard", stdObs.StorageAttributes.StorageClass)
+	}
+	if stdObs.StorageAttributes.SizeGB != 1 {
+		t.Errorf("StorageAttributes.SizeGB = %v, want 1", stdObs.StorageAttributes.SizeGB)
 	}
 }

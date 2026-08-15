@@ -11,8 +11,14 @@ import (
 // DefaultComputeServiceID is the well-known GCP Cloud Billing service ID for Compute Engine.
 const DefaultComputeServiceID = "6F81-5844-456A"
 
+// DefaultStorageServiceID is the well-known GCP Cloud Billing service ID for Cloud Storage.
+const DefaultStorageServiceID = "95FF-2EF5-5EA1"
+
 // DefaultBillingCatalogURL is the base URL for the GCP Cloud Billing Catalog API.
 const DefaultBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultComputeServiceID + "/skus"
+
+// DefaultStorageBillingCatalogURL is the base URL for the GCP Cloud Storage Billing Catalog API.
+const DefaultStorageBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultStorageServiceID + "/skus"
 
 // Client is an HTTP client for fetching GCP Cloud Billing Catalog API data.
 type Client struct {
