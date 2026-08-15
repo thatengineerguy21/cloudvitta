@@ -12,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
@@ -109,6 +110,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsAdapter)
+
+	// Register Azure compute adapter with rate limiting and retry config
+	azureClient := azure.NewClient()
+	azureAdapter := azure.NewAdapter(azureClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "compute",
+		RateLimitRPS:   10, // Azure Retail Prices API is public; 10 req/s is safe
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

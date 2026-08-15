@@ -112,7 +112,11 @@ func (f *Factory) BuildJobs() []Job {
 
 		var limiter *rate.Limiter
 		if cfg.RateLimitRPS > 0 {
-			limiter = rate.NewLimiter(rate.Limit(cfg.RateLimitRPS), cfg.RateLimitBurst)
+			burst := cfg.RateLimitBurst
+			if burst <= 0 {
+				burst = 1
+			}
+			limiter = rate.NewLimiter(rate.Limit(cfg.RateLimitRPS), burst)
 		}
 
 		// Apply defaults if retry config is zero-valued

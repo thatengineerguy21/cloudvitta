@@ -631,3 +631,55 @@ func TestNewOrchestrator_InitializesCleanly(t *testing.T) {
 		t.Fatal("expected non-nil orchestrator")
 	}
 }
+
+func TestOrchestrator_ConcurrentAWSAndAzure_Execution(t *testing.T) {
+	ctx := context.Background()
+
+	awsAdapter := &mockFetcher{
+		result: domain.FetchResult{
+			Observations: makeTestObservations("aws", "us-east-1", "0.50"),
+			RawGCSPath:   "raw/aws/compute/test.json",
+		},
+		delay: 10 * time.Millisecond,
+	}
+	azureAdapter := &mockFetcher{
+		result: domain.FetchResult{
+			Observations: makeTestObservations("azure", "eastus", "0.60"),
+			RawGCSPath:   "raw/azure/compute/test.json",
+		},
+		delay: 10 * time.Millisecond,
+	}
+
+	factory := provider.NewFactory()
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "compute",
+		RateLimitRPS:   100,
+		RateLimitBurst: 10,
+		Retry:          provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
+	}, awsAdapter)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "compute",
+		RateLimitRPS:   100,
+		RateLimitBurst: 10,
+		Retry:          provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
+	}, azureAdapter)
+
+	orch := service.NewOrchestrator(nil, nil, nil, factory, service.OrchestratorConfig{
+		MaxConcurrency: 5,
+		LockTTL:        30 * time.Second,
+	})
+
+	results := orch.RunAll(ctx)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	if awsAdapter.callCount.Load() != 1 {
+		t.Errorf("aws fetch count = %d, want 1", awsAdapter.callCount.Load())
+	}
+	if azureAdapter.callCount.Load() != 1 {
+		t.Errorf("azure fetch count = %d, want 1", azureAdapter.callCount.Load())
+	}
+}
