@@ -13,6 +13,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
@@ -121,6 +122,23 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureAdapter)
+
+	// Register GCP compute adapter with rate limiting and retry config
+	var gcpOpts []gcp.Option
+	if gcpAPIKey := os.Getenv("CLOUDVITTA_GCP_API_KEY"); gcpAPIKey != "" {
+		gcpOpts = append(gcpOpts, gcp.WithAPIKey(gcpAPIKey))
+	} else if gcpAPIKey := os.Getenv("GCP_API_KEY"); gcpAPIKey != "" {
+		gcpOpts = append(gcpOpts, gcp.WithAPIKey(gcpAPIKey))
+	}
+	gcpClient := gcp.NewClient(gcpOpts...)
+	gcpAdapter := gcp.NewAdapter(gcpClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "compute",
+		RateLimitRPS:   10, // GCP Cloud Billing API standard rate limit
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

@@ -10,6 +10,8 @@ func MapRegion(provider, region string) (string, error) {
 		return MapAWSRegion(region)
 	case "azure":
 		return MapAzureRegion(region)
+	case "gcp":
+		return MapGCPRegion(region)
 	default:
 		return "", fmt.Errorf("regionmap: unmapped provider %q", provider)
 	}

@@ -242,13 +242,15 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 			o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID)
 		}
 
-		if _, insertErr := o.queries.InsertPriceObservation(ctx, params); insertErr != nil {
-			slog.ErrorContext(ctx, "failed to insert observation",
-				"provider", job.Provider,
-				"sku", obs.SkuID,
-				"error", insertErr,
-			)
-			continue
+		if o.queries != nil {
+			if _, insertErr := o.queries.InsertPriceObservation(ctx, params); insertErr != nil {
+				slog.ErrorContext(ctx, "failed to insert observation",
+					"provider", job.Provider,
+					"sku", obs.SkuID,
+					"error", insertErr,
+				)
+				continue
+			}
 		}
 		result.InsertedCount++
 	}
@@ -311,6 +313,10 @@ func (o *Orchestrator) recordAnomalyMetric(ctx context.Context, provider, catego
 // for the same SKU/region. Returns "pending_review" if the price differs by
 // more than AnomalyThreshold, otherwise returns empty string.
 func (o *Orchestrator) checkAnomaly(ctx context.Context, obs domain.PriceObservation) string {
+	if o.queries == nil {
+		return ""
+	}
+
 	prev, err := o.queries.GetLatestPriceForSKU(ctx, store.GetLatestPriceForSKUParams{
 		Provider: obs.Provider,
 		SkuID:    obs.SkuID,
