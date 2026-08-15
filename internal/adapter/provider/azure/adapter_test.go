@@ -361,3 +361,60 @@ func TestAdapter_Fetch_Storage_HappyPath(t *testing.T) {
 		t.Errorf("StorageAttributes.SizeGB = %v, want 1", hotObs.StorageAttributes.SizeGB)
 	}
 }
+
+func TestAdapter_Fetch_Network_HappyPath(t *testing.T) {
+	fixtureBytes, err := os.ReadFile(filepath.Join("testdata", "azure-bandwidth-sample.json"))
+	if err != nil {
+		t.Fatalf("failed to read test fixture: %v", err)
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixtureBytes)
+	}))
+	defer ts.Close()
+
+	client := azure.NewClient(azure.WithURL(ts.URL), azure.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := azure.NewAdapter(client, memStorage)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := adapter.Fetch(ctx, nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
+	}
+	if result.RawGCSPath == "" {
+		t.Fatalf("Fetch() returned empty gcsPath")
+	}
+
+	// In the bandwidth sample fixture:
+	// - SKU-AZ-BW-FLAT -> included (tierMinimumUnits: 0.0)
+	// - SKU-AZ-BW-TIERED -> excluded (tierMinimumUnits: 10000.0)
+	// - SKU-AZ-BW-RES -> excluded (type: Reservation)
+	if len(result.Observations) != 1 {
+		t.Fatalf("Fetch() returned %d observations, want 1 (flat rate only)", len(result.Observations))
+	}
+
+	obs := result.Observations[0]
+	if obs.SkuID != "SKU-AZ-BW-FLAT" {
+		t.Errorf("SkuID = %q, want SKU-AZ-BW-FLAT", obs.SkuID)
+	}
+	if obs.Provider != "azure" {
+		t.Errorf("Provider = %q, want azure", obs.Provider)
+	}
+	if obs.ServiceCategory != "network" {
+		t.Errorf("ServiceCategory = %q, want network", obs.ServiceCategory)
+	}
+	if obs.RegionGroup != "us-east" {
+		t.Errorf("RegionGroup = %q, want us-east", obs.RegionGroup)
+	}
+	if obs.PriceAmount.String() != "0.087" {
+		t.Errorf("PriceAmount = %s, want 0.087", obs.PriceAmount.String())
+	}
+	if obs.NetworkAttributes.EgressGB != 1 {
+		t.Errorf("NetworkAttributes.EgressGB = %v, want 1", obs.NetworkAttributes.EgressGB)
+	}
+}

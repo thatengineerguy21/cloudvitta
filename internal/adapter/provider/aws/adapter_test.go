@@ -433,3 +433,60 @@ func TestAdapter_Fetch_Storage_HappyPath(t *testing.T) {
 		t.Errorf("StorageAttributes.SizeGB = %v, want 1", stdObs.StorageAttributes.SizeGB)
 	}
 }
+
+func TestAdapter_Fetch_Network_HappyPath(t *testing.T) {
+	fixtureBytes, err := os.ReadFile(filepath.Join("testdata", "datatransfer_us_east_1_sample.json"))
+	if err != nil {
+		t.Fatalf("failed to read test fixture: %v", err)
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixtureBytes)
+	}))
+	defer ts.Close()
+
+	client := NewClient(WithURL(ts.URL), WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := NewAdapter(client, memStorage)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := adapter.Fetch(ctx, nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
+	}
+	if result.RawGCSPath == "" {
+		t.Fatalf("Fetch() returned empty gcsPath")
+	}
+
+	// In the data transfer sample fixture:
+	// - SKU-AWS-DT-FLAT -> included (flat rate, 1 dimension)
+	// - SKU-AWS-DT-TIERED -> excluded (tiered pricing, 2 dimensions)
+	// - SKU-AWS-NONMATCH -> excluded
+	if len(result.Observations) != 1 {
+		t.Fatalf("Fetch() returned %d observations, want 1 (flat rate only)", len(result.Observations))
+	}
+
+	obs := result.Observations[0]
+	if obs.SkuID != "SKU-AWS-DT-FLAT" {
+		t.Errorf("SkuID = %q, want SKU-AWS-DT-FLAT", obs.SkuID)
+	}
+	if obs.Provider != "aws" {
+		t.Errorf("Provider = %q, want aws", obs.Provider)
+	}
+	if obs.ServiceCategory != "network" {
+		t.Errorf("ServiceCategory = %q, want network", obs.ServiceCategory)
+	}
+	if obs.RegionGroup != "us-east" {
+		t.Errorf("RegionGroup = %q, want us-east", obs.RegionGroup)
+	}
+	if obs.PriceAmount.String() != "0.09" {
+		t.Errorf("PriceAmount = %s, want 0.09", obs.PriceAmount.String())
+	}
+	if obs.NetworkAttributes.EgressGB != 1 {
+		t.Errorf("NetworkAttributes.EgressGB = %v, want 1", obs.NetworkAttributes.EgressGB)
+	}
+}

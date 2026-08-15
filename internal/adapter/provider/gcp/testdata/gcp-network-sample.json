@@ -1,0 +1,100 @@
+{
+  "skus": [
+    {
+      "name": "services/E89B-A08C-8A2D/skus/SKU-GCP-NET-FLAT",
+      "skuId": "SKU-GCP-NET-FLAT",
+      "description": "Network Internet Egress from US to Americas",
+      "category": {
+        "serviceDisplayName": "Cloud Interconnect",
+        "resourceFamily": "Network",
+        "resourceGroup": "Interconnect",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east1"
+      ],
+      "pricingInfo": [
+        {
+          "summary": "Flat rate egress per GB",
+          "pricingExpression": {
+            "usageUnit": "GiBy",
+            "usageUnitDescription": "gibibyte",
+            "baseUnit": "By",
+            "baseUnitDescription": "byte",
+            "baseUnitConversionFactor": 1073741824,
+            "displayQuantity": 1,
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 85000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/E89B-A08C-8A2D/skus/SKU-GCP-NET-TIERED",
+      "skuId": "SKU-GCP-NET-TIERED",
+      "description": "Network Tiered Egress",
+      "category": {
+        "serviceDisplayName": "Cloud Interconnect",
+        "resourceFamily": "Network",
+        "resourceGroup": "Interconnect",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east1"
+      ],
+      "pricingInfo": [
+        {
+          "summary": "Tiered egress pricing",
+          "pricingExpression": {
+            "usageUnit": "GiBy",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 85000000
+                }
+              },
+              {
+                "startUsageAmount": 10240,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 80000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/E89B-A08C-8A2D/skus/SKU-GCP-NONMATCH",
+      "skuId": "SKU-GCP-NONMATCH",
+      "description": "Preemptible Network",
+      "category": {
+        "serviceDisplayName": "Cloud Interconnect",
+        "resourceFamily": "Network",
+        "resourceGroup": "Interconnect",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-east1"
+      ],
+      "pricingInfo": [],
+      "serviceProviderName": "Google"
+    }
+  ],
+  "nextPageToken": ""
+}

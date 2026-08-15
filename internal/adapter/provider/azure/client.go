@@ -13,6 +13,9 @@ const DefaultRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filt
 // DefaultStorageRetailPricesURL is the standard Azure Retail Prices API URL for Storage.
 const DefaultStorageRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName eq 'Storage'"
 
+// DefaultNetworkRetailPricesURL is the standard Azure Retail Prices API URL for Bandwidth / Network.
+const DefaultNetworkRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName eq 'Bandwidth'"
+
 // Client is an HTTP client for fetching Azure Retail Prices API data.
 type Client struct {
 	httpClient *http.Client

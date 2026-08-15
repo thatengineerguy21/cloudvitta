@@ -20,6 +20,12 @@ const DefaultBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/service
 // DefaultStorageBillingCatalogURL is the base URL for the GCP Cloud Storage Billing Catalog API.
 const DefaultStorageBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultStorageServiceID + "/skus"
 
+// DefaultNetworkServiceID is the well-known GCP Cloud Billing service ID for Cloud Interconnect / Networking.
+const DefaultNetworkServiceID = "E89B-A08C-8A2D"
+
+// DefaultNetworkBillingCatalogURL is the base URL for the GCP Network Billing Catalog API.
+const DefaultNetworkBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultNetworkServiceID + "/skus"
+
 // Client is an HTTP client for fetching GCP Cloud Billing Catalog API data.
 type Client struct {
 	httpClient *http.Client

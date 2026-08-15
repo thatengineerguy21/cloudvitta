@@ -37,6 +37,24 @@ func TestMapGCPProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Cloud Interconnect service display name",
+			serviceName:  "Cloud Interconnect",
+			wantCategory: "network",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Networking service display name",
+			serviceName:  "Networking",
+			wantCategory: "network",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Network service ID",
+			serviceName:  "E89B-A08C-8A2D",
+			wantCategory: "network",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "Cloud Bigtable",
 			wantCategory: "",

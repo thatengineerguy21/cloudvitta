@@ -24,6 +24,11 @@ type StorageAttributes struct {
 	IOPS *int `json:"iops,omitempty"`
 }
 
+// NetworkAttributes holds normalized attributes for networking / data transfer resources.
+type NetworkAttributes struct {
+	EgressGB float64 `json:"egress_gb"`
+}
+
 // PriceObservation represents a single normalized cloud pricing observation.
 type PriceObservation struct {
 	Provider          string            `json:"provider"`
@@ -38,6 +43,7 @@ type PriceObservation struct {
 	PricingModel      string            `json:"pricing_model"`
 	Attributes        ComputeAttributes `json:"attributes,omitempty"`
 	StorageAttributes StorageAttributes `json:"storage_attributes,omitempty"`
+	NetworkAttributes NetworkAttributes `json:"network_attributes,omitempty"`
 	FetchedAt         time.Time         `json:"fetched_at"`
 }
 
@@ -57,30 +63,40 @@ type ScoredComputeObservation struct {
 
 // MarshalAttributes serializes the category-specific attributes of an observation to JSON bytes.
 func MarshalAttributes(obs PriceObservation) ([]byte, error) {
-	if obs.ServiceCategory == "storage" {
+	switch obs.ServiceCategory {
+	case "storage":
 		return json.Marshal(obs.StorageAttributes)
+	case "network":
+		return json.Marshal(obs.NetworkAttributes)
+	default:
+		return json.Marshal(obs.Attributes)
 	}
-	return json.Marshal(obs.Attributes)
 }
 
 // UnmarshalAttributes deserializes raw JSON bytes into the corresponding category attribute struct.
-func UnmarshalAttributes(serviceCategory string, raw []byte) (ComputeAttributes, StorageAttributes, error) {
+func UnmarshalAttributes(serviceCategory string, raw []byte) (ComputeAttributes, StorageAttributes, NetworkAttributes, error) {
 	var computeAttrs ComputeAttributes
 	var storageAttrs StorageAttributes
+	var networkAttrs NetworkAttributes
 
 	if len(raw) == 0 {
-		return computeAttrs, storageAttrs, nil
+		return computeAttrs, storageAttrs, networkAttrs, nil
 	}
 
-	if serviceCategory == "storage" {
+	switch serviceCategory {
+	case "storage":
 		if err := json.Unmarshal(raw, &storageAttrs); err != nil {
-			return computeAttrs, storageAttrs, fmt.Errorf("unmarshal storage attributes: %w", err)
+			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal storage attributes: %w", err)
 		}
-	} else {
+	case "network":
+		if err := json.Unmarshal(raw, &networkAttrs); err != nil {
+			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal network attributes: %w", err)
+		}
+	default:
 		if err := json.Unmarshal(raw, &computeAttrs); err != nil {
-			return computeAttrs, storageAttrs, fmt.Errorf("unmarshal compute attributes: %w", err)
+			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal compute attributes: %w", err)
 		}
 	}
 
-	return computeAttrs, storageAttrs, nil
+	return computeAttrs, storageAttrs, networkAttrs, nil
 }

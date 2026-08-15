@@ -25,6 +25,12 @@ func TestMapAzureProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Bandwidth service",
+			serviceName:  "Bandwidth",
+			wantCategory: "network",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "SQL Database",
 			wantCategory: "",

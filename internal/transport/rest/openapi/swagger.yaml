@@ -8,6 +8,11 @@ definitions:
       vcpu:
         type: number
     type: object
+  github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes:
+    properties:
+      egress_gb:
+        type: number
+    type: object
   github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes:
     properties:
       iops:
@@ -71,6 +76,52 @@ definitions:
           type: string
         type: array
       normalized_hourly_usd:
+        type: number
+      price:
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
+      provider:
+        type: string
+      sku_id:
+        type: string
+      stale:
+        type: boolean
+    type: object
+  internal_transport_rest.NetworkComparisonMeta:
+    properties:
+      api_version:
+        type: string
+      generated_at:
+        type: string
+      query:
+        additionalProperties: true
+        type: object
+    type: object
+  internal_transport_rest.NetworkComparisonResponse:
+    properties:
+      meta:
+        $ref: '#/definitions/internal_transport_rest.NetworkComparisonMeta'
+      results:
+        items:
+          $ref: '#/definitions/internal_transport_rest.NetworkResultEntry'
+        type: array
+      warnings:
+        items:
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
+        type: array
+    type: object
+  internal_transport_rest.NetworkResultEntry:
+    properties:
+      fetched_at:
+        type: string
+      match_quality:
+        type: string
+      matched_spec:
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes'
+      missing_attributes:
+        items:
+          type: string
+        type: array
+      monthly_cost_usd:
         type: number
       price:
         $ref: '#/definitions/internal_transport_rest.PriceDetail'
@@ -193,6 +244,45 @@ paths:
           schema:
             $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get compute pricing comparison
+      tags:
+      - prices
+  /api/v1/prices/network:
+    get:
+      description: Returns normalized network / data transfer egress pricing across
+        cloud providers (AWS, Azure, GCP) for requested specs.
+      parameters:
+      - description: Requested network egress in GB (e.g. 500, max 10000000)
+        in: query
+        name: egress_gb
+        type: string
+      - description: 'Canonical region group (default: us-east)'
+        in: query
+        name: region
+        type: string
+      - description: 'Target currency code (default: USD)'
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_transport_rest.NetworkComparisonResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+      summary: Get network pricing comparison
       tags:
       - prices
   /api/v1/prices/storage:

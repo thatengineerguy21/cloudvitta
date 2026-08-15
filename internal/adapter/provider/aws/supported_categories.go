@@ -4,6 +4,7 @@ package aws
 var SupportedCategories = map[string]bool{
 	"compute": true,
 	"storage": true,
+	"network": true,
 }
 
 // IsCategorySupported reports whether the specified category is supported by the AWS adapter.

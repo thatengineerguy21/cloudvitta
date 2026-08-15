@@ -9,8 +9,9 @@ import (
 var ErrUnmappedProduct = errors.New("catalogmap: unmapped product code")
 
 var awsCatalogMap = map[string]string{
-	"AmazonEC2": "compute",
-	"AmazonS3":  "storage",
+	"AmazonEC2":       "compute",
+	"AmazonS3":        "storage",
+	"AWSDataTransfer": "network",
 }
 
 // MapAWSProduct resolves an AWS product code to a normalized service category.

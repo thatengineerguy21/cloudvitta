@@ -13,6 +13,9 @@ const DefaultEC2PriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v
 // DefaultS3PriceListURL is the standard AWS Price List API URL for S3 us-east-1.
 const DefaultS3PriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-east-1/index.json"
 
+// DefaultDataTransferPriceListURL is the standard AWS Price List API URL for AWSDataTransfer us-east-1.
+const DefaultDataTransferPriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/us-east-1/index.json"
+
 // Client is an HTTP client for fetching AWS Price List API data.
 type Client struct {
 	httpClient *http.Client

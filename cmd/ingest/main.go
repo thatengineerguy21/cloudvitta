@@ -123,6 +123,17 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsStorageAdapter)
 
+	// Register AWS network adapter with rate limiting and retry config
+	awsNetworkClient := aws.NewClient(aws.WithURL(aws.DefaultDataTransferPriceListURL))
+	awsNetworkAdapter := aws.NewAdapter(awsNetworkClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "network",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsNetworkAdapter)
+
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
 	azureAdapter := azure.NewAdapter(azureClient, rawStorage)
@@ -144,6 +155,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureStorageAdapter)
+
+	// Register Azure network adapter with rate limiting and retry config
+	azureNetworkClient := azure.NewClient(azure.WithURL(azure.DefaultNetworkRetailPricesURL))
+	azureNetworkAdapter := azure.NewAdapter(azureNetworkClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "network",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureNetworkAdapter)
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
@@ -174,6 +196,21 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpStorageAdapter)
+
+	// Register GCP network adapter with rate limiting and retry config
+	gcpNetworkOpts := []gcp.Option{gcp.WithURL(gcp.DefaultNetworkBillingCatalogURL)}
+	if cfg.GCP.APIKey != "" {
+		gcpNetworkOpts = append(gcpNetworkOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpNetworkClient := gcp.NewClient(gcpNetworkOpts...)
+	gcpNetworkAdapter := gcp.NewAdapter(gcpNetworkClient, rawStorage)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "network",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpNetworkAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

@@ -74,6 +74,64 @@
                 }
             }
         },
+        "/api/v1/prices/network": {
+            "get": {
+                "description": "Returns normalized network / data transfer egress pricing across cloud providers (AWS, Azure, GCP) for requested specs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "prices"
+                ],
+                "summary": "Get network pricing comparison",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Requested network egress in GB (e.g. 500, max 10000000)",
+                        "name": "egress_gb",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Canonical region group (default: us-east)",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency code (default: USD)",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.NetworkComparisonResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/prices/storage": {
             "get": {
                 "description": "Returns normalized storage pricing across cloud providers (AWS, Azure, GCP) for requested specs.",
@@ -150,6 +208,14 @@
                     "type": "number"
                 },
                 "vcpu": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes": {
+            "type": "object",
+            "properties": {
+                "egress_gb": {
                     "type": "number"
                 }
             }
@@ -246,6 +312,76 @@
                     }
                 },
                 "normalized_hourly_usd": {
+                    "type": "number"
+                },
+                "price": {
+                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_transport_rest.NetworkComparisonMeta": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "query": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "internal_transport_rest.NetworkComparisonResponse": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/internal_transport_rest.NetworkComparisonMeta"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.NetworkResultEntry"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                    }
+                }
+            }
+        },
+        "internal_transport_rest.NetworkResultEntry": {
+            "type": "object",
+            "properties": {
+                "fetched_at": {
+                    "type": "string"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "matched_spec": {
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "monthly_cost_usd": {
                     "type": "number"
                 },
                 "price": {

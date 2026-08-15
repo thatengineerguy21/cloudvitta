@@ -319,6 +319,81 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 						}
 						observations = append(observations, obs)
 					}
+
+				} else if category == "network" {
+					if !isNetworkProduct(sku) {
+						continue
+					}
+
+					if len(sku.PricingInfo) == 0 || len(sku.PricingInfo[0].PricingExpression.TieredRates) == 0 {
+						continue
+					}
+
+					rates := sku.PricingInfo[0].PricingExpression.TieredRates
+					if len(rates) > 1 {
+						slog.Info("skipping GCP SKU due to tiered pricing", "provider", "gcp", "sku", sku.SkuID, "tiered_rate_count", len(rates), "reason", "tiered_pricing_not_supported_in_v1")
+						continue
+					}
+					rate := rates[0]
+					if rate.StartUsageAmount > 0 {
+						slog.Info("skipping GCP SKU due to non-zero start usage tiered pricing", "provider", "gcp", "sku", sku.SkuID, "reason", "tiered_pricing_not_supported_in_v1")
+						continue
+					}
+
+					unitPrice := rate.UnitPrice
+					var unitsDec decimal.Decimal
+					if unitPrice.Units != "" {
+						var err error
+						unitsDec, err = decimal.NewFromString(unitPrice.Units)
+						if err != nil {
+							return nil, "", fmt.Errorf("gcp normalize sku %s: invalid units %q: %w", sku.SkuID, unitPrice.Units, err)
+						}
+					} else {
+						unitsDec = decimal.Zero
+					}
+
+					nanosDec := decimal.NewFromInt(int64(unitPrice.Nanos)).Div(decimal.NewFromInt(1_000_000_000))
+					priceAmount := unitsDec.Add(nanosDec)
+
+					if priceAmount.IsZero() {
+						continue
+					}
+
+					unit := "GB"
+					currency := unitPrice.CurrencyCode
+					if currency == "" {
+						currency = "USD"
+					}
+
+					regions := sku.ServiceRegions
+					if len(regions) == 0 {
+						regions = []string{"us-east1"}
+					}
+
+					for _, region := range regions {
+						regionGroup, err := regionmap.MapGCPRegion(region)
+						if err != nil {
+							return nil, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+						}
+
+						obs := domain.PriceObservation{
+							Provider:        "gcp",
+							ServiceCategory: category,
+							SkuID:           sku.SkuID,
+							DisplayName:     sku.Description,
+							Region:          region,
+							RegionGroup:     regionGroup,
+							Unit:            unit,
+							PriceAmount:     priceAmount,
+							PriceCurrency:   currency,
+							PricingModel:    "OnDemand",
+							NetworkAttributes: domain.NetworkAttributes{
+								EgressGB: 1,
+							},
+							FetchedAt: fetchedAt,
+						}
+						observations = append(observations, obs)
+					}
 				}
 			}
 			// Consume ']'
@@ -338,6 +413,16 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 	}
 
 	return observations, nextPageToken, nil
+}
+
+func isNetworkProduct(sku gcpSKU) bool {
+	if sku.Category.UsageType != "OnDemand" {
+		return false
+	}
+	if sku.Category.ResourceFamily == "Network" || strings.Contains(sku.Description, "Network") || strings.Contains(sku.Description, "Egress") || strings.Contains(sku.Description, "Data Transfer") || strings.Contains(sku.Category.ResourceGroup, "Interconnect") || strings.Contains(sku.Category.ResourceGroup, "Egress") {
+		return true
+	}
+	return false
 }
 
 func isComputeInstance(sku gcpSKU) bool {

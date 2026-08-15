@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
@@ -192,6 +193,42 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 				StorageAttributes: domain.StorageAttributes{
 					SizeGB:       1,
 					StorageClass: storageClass,
+				},
+				FetchedAt: fetchedAt,
+			}
+			observations = append(observations, obs)
+
+		} else if category == "network" {
+			// Tiered Pricing Detection (PRD §16.1):
+			// If an item has TierMinimumUnits > 0 (starts after initial tier), skip it.
+			if item.TierMinimumUnits > 0 {
+				slog.Info("skipping Azure SKU due to tiered pricing", "provider", "azure", "sku", skuID, "tierMinimumUnits", item.TierMinimumUnits, "reason", "tiered_pricing_not_supported_in_v1")
+				continue
+			}
+
+			displayName := item.ProductName
+			if displayName == "" {
+				displayName = item.MeterName
+			}
+
+			unit := item.UnitOfMeasure
+			if strings.EqualFold(unit, "1 GB") || strings.EqualFold(unit, "1 GB/Month") || strings.EqualFold(unit, "GB") {
+				unit = "GB"
+			}
+
+			obs := domain.PriceObservation{
+				Provider:        "azure",
+				ServiceCategory: category,
+				SkuID:           skuID,
+				DisplayName:     displayName,
+				Region:          region,
+				RegionGroup:     regionGroup,
+				Unit:            unit,
+				PriceAmount:     priceAmount,
+				PriceCurrency:   item.CurrencyCode,
+				PricingModel:    "OnDemand",
+				NetworkAttributes: domain.NetworkAttributes{
+					EgressGB: 1,
 				},
 				FetchedAt: fetchedAt,
 			}

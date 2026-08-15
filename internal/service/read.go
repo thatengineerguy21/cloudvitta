@@ -149,7 +149,7 @@ func (s *PricingService) GetPrices(ctx context.Context, provider, category, regi
 }
 
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {
-	computeAttrs, storageAttrs, err := domain.UnmarshalAttributes(row.ServiceCategory, row.Attributes)
+	computeAttrs, storageAttrs, networkAttrs, err := domain.UnmarshalAttributes(row.ServiceCategory, row.Attributes)
 	if err != nil {
 		return domain.PriceObservation{}, err
 	}
@@ -177,6 +177,7 @@ func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, erro
 		PricingModel:      row.PricingModel,
 		Attributes:        computeAttrs,
 		StorageAttributes: storageAttrs,
+		NetworkAttributes: networkAttrs,
 		FetchedAt:         fetchedAtTime,
 	}, nil
 }

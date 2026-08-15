@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,8 @@ type awsProduct struct {
 
 type awsPriceDimension struct {
 	Unit         string            `json:"unit"`
+	BeginRange   string            `json:"beginRange"`
+	EndRange     string            `json:"endRange"`
 	PricePerUnit map[string]string `json:"pricePerUnit"`
 }
 
@@ -39,6 +42,7 @@ type awsProductMeta struct {
 	displayName  string
 	computeAttrs domain.ComputeAttributes
 	storageAttrs domain.StorageAttributes
+	networkAttrs domain.NetworkAttributes
 }
 
 // Normalize parses an AWS Price List JSON stream and returns normalized domain observations.
@@ -49,35 +53,30 @@ type awsProductMeta struct {
 func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, error) {
 	dec := json.NewDecoder(r)
 
-	// Consume opening '{'
-	t, err := dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("aws normalize: read start token: %w", err)
-	}
-	if delim, ok := t.(json.Delim); !ok || delim != '{' {
-		return nil, fmt.Errorf("aws normalize: expected '{' at root, got %v", t)
+	// Advance to opening '{' of root object
+	if err := consumeDelim(dec, '{'); err != nil {
+		return nil, fmt.Errorf("aws normalize: stream start: %w", err)
 	}
 
-	var offerCode string
-	var productsParsed bool
 	filteredProducts := make(map[string]awsProductMeta)
 	var observations []domain.PriceObservation
+	var productsParsed bool
+	var offerCode string
 
 	for dec.More() {
 		keyToken, err := dec.Token()
 		if err != nil {
 			return nil, fmt.Errorf("aws normalize: read top-level key: %w", err)
 		}
-		key, ok := keyToken.(string)
-		if !ok {
-			return nil, fmt.Errorf("aws normalize: expected string key, got %v", keyToken)
-		}
+		key := fmt.Sprintf("%v", keyToken)
 
 		switch key {
 		case "offerCode":
-			if err := dec.Decode(&offerCode); err != nil {
+			var val string
+			if err := dec.Decode(&val); err != nil {
 				return nil, fmt.Errorf("aws normalize: decode offerCode: %w", err)
 			}
+			offerCode = val
 
 		case "products":
 			// Consume opening '{' of products map
@@ -88,7 +87,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 			for dec.More() {
 				skuToken, err := dec.Token()
 				if err != nil {
-					return nil, fmt.Errorf("aws normalize: read product sku: %w", err)
+					return nil, fmt.Errorf("aws normalize: read sku key: %w", err)
 				}
 				sku := fmt.Sprintf("%v", skuToken)
 
@@ -184,6 +183,46 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 						},
 					}
 					filteredProducts[sku] = meta
+
+				} else if isNetworkProduct(prod, prod.Attributes) {
+					category, err := catalogmap.MapAWSProduct(serviceCode)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+					}
+
+					location := prod.Attributes["fromLocation"]
+					if location == "" {
+						location = prod.Attributes["location"]
+					}
+					if location == "" {
+						location = prod.Attributes["regionCode"]
+					}
+					regionGroup, err := regionmap.MapAWSRegion(location)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+					}
+
+					region := prod.Attributes["regionCode"]
+					if region == "" {
+						region = location
+					}
+
+					displayName := prod.Attributes["description"]
+					if displayName == "" {
+						displayName = "AWS Data Transfer Out"
+					}
+
+					meta := awsProductMeta{
+						sku:         sku,
+						category:    category,
+						regionGroup: regionGroup,
+						region:      region,
+						displayName: displayName,
+						networkAttrs: domain.NetworkAttributes{
+							EgressGB: 1,
+						},
+					}
+					filteredProducts[sku] = meta
 				}
 			}
 
@@ -232,7 +271,19 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 							}
 
 							for _, term := range skuTerms {
+								// Tiered Pricing Detection (PRD §16.1):
+								// If there are multiple price dimensions in a term or dimension starts above 0, skip the SKU entirely.
+								if len(term.PriceDimensions) > 1 {
+									slog.Info("skipping AWS SKU due to tiered pricing", "provider", "aws", "sku", sku, "dimensions", len(term.PriceDimensions), "reason", "tiered_pricing_not_supported_in_v1")
+									continue
+								}
+
 								for _, dim := range term.PriceDimensions {
+									if dim.BeginRange != "" && dim.BeginRange != "0" {
+										slog.Info("skipping AWS SKU dimension due to tiered pricing", "provider", "aws", "sku", sku, "begin_range", dim.BeginRange, "reason", "tiered_pricing_not_supported_in_v1")
+										continue
+									}
+
 									usdStr, hasUSD := dim.PricePerUnit["USD"]
 									if !hasUSD {
 										continue
@@ -296,6 +347,7 @@ func buildObservation(meta awsProductMeta, unit string, price decimal.Decimal, f
 		PricingModel:      "OnDemand",
 		Attributes:        meta.computeAttrs,
 		StorageAttributes: meta.storageAttrs,
+		NetworkAttributes: meta.networkAttrs,
 		FetchedAt:         fetchedAt,
 	}
 }
@@ -305,15 +357,18 @@ func consumeDelim(dec *json.Decoder, expected rune) error {
 	if err != nil {
 		return err
 	}
-	delim, ok := t.(json.Delim)
-	if !ok || rune(delim) != expected {
-		return fmt.Errorf("expected %q, got %v", expected, t)
+	d, ok := t.(json.Delim)
+	if !ok || rune(d) != expected {
+		return fmt.Errorf("expected delimiter %q, got %v", string(expected), t)
 	}
 	return nil
 }
 
 func isComputeInstance(product awsProduct, attrs map[string]string) bool {
 	if attrs == nil {
+		return false
+	}
+	if product.ProductFamily != "" && product.ProductFamily != "Compute Instance" {
 		return false
 	}
 
@@ -353,7 +408,7 @@ func isStorageProduct(product awsProduct, attrs map[string]string) bool {
 	if attrs == nil {
 		return false
 	}
-	if product.ProductFamily != "Storage" {
+	if product.ProductFamily != "" && product.ProductFamily != "Storage" {
 		return false
 	}
 	rawClass := attrs["storageClass"]
@@ -368,6 +423,22 @@ func isStorageProduct(product awsProduct, attrs map[string]string) bool {
 		return false
 	}
 	return true
+}
+
+func isNetworkProduct(product awsProduct, attrs map[string]string) bool {
+	if attrs == nil {
+		return false
+	}
+	if product.ProductFamily == "Fee" || product.ProductFamily == "Storage" || product.ProductFamily == "Compute Instance" {
+		return false
+	}
+	if product.ProductFamily == "Data Transfer" {
+		return true
+	}
+	if attrs["servicecode"] == "AWSDataTransfer" && (strings.Contains(attrs["usagetype"], "DataTransfer-Out") || strings.Contains(attrs["usagetype"], "AWS-Out-Bytes") || attrs["fromLocation"] != "") {
+		return true
+	}
+	return false
 }
 
 func parseVCPU(s string) float64 {

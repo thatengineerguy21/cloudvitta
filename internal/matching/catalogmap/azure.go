@@ -7,6 +7,7 @@ import (
 var azureCatalogMap = map[string]string{
 	"Virtual Machines": "compute",
 	"Storage":          "storage",
+	"Bandwidth":        "network",
 }
 
 // MapAzureProduct resolves an Azure service name to a normalized service category.
