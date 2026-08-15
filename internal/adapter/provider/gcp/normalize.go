@@ -332,12 +332,12 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 
 					rates := sku.PricingInfo[0].PricingExpression.TieredRates
 					if len(rates) > 1 {
-						slog.Info("skipping GCP SKU due to tiered pricing", "provider", "gcp", "sku", sku.SkuID, "tiered_rate_count", len(rates), "reason", "tiered_pricing_not_supported_in_v1")
+						slog.Debug("skipping GCP SKU due to tiered pricing", "provider", "gcp", "sku", sku.SkuID, "tiered_rate_count", len(rates), "reason", "tiered_pricing_not_supported_in_v1")
 						continue
 					}
 					rate := rates[0]
 					if rate.StartUsageAmount > 0 {
-						slog.Info("skipping GCP SKU due to non-zero start usage tiered pricing", "provider", "gcp", "sku", sku.SkuID, "reason", "tiered_pricing_not_supported_in_v1")
+						slog.Debug("skipping GCP SKU due to non-zero start usage tiered pricing", "provider", "gcp", "sku", sku.SkuID, "reason", "tiered_pricing_not_supported_in_v1")
 						continue
 					}
 
@@ -377,7 +377,11 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 							return nil, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 						}
 
-						transferType, _ := transfertypemap.MapGCPTransferType(sku.Description)
+						transferType, err := parseGCPTransferType(sku.Description, sku.Category.ResourceGroup)
+						if err != nil {
+							return nil, "", fmt.Errorf("gcp normalize sku %s transfer type: %w", sku.SkuID, err)
+						}
+
 						obs := domain.PriceObservation{
 							Provider:        "gcp",
 							ServiceCategory: category,
@@ -472,6 +476,17 @@ func parseGCPStorageClass(resourceGroup, description, name string) (string, erro
 		}
 	}
 	return storageclassmap.MapGCPStorageClass(resourceGroup)
+}
+
+func parseGCPTransferType(description, resourceGroup string) (string, error) {
+	for _, text := range []string{description, resourceGroup} {
+		if text != "" {
+			if tt, err := transfertypemap.MapGCPTransferType(text); err == nil {
+				return tt, nil
+			}
+		}
+	}
+	return transfertypemap.MapGCPTransferType(description)
 }
 
 var gcpMachineTypeRegex = regexp.MustCompile(`(?i)\b([a-z0-9]+)-(standard|highmem|highcpu|micro|small|medium)-?(\d+)?\b`)

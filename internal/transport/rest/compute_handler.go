@@ -72,9 +72,10 @@ func NewComputeHandler(pricingSvc *service.PricingService) *ComputeHandler {
 // @Produce      json
 // @Param        vcpu           query     number  false  "Requested vCPU count (e.g. 4)"
 // @Param        ram_gb         query     number  false  "Requested RAM in GB (e.g. 16)"
+// @Param        family         query     string  false  "Instance family filter (e.g. t3, c5)"
 // @Param        region         query     string  false  "Canonical region group (default: us-east)"
 // @Param        currency       query     string  false  "Target currency code (default: USD)"
-// @Param        strict_family  query     bool    false  "Strict instance family matching"
+// @Param        strict_family  query     bool    false  "Strict instance family matching (default: true)"
 // @Success      200            {object}  ComputeComparisonResponse
 // @Failure      400            {object}  middleware.RFC7807Error
 // @Failure      429            {object}  middleware.RFC7807Error
@@ -94,10 +95,8 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		region = "us-east"
 	}
 
-	// Build warnings array for Stage 0 (only AWS ingested)
+	// Build warnings array for Stage 3 providers
 	warnings := []ProviderWarning{
-		{Provider: "azure", Code: "not_yet_ingested", Message: "Azure ingestion lands in stage 1."},
-		{Provider: "gcp", Code: "not_yet_ingested", Message: "GCP ingestion lands in stage 1."},
 		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
 		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
 		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
@@ -118,12 +117,14 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	currency = "USD"
 
-	strictFamily := false
+	strictFamily := true
 	if strictStr := q.Get("strict_family"); strictStr != "" {
 		if b, err := strconv.ParseBool(strictStr); err == nil {
 			strictFamily = b
 		}
 	}
+
+	family := q.Get("family")
 
 	var reqVCPU float64
 	if vcpuStr := q.Get("vcpu"); vcpuStr != "" {
@@ -145,28 +146,61 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reqRAMGB = v
 	}
 
-	// Fetch compute prices from PricingService (which uses cache-aside + singleflight)
-	obsList, err := h.pricingSvc.GetPrices(r.Context(), "aws", "compute", region)
-	if err != nil {
-		status, errType, title := middleware.MapServiceError(err)
-		middleware.WriteJSONError(w, r, status, errType, title, err.Error())
-		return
-	}
-
-	// Score & match results using the service layer matching engine
-	target := service.MatchTarget{
-		VCPU:         reqVCPU,
-		RAMGB:        reqRAMGB,
-		StrictFamily: strictFamily,
-		Category:     "compute",
-	}
-
-	matchResult := service.MatchObservations(
-		service.ComputeScorer{}, obsList, target, service.ThresholdsForCategory("compute"),
-	)
-
+	providers := []string{"aws", "azure", "gcp"}
 	var results []ComputeResultEntry
-	if matchResult != nil {
+	var providerErrors int
+
+	for _, prov := range providers {
+		if !service.IsProviderCategorySupported(prov, "compute") {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "category_not_supported",
+				Message:  "Compute category is not supported by " + prov,
+			})
+			continue
+		}
+
+		obsList, err := h.pricingSvc.GetPrices(r.Context(), prov, "compute", region)
+		if err != nil {
+			providerErrors++
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "fetch_failed",
+				Message:  err.Error(),
+			})
+			continue
+		}
+
+		if len(obsList) == 0 {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "no_data_available",
+				Message:  "No compute pricing data available for this region.",
+			})
+			continue
+		}
+
+		// Score & match results using the service layer matching engine
+		target := service.MatchTarget{
+			VCPU:         reqVCPU,
+			RAMGB:        reqRAMGB,
+			Family:       family,
+			StrictFamily: strictFamily,
+			Category:     "compute",
+		}
+
+		matchResult := service.MatchObservations(
+			service.ComputeScorer{}, obsList, target, service.ThresholdsForCategory("compute"),
+		)
+		if matchResult == nil {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "no_match",
+				Message:  "No compute SKU matched the requested spec within acceptable thresholds.",
+			})
+			continue
+		}
+
 		obs := matchResult.Observation
 		results = append(results, ComputeResultEntry{
 			Provider:          obs.Provider,
@@ -186,6 +220,12 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// If all providers errored and produced zero results, return a 500 error
+	if len(results) == 0 && providerErrors == len(providers) {
+		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-error", "Compute pricing unavailable", "All providers failed to retrieve pricing data")
+		return
+	}
+
 	queryMeta := map[string]interface{}{
 		"category": "compute",
 		"region":   region,
@@ -196,6 +236,12 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if reqRAMGB > 0 {
 		queryMeta["ram_gb"] = reqRAMGB
+	}
+	if family != "" {
+		queryMeta["family"] = family
+	}
+	if q.Get("strict_family") != "" {
+		queryMeta["strict_family"] = strictFamily
 	}
 
 	resp := ComputeComparisonResponse{

@@ -9,4 +9,6 @@ var (
 	ErrProviderUnavailable = errors.New("provider unavailable")
 	// ErrNoMatchFound is returned when no matches can be found.
 	ErrNoMatchFound = errors.New("no match found")
+	// ErrCategoryNotSupported is returned when a provider does not support the requested category.
+	ErrCategoryNotSupported = errors.New("category not supported by provider")
 )

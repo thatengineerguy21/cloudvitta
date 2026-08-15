@@ -121,6 +121,15 @@ func (h *NetworkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var providerErrors int
 
 	for _, prov := range providers {
+		if !service.IsProviderCategorySupported(prov, "network") {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "category_not_supported",
+				Message:  "Network category is not supported by " + prov,
+			})
+			continue
+		}
+
 		obsList, err := h.pricingSvc.GetPrices(r.Context(), prov, "network", region)
 		if err != nil {
 			providerErrors++
@@ -179,7 +188,7 @@ func (h *NetworkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Unit:     unit,
 				Currency: currency,
 			},
-			MonthlyCostUSD: obs.PriceAmount.Mul(egressGB),
+			MonthlyCostUSD: service.CalculateNetworkMonthlyCost(obs.PriceAmount, egressGB),
 			FetchedAt:      obs.FetchedAt,
 			Stale:          false,
 		})

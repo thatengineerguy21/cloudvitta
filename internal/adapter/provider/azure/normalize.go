@@ -203,7 +203,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 			// Tiered Pricing Detection (PRD §16.1):
 			// If an item has TierMinimumUnits > 0 (starts after initial tier), skip it.
 			if item.TierMinimumUnits > 0 {
-				slog.Info("skipping Azure SKU due to tiered pricing", "provider", "azure", "sku", skuID, "tierMinimumUnits", item.TierMinimumUnits, "reason", "tiered_pricing_not_supported_in_v1")
+				slog.Debug("skipping Azure SKU due to tiered pricing", "provider", "azure", "sku", skuID, "tierMinimumUnits", item.TierMinimumUnits, "reason", "tiered_pricing_not_supported_in_v1")
 				continue
 			}
 
@@ -217,7 +217,11 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 				unit = "GB"
 			}
 
-			transferType, _ := transfertypemap.MapAzureTransferType(displayName)
+			transferType, err := parseAzureTransferType(displayName, item.MeterName, item.SkuName)
+			if err != nil {
+				return nil, "", fmt.Errorf("azure normalize sku %s transfer type: %w", skuID, err)
+			}
+
 			obs := domain.PriceObservation{
 				Provider:        "azure",
 				ServiceCategory: category,
@@ -273,6 +277,17 @@ func parseAzureStorageClass(skuName, meterName, productName string) (string, err
 		}
 	}
 	return storageclassmap.MapAzureStorageClass(skuName)
+}
+
+func parseAzureTransferType(displayName, meterName, skuName string) (string, error) {
+	for _, candidate := range []string{displayName, meterName, skuName} {
+		if candidate != "" {
+			if tt, err := transfertypemap.MapAzureTransferType(candidate); err == nil {
+				return tt, nil
+			}
+		}
+	}
+	return transfertypemap.MapAzureTransferType(displayName)
 }
 
 var vmSizeRegex = regexp.MustCompile(`(?i)(?:Standard_)?([A-Za-z]+)(\d+)(?:[A-Za-z]*)?(?:_v(\d+))?`)

@@ -213,7 +213,10 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 						displayName = "AWS Data Transfer Out"
 					}
 
-					transferType, _ := transfertypemap.MapAWSTransferType(displayName)
+					transferType, err := transfertypemap.MapAWSTransferType(displayName)
+					if err != nil {
+						return nil, fmt.Errorf("aws normalize sku %s transfer type: %w", sku, err)
+					}
 
 					meta := awsProductMeta{
 						sku:         sku,

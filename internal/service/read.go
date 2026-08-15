@@ -61,6 +61,10 @@ func NewPricingService(queries *store.Queries, redisClient redis.Cmdable, opts .
 // It attempts a Redis read first; on miss, it uses singleflight to collapse concurrent DB queries,
 // queries Postgres by regionGroup, and warms the cache before returning.
 func (s *PricingService) GetPrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
+	if !IsProviderCategorySupported(provider, category) {
+		return nil, fmt.Errorf("%w: provider %q does not support category %q", ErrCategoryNotSupported, provider, category)
+	}
+
 	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, regionGroup)
 
 	// 1. Try Cache-Aside Read from Redis

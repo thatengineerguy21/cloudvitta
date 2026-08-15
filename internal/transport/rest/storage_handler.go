@@ -121,6 +121,15 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var providerErrors int
 
 	for _, prov := range providers {
+		if !service.IsProviderCategorySupported(prov, "storage") {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "category_not_supported",
+				Message:  "Storage category is not supported by " + prov,
+			})
+			continue
+		}
+
 		obsList, err := h.pricingSvc.GetPrices(r.Context(), prov, "storage", region)
 		if err != nil {
 			providerErrors++
@@ -179,7 +188,7 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Unit:     unit,
 				Currency: currency,
 			},
-			MonthlyCostUSD: obs.PriceAmount.Mul(sizeGB),
+			MonthlyCostUSD: service.CalculateStorageMonthlyCost(obs.PriceAmount, sizeGB),
 			FetchedAt:      obs.FetchedAt,
 			Stale:          false,
 		})

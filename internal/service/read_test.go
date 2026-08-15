@@ -362,3 +362,17 @@ func TestPricingService_GetPrices_SingleflightCancellation(t *testing.T) {
 		t.Errorf("expected caller 2 to succeed despite caller 1 cancellation, got error: %v", err2)
 	}
 }
+
+func TestPricingService_GetPrices_UnsupportedCategory(t *testing.T) {
+	svc := service.NewPricingService(nil, nil)
+
+	_, err := svc.GetPrices(context.Background(), "aws", "unsupported_cat", "us-east")
+	if err == nil || !errors.Is(err, service.ErrCategoryNotSupported) {
+		t.Errorf("GetPrices with unsupported category error = %v, want ErrCategoryNotSupported", err)
+	}
+
+	_, err = svc.GetPrices(context.Background(), "unsupported_provider", "compute", "us-east")
+	if err == nil || !errors.Is(err, service.ErrCategoryNotSupported) {
+		t.Errorf("GetPrices with unsupported provider error = %v, want ErrCategoryNotSupported", err)
+	}
+}

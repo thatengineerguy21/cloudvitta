@@ -9,13 +9,15 @@ import (
 var ErrUnmappedTransferType = errors.New("transfertypemap: unmapped transfer type")
 
 var awsTransferTypeMap = map[string]string{
-	"AWS Data Transfer Out":            "internet_egress",
-	"Data Transfer Out (Internet)":     "internet_egress",
-	"Data Transfer Out (Inter-Region)": "inter_region",
-	"Data Transfer Out (Intra-Region)": "intra_region",
-	"Internet":                         "internet_egress",
-	"Inter-Region":                     "inter_region",
-	"Intra-Region":                     "intra_region",
+	"AWS Data Transfer Out":             "internet_egress",
+	"AWS Data Transfer Out to Internet": "internet_egress",
+	"AWS Tiered Data Transfer Out":      "internet_egress",
+	"Data Transfer Out (Internet)":      "internet_egress",
+	"Data Transfer Out (Inter-Region)":  "inter_region",
+	"Data Transfer Out (Intra-Region)":  "intra_region",
+	"Internet":                          "internet_egress",
+	"Inter-Region":                      "inter_region",
+	"Intra-Region":                      "intra_region",
 }
 
 // MapAWSTransferType resolves an AWS transfer type to a canonical transfer type.
