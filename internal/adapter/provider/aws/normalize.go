@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
@@ -40,13 +41,10 @@ type computeProductMeta struct {
 	family       string
 }
 
-type rawTermPrice struct {
-	unit     string
-	usdPrice decimal.Decimal
-}
-
 // Normalize parses an AWS Price List JSON stream and returns normalized domain observations.
-// It streams tokens using json.Decoder to minimize memory overhead on large provider files.
+// It streams tokens using json.Decoder with depth-aware skipping to minimize memory overhead
+// on large provider files. It enforces that products precede terms, returning ErrPermanentFailure
+// if the payload order violates this streaming invariant.
 // It fails loudly if an unmapped product code or region is encountered.
 func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, error) {
 	dec := json.NewDecoder(r)
@@ -61,8 +59,8 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 	}
 
 	var offerCode string
+	var productsParsed bool
 	filteredProducts := make(map[string]computeProductMeta)
-	pendingTerms := make(map[string][]rawTermPrice)
 	var observations []domain.PriceObservation
 
 	for dec.More() {
@@ -143,22 +141,19 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 				}
 
 				filteredProducts[sku] = meta
-
-				// If terms were encountered before products
-				if terms, hasTerms := pendingTerms[sku]; hasTerms {
-					for _, term := range terms {
-						observations = append(observations, buildObservation(meta, term.unit, term.usdPrice, fetchedAt))
-					}
-					delete(pendingTerms, sku)
-				}
 			}
 
 			// Consume closing '}' of products map
 			if err := consumeDelim(dec, '}'); err != nil {
 				return nil, fmt.Errorf("aws normalize: products close delim: %w", err)
 			}
+			productsParsed = true
 
 		case "terms":
+			if !productsParsed {
+				return nil, fmt.Errorf("%w: aws normalize: terms encountered before products in payload", provider.ErrPermanentFailure)
+			}
+
 			// Consume opening '{' of terms map
 			if err := consumeDelim(dec, '{'); err != nil {
 				return nil, fmt.Errorf("aws normalize: terms open delim: %w", err)
@@ -206,35 +201,9 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 								}
 							}
 						} else {
-							// If products haven't been parsed yet or this is a non-compute sku
-							// If products already parsed, we skip decoding terms payload completely!
-							if len(filteredProducts) > 0 {
-								var discard json.RawMessage
-								if err := dec.Decode(&discard); err != nil {
-									return nil, fmt.Errorf("aws normalize: discard sku terms: %w", err)
-								}
-							} else {
-								// Products not parsed yet; buffer compact terms
-								var skuTerms map[string]awsOfferTerm
-								if err := dec.Decode(&skuTerms); err != nil {
-									return nil, fmt.Errorf("aws normalize: buffer OnDemand sku %s: %w", sku, err)
-								}
-								for _, term := range skuTerms {
-									for _, dim := range term.PriceDimensions {
-										usdStr, hasUSD := dim.PricePerUnit["USD"]
-										if !hasUSD {
-											continue
-										}
-										priceAmount, err := decimal.NewFromString(usdStr)
-										if err != nil {
-											return nil, fmt.Errorf("aws normalize sku %s: invalid price %q: %w", sku, usdStr, err)
-										}
-										pendingTerms[sku] = append(pendingTerms[sku], rawTermPrice{
-											unit:     dim.Unit,
-											usdPrice: priceAmount,
-										})
-									}
-								}
+							// Discard non-compute terms without memory allocation
+							if err := skipValue(dec); err != nil {
+								return nil, fmt.Errorf("aws normalize: skip sku terms for %s: %w", sku, err)
 							}
 						}
 					}
@@ -243,9 +212,9 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 						return nil, fmt.Errorf("aws normalize: OnDemand close delim: %w", err)
 					}
 				} else {
-					var discard json.RawMessage
-					if err := dec.Decode(&discard); err != nil {
-						return nil, fmt.Errorf("aws normalize: discard term %s: %w", termType, err)
+					// Discard non-OnDemand terms (e.g. Reserved) without memory allocation
+					if err := skipValue(dec); err != nil {
+						return nil, fmt.Errorf("aws normalize: skip term %s: %w", termType, err)
 					}
 				}
 			}
@@ -259,14 +228,42 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 			}
 
 		default:
-			var discard json.RawMessage
-			if err := dec.Decode(&discard); err != nil {
-				return nil, fmt.Errorf("aws normalize: discard top-level key %s: %w", key, err)
+			// Discard unknown top-level section without memory allocation
+			if err := skipValue(dec); err != nil {
+				return nil, fmt.Errorf("aws normalize: skip top-level key %s: %w", key, err)
 			}
 		}
 	}
 
 	return observations, nil
+}
+
+func skipValue(dec *json.Decoder) error {
+	t, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	_, isDelim := t.(json.Delim)
+	if !isDelim {
+		return nil
+	}
+
+	depth := 1
+	for depth > 0 {
+		t, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		if d, ok := t.(json.Delim); ok {
+			switch d {
+			case '{', '[':
+				depth++
+			case '}', ']':
+				depth--
+			}
+		}
+	}
+	return nil
 }
 
 func buildObservation(meta computeProductMeta, unit string, price decimal.Decimal, fetchedAt time.Time) domain.PriceObservation {

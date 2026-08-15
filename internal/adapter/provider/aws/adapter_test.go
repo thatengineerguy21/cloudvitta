@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
@@ -222,5 +223,111 @@ func TestAdapter_Fetch_HTTPError_FailsCleanly(t *testing.T) {
 	_, err := adapter.Fetch(context.Background())
 	if err == nil {
 		t.Fatalf("Fetch() expected error for HTTP 500, got nil")
+	}
+}
+
+func TestNormalize_TermsBeforeProducts_ReturnsPermanentFailure(t *testing.T) {
+	// Payload where terms appears before products
+	jsonBody := `{
+		"offerCode": "AmazonEC2",
+		"terms": {
+			"OnDemand": {
+				"SKU-1": {
+					"TERM-1": {
+						"priceDimensions": {
+							"DIM-1": {
+								"unit": "Hrs",
+								"pricePerUnit": {"USD": "0.10"}
+							}
+						}
+					}
+				}
+			}
+		},
+		"products": {
+			"SKU-1": {
+				"sku": "SKU-1",
+				"attributes": {
+					"servicecode": "AmazonEC2",
+					"location": "US East (N. Virginia)",
+					"instanceType": "c5.xlarge",
+					"operatingSystem": "Linux",
+					"tenancy": "Shared"
+				}
+			}
+		}
+	}`
+
+	_, err := Normalize(strings.NewReader(jsonBody), time.Now().UTC())
+	if err == nil {
+		t.Fatalf("Normalize() expected error when terms precedes products, got nil")
+	}
+	if !errors.Is(err, provider.ErrPermanentFailure) {
+		t.Errorf("Normalize() error = %v, want errors.Is ErrPermanentFailure", err)
+	}
+}
+
+func TestNormalize_SkipsMassiveReservedBlocksWithoutSpike(t *testing.T) {
+	// Build a JSON payload with a massive Reserved block and many skipped keys
+	var b strings.Builder
+	b.WriteString(`{
+		"offerCode": "AmazonEC2",
+		"products": {
+			"SKU-C5": {
+				"sku": "SKU-C5",
+				"attributes": {
+					"servicecode": "AmazonEC2",
+					"location": "US East (N. Virginia)",
+					"instanceType": "c5.xlarge",
+					"operatingSystem": "Linux",
+					"tenancy": "Shared",
+					"vcpu": "4",
+					"memory": "8 GiB"
+				}
+			}
+		},
+		"terms": {
+			"Reserved": {`)
+
+	// Generate 1000 dummy reserved term entries to simulate large skipped blocks
+	for i := 0; i < 1000; i++ {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`"SKU-RES-`)
+		b.WriteString(string(rune('A' + (i % 26))))
+		b.WriteString(`": {"term": {"dimensions": {"dim": {"price": "100.00"}}}}`)
+	}
+
+	b.WriteString(`},
+			"OnDemand": {
+				"SKU-C5": {
+					"TERM-1": {
+						"priceDimensions": {
+							"DIM-1": {
+								"unit": "Hrs",
+								"pricePerUnit": {"USD": "0.17"}
+							}
+						}
+					}
+				}
+			}
+		},
+		"hugeExtraMetadata": {
+			"nested": [1, 2, 3, {"deep": "value"}]
+		}
+	}`)
+
+	payloadStr := b.String()
+
+	obs, err := Normalize(strings.NewReader(payloadStr), time.Now().UTC())
+	if err != nil {
+		t.Fatalf("Normalize() failed: %v", err)
+	}
+	if len(obs) != 1 {
+		t.Fatalf("expected 1 observation, got %d", len(obs))
+	}
+	if obs[0].PriceAmount.String() != "0.17" {
+		t.Errorf("PriceAmount = %s, want 0.17", obs[0].PriceAmount.String())
 	}
 }
