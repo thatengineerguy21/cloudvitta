@@ -141,7 +141,7 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			PriceAmount:       decimal.RequireFromString("0.090"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1},
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -157,7 +157,7 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			PriceAmount:       decimal.RequireFromString("0.087"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1},
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -173,7 +173,7 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			PriceAmount:       decimal.RequireFromString("0.085"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1},
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -220,8 +220,8 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 	if awsResult.MonthlyCostUSD.String() != "90" {
 		t.Errorf("AWS MonthlyCostUSD = %s, want 90", awsResult.MonthlyCostUSD.String())
 	}
-	if awsResult.MatchQuality != "not_yet_scored" {
-		t.Errorf("AWS MatchQuality = %q, want not_yet_scored", awsResult.MatchQuality)
+	if awsResult.MatchQuality != "exact" {
+		t.Errorf("AWS MatchQuality = %q, want exact", awsResult.MatchQuality)
 	}
 }
 
@@ -248,7 +248,7 @@ func TestNetworkHandler_PartialProviderFailure_Returns200WithWarning(t *testing.
 			PriceAmount:       decimal.RequireFromString("0.090"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1},
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 100},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -307,7 +307,7 @@ func TestNetworkHandler_EmptyProviderResults_AddsWarning(t *testing.T) {
 			ServiceCategory:   "network",
 			SkuID:             "SKU-AWS-DT-FLAT",
 			PriceAmount:       decimal.RequireFromString("0.090"),
-			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1},
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 100},
 		},
 	}
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east"), awsObs, cache.DefaultTTL)

@@ -15,6 +15,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
 )
 
 type gcpUnitPrice struct {
@@ -376,6 +377,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 							return nil, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 						}
 
+						transferType, _ := transfertypemap.MapGCPTransferType(sku.Description)
 						obs := domain.PriceObservation{
 							Provider:        "gcp",
 							ServiceCategory: category,
@@ -388,7 +390,8 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 							PriceCurrency:   currency,
 							PricingModel:    "OnDemand",
 							NetworkAttributes: domain.NetworkAttributes{
-								EgressGB: 1,
+								EgressGB:     1,
+								TransferType: transferType,
 							},
 							FetchedAt: fetchedAt,
 						}

@@ -15,6 +15,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
 )
 
 type awsProduct struct {
@@ -212,6 +213,8 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 						displayName = "AWS Data Transfer Out"
 					}
 
+					transferType, _ := transfertypemap.MapAWSTransferType(displayName)
+
 					meta := awsProductMeta{
 						sku:         sku,
 						category:    category,
@@ -219,7 +222,8 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 						region:      region,
 						displayName: displayName,
 						networkAttrs: domain.NetworkAttributes{
-							EgressGB: 1,
+							EgressGB:     1,
+							TransferType: transferType,
 						},
 					}
 					filteredProducts[sku] = meta

@@ -27,6 +27,7 @@ type NetworkResultEntry struct {
 	SkuID             string                   `json:"sku_id"`
 	MatchedSpec       domain.NetworkAttributes `json:"matched_spec"`
 	MatchQuality      string                   `json:"match_quality"`
+	MatchDeltaPct     float64                  `json:"match_delta_pct"`
 	MissingAttributes []string                 `json:"missing_attributes"`
 	Price             PriceDetail              `json:"price"`
 	MonthlyCostUSD    decimal.Decimal          `json:"monthly_cost_usd"`
@@ -57,9 +58,10 @@ func NewNetworkHandler(pricingSvc *service.PricingService) *NetworkHandler {
 // @Description  Returns normalized network / data transfer egress pricing across cloud providers (AWS, Azure, GCP) for requested specs.
 // @Tags         prices
 // @Produce      json
-// @Param        egress_gb  query     string  false  "Requested network egress in GB (e.g. 500, max 10000000)"
-// @Param        region     query     string  false  "Canonical region group (default: us-east)"
-// @Param        currency   query     string  false  "Target currency code (default: USD)"
+// @Param        egress_gb      query     string  false  "Requested network egress in GB (e.g. 500, max 10000000)"
+// @Param        transfer_type  query     string  false  "Canonical transfer type (intra_region, inter_region, internet_egress)"
+// @Param        region         query     string  false  "Canonical region group (default: us-east)"
+// @Param        currency       query     string  false  "Target currency code (default: USD)"
 // @Success      200        {object}  NetworkComparisonResponse
 // @Failure      400        {object}  middleware.RFC7807Error
 // @Failure      429        {object}  middleware.RFC7807Error
@@ -112,6 +114,8 @@ func (h *NetworkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		hasExplicitEgress = true
 	}
 
+	transferType := q.Get("transfer_type")
+
 	providers := []string{"aws", "azure", "gcp"}
 	var results []NetworkResultEntry
 	var providerErrors int
@@ -137,36 +141,48 @@ func (h *NetworkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		for _, obs := range obsList {
-			matchedSpec := obs.NetworkAttributes
-			if hasExplicitEgress {
-				f, _ := egressGB.Float64()
-				matchedSpec.EgressGB = f
-			}
-
-			unit := obs.Unit
-			if unit == "" {
-				unit = "GB"
-			}
-
-			// In stage 1.5, matching thresholds are deferred to stage 1.6.
-			// Honesty vocabulary: "not_yet_scored" accurately describes status without fake delta numbers.
-			results = append(results, NetworkResultEntry{
-				Provider:          obs.Provider,
-				SkuID:             obs.SkuID,
-				MatchedSpec:       matchedSpec,
-				MatchQuality:      "not_yet_scored", // match scoring lands in 1.6
-				MissingAttributes: []string{},
-				Price: PriceDetail{
-					Amount:   obs.PriceAmount,
-					Unit:     unit,
-					Currency: currency,
-				},
-				MonthlyCostUSD: obs.PriceAmount.Mul(egressGB),
-				FetchedAt:      obs.FetchedAt,
-				Stale:          false,
-			})
+		// Build match target from query parameters.
+		egressF, _ := egressGB.Float64()
+		target := service.MatchTarget{
+			EgressGB:     egressF,
+			TransferType: transferType,
+			Category:     "network",
 		}
+
+		matchResult := service.MatchObservations(
+			service.NetworkScorer{}, obsList, target, service.ThresholdsForCategory("network"),
+		)
+		if matchResult == nil {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "no_match",
+				Message:  "No network SKU matched the requested spec within acceptable thresholds.",
+			})
+			continue
+		}
+
+		obs := matchResult.Observation
+		unit := obs.Unit
+		if unit == "" {
+			unit = "GB"
+		}
+
+		results = append(results, NetworkResultEntry{
+			Provider:          obs.Provider,
+			SkuID:             obs.SkuID,
+			MatchedSpec:       obs.NetworkAttributes,
+			MatchQuality:      matchResult.MatchQuality,
+			MatchDeltaPct:     matchResult.MatchDeltaPct,
+			MissingAttributes: matchResult.MissingAttributes,
+			Price: PriceDetail{
+				Amount:   obs.PriceAmount,
+				Unit:     unit,
+				Currency: currency,
+			},
+			MonthlyCostUSD: obs.PriceAmount.Mul(egressGB),
+			FetchedAt:      obs.FetchedAt,
+			Stale:          false,
+		})
 	}
 
 	// If all providers errored and produced zero results, return a 500 error
@@ -182,6 +198,9 @@ func (h *NetworkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if hasExplicitEgress {
 		queryMeta["egress_gb"] = egressGB
+	}
+	if transferType != "" {
+		queryMeta["transfer_type"] = transferType
 	}
 
 	resp := NetworkComparisonResponse{

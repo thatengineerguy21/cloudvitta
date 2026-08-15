@@ -27,6 +27,7 @@ type StorageResultEntry struct {
 	SkuID             string                   `json:"sku_id"`
 	MatchedSpec       domain.StorageAttributes `json:"matched_spec"`
 	MatchQuality      string                   `json:"match_quality"`
+	MatchDeltaPct     float64                  `json:"match_delta_pct"`
 	MissingAttributes []string                 `json:"missing_attributes"`
 	Price             PriceDetail              `json:"price"`
 	MonthlyCostUSD    decimal.Decimal          `json:"monthly_cost_usd"`
@@ -140,36 +141,48 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		for _, obs := range obsList {
-			matchedSpec := obs.StorageAttributes
-			if hasExplicitSize {
-				f, _ := sizeGB.Float64()
-				matchedSpec.SizeGB = f
-			}
-
-			unit := obs.Unit
-			if unit == "" {
-				unit = "GB-Mo"
-			}
-
-			// In stage 1.4, matching thresholds are deferred to stage 1.6.
-			// Honesty vocabulary: "not_yet_scored" accurately describes status without fake numbers.
-			results = append(results, StorageResultEntry{
-				Provider:          obs.Provider,
-				SkuID:             obs.SkuID,
-				MatchedSpec:       matchedSpec,
-				MatchQuality:      "not_yet_scored", // match scoring lands in 1.6
-				MissingAttributes: []string{},
-				Price: PriceDetail{
-					Amount:   obs.PriceAmount,
-					Unit:     unit,
-					Currency: currency,
-				},
-				MonthlyCostUSD: obs.PriceAmount.Mul(sizeGB),
-				FetchedAt:      obs.FetchedAt,
-				Stale:          false,
-			})
+		// Build match target from query parameters.
+		sizeF, _ := sizeGB.Float64()
+		target := service.MatchTarget{
+			SizeGB:       sizeF,
+			StorageClass: storageClass,
+			Category:     "storage",
 		}
+
+		matchResult := service.MatchObservations(
+			service.StorageScorer{}, obsList, target, service.ThresholdsForCategory("storage"),
+		)
+		if matchResult == nil {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "no_match",
+				Message:  "No storage SKU matched the requested spec within acceptable thresholds.",
+			})
+			continue
+		}
+
+		obs := matchResult.Observation
+		unit := obs.Unit
+		if unit == "" {
+			unit = "GB-Mo"
+		}
+
+		results = append(results, StorageResultEntry{
+			Provider:          obs.Provider,
+			SkuID:             obs.SkuID,
+			MatchedSpec:       obs.StorageAttributes,
+			MatchQuality:      matchResult.MatchQuality,
+			MatchDeltaPct:     matchResult.MatchDeltaPct,
+			MissingAttributes: matchResult.MissingAttributes,
+			Price: PriceDetail{
+				Amount:   obs.PriceAmount,
+				Unit:     unit,
+				Currency: currency,
+			},
+			MonthlyCostUSD: obs.PriceAmount.Mul(sizeGB),
+			FetchedAt:      obs.FetchedAt,
+			Stale:          false,
+		})
 	}
 
 	// If all providers errored and produced zero results, return a 500 error

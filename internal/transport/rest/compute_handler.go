@@ -153,25 +153,35 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Score & filter results using the service layer
-	scoredList := service.ScoreComputeObservations(reqVCPU, reqRAMGB, strictFamily, obsList)
+	// Score & match results using the service layer matching engine
+	target := service.MatchTarget{
+		VCPU:         reqVCPU,
+		RAMGB:        reqRAMGB,
+		StrictFamily: strictFamily,
+		Category:     "compute",
+	}
+
+	matchResult := service.MatchObservations(
+		service.ComputeScorer{}, obsList, target, service.ThresholdsForCategory("compute"),
+	)
 
 	var results []ComputeResultEntry
-	for _, scored := range scoredList {
+	if matchResult != nil {
+		obs := matchResult.Observation
 		results = append(results, ComputeResultEntry{
-			Provider:          scored.Observation.Provider,
-			SkuID:             scored.Observation.SkuID,
-			MatchedSpec:       scored.Observation.Attributes,
-			MatchQuality:      scored.MatchQuality,
-			MatchDeltaPct:     scored.MatchDeltaPct,
-			MissingAttributes: scored.MissingAttributes,
+			Provider:          obs.Provider,
+			SkuID:             obs.SkuID,
+			MatchedSpec:       obs.Attributes,
+			MatchQuality:      matchResult.MatchQuality,
+			MatchDeltaPct:     matchResult.MatchDeltaPct,
+			MissingAttributes: matchResult.MissingAttributes,
 			Price: PriceDetail{
-				Amount:   scored.Observation.PriceAmount,
+				Amount:   obs.PriceAmount,
 				Unit:     "hour",
 				Currency: currency,
 			},
-			NormalizedHourlyUSD: scored.Observation.PriceAmount,
-			FetchedAt:           scored.Observation.FetchedAt,
+			NormalizedHourlyUSD: obs.PriceAmount,
+			FetchedAt:           obs.FetchedAt,
 			Stale:               false,
 		})
 	}

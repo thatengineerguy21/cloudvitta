@@ -26,7 +26,8 @@ type StorageAttributes struct {
 
 // NetworkAttributes holds normalized attributes for networking / data transfer resources.
 type NetworkAttributes struct {
-	EgressGB float64 `json:"egress_gb"`
+	EgressGB     float64 `json:"egress_gb"`
+	TransferType string  `json:"transfer_type,omitempty"`
 }
 
 // PriceObservation represents a single normalized cloud pricing observation.

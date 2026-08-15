@@ -151,7 +151,7 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			PriceAmount:       decimal.RequireFromString("0.023"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			StorageAttributes: domain.StorageAttributes{SizeGB: 1, StorageClass: "standard"},
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -167,7 +167,7 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			PriceAmount:       decimal.RequireFromString("0.0184"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			StorageAttributes: domain.StorageAttributes{SizeGB: 1, StorageClass: "standard"},
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -183,7 +183,7 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			PriceAmount:       decimal.RequireFromString("0.020"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			StorageAttributes: domain.StorageAttributes{SizeGB: 1, StorageClass: "standard"},
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -230,8 +230,8 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 	if awsResult.MonthlyCostUSD.String() != "11.5" {
 		t.Errorf("AWS MonthlyCostUSD = %s, want 11.5", awsResult.MonthlyCostUSD.String())
 	}
-	if awsResult.MatchQuality != "not_yet_scored" {
-		t.Errorf("AWS MatchQuality = %q, want not_yet_scored", awsResult.MatchQuality)
+	if awsResult.MatchQuality != "exact" {
+		t.Errorf("AWS MatchQuality = %q, want exact", awsResult.MatchQuality)
 	}
 }
 
@@ -259,7 +259,7 @@ func TestStorageHandler_PartialProviderFailure_Returns200WithWarning(t *testing.
 			PriceAmount:       decimal.RequireFromString("0.023"),
 			PriceCurrency:     "USD",
 			PricingModel:      "OnDemand",
-			StorageAttributes: domain.StorageAttributes{SizeGB: 1, StorageClass: "standard"},
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
@@ -321,7 +321,7 @@ func TestStorageHandler_EmptyProviderResults_AddsWarning(t *testing.T) {
 			ServiceCategory:   "storage",
 			SkuID:             "SKU-AWS-S3-STD",
 			PriceAmount:       decimal.RequireFromString("0.023"),
-			StorageAttributes: domain.StorageAttributes{SizeGB: 1, StorageClass: "standard"},
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
 		},
 	}
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east"), awsObs, cache.DefaultTTL)

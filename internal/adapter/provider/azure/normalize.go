@@ -15,6 +15,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
 )
 
 type azureItem struct {
@@ -216,6 +217,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 				unit = "GB"
 			}
 
+			transferType, _ := transfertypemap.MapAzureTransferType(displayName)
 			obs := domain.PriceObservation{
 				Provider:        "azure",
 				ServiceCategory: category,
@@ -228,7 +230,8 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 				PriceCurrency:   item.CurrencyCode,
 				PricingModel:    "OnDemand",
 				NetworkAttributes: domain.NetworkAttributes{
-					EgressGB: 1,
+					EgressGB:     1,
+					TransferType: transferType,
 				},
 				FetchedAt: fetchedAt,
 			}
