@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceForSKUParams) (PriceObservation, error)
 	GetPriceObservations(ctx context.Context, arg GetPriceObservationsParams) ([]PriceObservation, error)
 	InsertPriceObservation(ctx context.Context, arg InsertPriceObservationParams) (int64, error)
 }

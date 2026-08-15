@@ -145,7 +145,7 @@ Execute the provider data ingestion pipeline:
 ```bash
 go run ./cmd/ingest
 ```
-This fetches raw pricing payloads from provider APIs (e.g. AWS EC2), uploads raw JSON to your GCS bucket, and inserts normalized pricing rows into `price_observations`.
+The orchestrator concurrently fetches pricing data from all registered provider/category pairs (e.g. AWS EC2). Each job uses per-provider rate limiting and retry policies, acquires a Redis idempotency lock to prevent overlapping runs, uploads raw JSON to GCS, inserts normalized pricing rows into `price_observations` with anomaly detection (flagging >10x price swings as `pending_review`), and records permanently failed jobs to the Redis DLQ.
 
 ---
 

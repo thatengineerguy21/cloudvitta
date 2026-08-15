@@ -10,9 +10,11 @@ import (
 
 	gcsstorage "cloud.google.com/go/storage"
 	"github.com/redis/go-redis/v9"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
@@ -58,7 +60,7 @@ func run() error {
 	defer func() { _ = gcsClient.Close() }()
 	rawStorage := storage.NewGCSStorage(gcsClient, cfg.Storage.GCSBucketName)
 
-	// --- Redis Cache ---
+	// --- Redis ---
 	var redisClient redis.Cmdable
 	if cfg.Redis.URL != "" {
 		rc, err := cache.NewClient(cfg.Redis.URL)
@@ -75,19 +77,71 @@ func run() error {
 		}
 	}
 
-	// --- Dependencies & Wiring ---
-	queries := store.New(dbPool)
+	// --- Provider Factory ---
+	factory := provider.NewFactory()
+
+	// Register AWS compute adapter with rate limiting and retry config
 	awsClient := aws.NewClient()
 	awsAdapter := aws.NewAdapter(awsClient, rawStorage)
-	ingestSvc := service.NewIngestionService(queries, awsAdapter, redisClient)
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "compute",
+		RateLimitRPS:   10, // AWS bulk API is generous; 10 req/s is safe
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsAdapter)
 
-	// --- Execution ---
-	slog.Info("executing AWS compute pricing ingestion...")
-	count, err := ingestSvc.RunAWSComputeIngestion(ctx)
-	if err != nil {
-		return fmt.Errorf("aws compute ingestion failed: %w", err)
+	// --- DLQ ---
+	var dlqSvc *dlq.DLQ
+	if redisClient != nil {
+		dlqSvc = dlq.New(redisClient)
 	}
 
-	slog.Info("ingestion job completed successfully", "inserted_count", count)
+	// --- Orchestrator ---
+	queries := store.New(dbPool)
+	orchestrator := service.NewOrchestrator(
+		queries,
+		redisClient,
+		dlqSvc,
+		factory,
+		service.DefaultOrchestratorConfig(),
+	)
+
+	// --- Execution ---
+	slog.Info("starting orchestrated ingestion run...")
+	results := orchestrator.RunAll(ctx)
+
+	// Report results
+	var hasErrors bool
+	for _, r := range results {
+		if r.Skipped {
+			slog.Info("ingestion job skipped (lock held)",
+				"provider", r.Provider,
+				"category", r.Category,
+			)
+			continue
+		}
+		if r.Err != nil {
+			slog.Error("ingestion job failed",
+				"provider", r.Provider,
+				"category", r.Category,
+				"error", r.Err,
+			)
+			hasErrors = true
+			continue
+		}
+		slog.Info("ingestion job completed",
+			"provider", r.Provider,
+			"category", r.Category,
+			"inserted", r.InsertedCount,
+			"anomalies", r.AnomalyCount,
+		)
+	}
+
+	if hasErrors {
+		return fmt.Errorf("one or more ingestion jobs failed")
+	}
+
+	slog.Info("all ingestion jobs completed successfully")
 	return nil
 }

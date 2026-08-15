@@ -11,6 +11,62 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getLatestPriceForSKU = `-- name: GetLatestPriceForSKU :one
+SELECT
+    id,
+    provider,
+    service_category,
+    sku_id,
+    display_name,
+    region,
+    region_group,
+    unit,
+    price_amount,
+    price_currency,
+    pricing_model,
+    attributes,
+    raw_response_ref,
+    fetched_at,
+    last_seen_at,
+    anomaly_status
+FROM price_observations
+WHERE provider = $1
+  AND sku_id = $2
+  AND region = $3
+ORDER BY fetched_at DESC
+LIMIT 1
+`
+
+type GetLatestPriceForSKUParams struct {
+	Provider string `json:"provider"`
+	SkuID    string `json:"sku_id"`
+	Region   string `json:"region"`
+}
+
+func (q *Queries) GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceForSKUParams) (PriceObservation, error) {
+	row := q.db.QueryRow(ctx, getLatestPriceForSKU, arg.Provider, arg.SkuID, arg.Region)
+	var i PriceObservation
+	err := row.Scan(
+		&i.ID,
+		&i.Provider,
+		&i.ServiceCategory,
+		&i.SkuID,
+		&i.DisplayName,
+		&i.Region,
+		&i.RegionGroup,
+		&i.Unit,
+		&i.PriceAmount,
+		&i.PriceCurrency,
+		&i.PricingModel,
+		&i.Attributes,
+		&i.RawResponseRef,
+		&i.FetchedAt,
+		&i.LastSeenAt,
+		&i.AnomalyStatus,
+	)
+	return i, err
+}
+
 const getPriceObservations = `-- name: GetPriceObservations :many
 SELECT
     id,

@@ -16,6 +16,7 @@ classDiagram
 
     class service {
         Calculator Engine
+        Ingestion Orchestrator
         FX Service Abstraction
         SKU Matching Orchestration
     }
@@ -28,6 +29,8 @@ classDiagram
         aws
         azure
         gcp
+        factory: Job construction
+        retry: Backoff and retry policy
     }
 
     class store {
@@ -37,6 +40,11 @@ classDiagram
     class cache {
         Redis / Upstash Wrapper
         Singleflight
+        Distributed Lock
+    }
+
+    class dlq {
+        Redis-backed Dead Letter Queue
     }
 
     class matching {
@@ -50,9 +58,11 @@ classDiagram
     transport --> service : Thin adapters call engine
     
     service --> store : Calls DB layer
-    service --> cache : Orchestrates reads
+    service --> cache : Orchestrates reads + locks
+    service --> dlq : Records failed jobs
     service --> matching : Uses matching strategies
     service --> domain : Returns domain types
+    service --> adapter : Builds and runs jobs
     
     adapter --> domain : Normalizes raw JSON to domain
     
