@@ -38,7 +38,7 @@ func TestAdapter_Fetch_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, err := adapter.Fetch(ctx)
+	result, err := adapter.Fetch(ctx, nil)
 	if err != nil {
 		t.Fatalf("Fetch() unexpected error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestAdapter_Fetch_UnmappedProduct_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background(), nil)
 	if err == nil {
 		t.Fatalf("Fetch() expected error for unmapped product, got nil")
 	}
@@ -201,7 +201,7 @@ func TestAdapter_Fetch_UnmappedRegion_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background(), nil)
 	if err == nil {
 		t.Fatalf("Fetch() expected error for unmapped region, got nil")
 	}
@@ -220,7 +220,7 @@ func TestAdapter_Fetch_HTTPError_FailsCleanly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background(), nil)
 	if err == nil {
 		t.Fatalf("Fetch() expected error for HTTP 500, got nil")
 	}
@@ -329,5 +329,40 @@ func TestNormalize_SkipsMassiveReservedBlocksWithoutSpike(t *testing.T) {
 	}
 	if obs[0].PriceAmount.String() != "0.17" {
 		t.Errorf("PriceAmount = %s, want 0.17", obs[0].PriceAmount.String())
+	}
+}
+
+func TestAdapter_Fetch_GCSCompletesOnNormalizeFailure(t *testing.T) {
+	invalidJSON := `{"offerCode": "AmazonEC2", "products": { "broken`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(invalidJSON))
+	}))
+	defer ts.Close()
+
+	client := NewClient(WithURL(ts.URL), WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := NewAdapter(client, memStorage)
+
+	_, err := adapter.Fetch(context.Background(), nil)
+	if err == nil {
+		t.Fatalf("Fetch() expected error due to invalid JSON, got nil")
+	}
+
+	files := memStorage.GetFiles()
+	if len(files) == 0 {
+		t.Fatalf("Fetch() did not write to GCS on normalize failure")
+	}
+
+	var storedBytes []byte
+	for _, v := range files {
+		storedBytes = v
+		break
+	}
+
+	if string(storedBytes) != invalidJSON {
+		t.Fatalf("Fetch() GCS payload mismatch.\nGot: %s\nWant: %s", string(storedBytes), invalidJSON)
 	}
 }
