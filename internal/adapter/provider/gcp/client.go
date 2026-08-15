@@ -59,15 +59,15 @@ func NewClient(opts ...Option) *Client {
 
 // FetchPriceList fetches the raw price list JSON response stream.
 // The caller is responsible for closing the returned io.ReadCloser.
-func (c *Client) FetchPriceList(ctx context.Context) (io.ReadCloser, error) {
+func (c *Client) FetchPriceList(ctx context.Context, pageToken string) (io.ReadCloser, error) {
 	reqURL := c.url
-	if c.apiKey != "" {
+	if pageToken != "" {
 		u, err := url.Parse(reqURL)
 		if err != nil {
 			return nil, fmt.Errorf("gcp client: parse url: %w", err)
 		}
 		q := u.Query()
-		q.Set("key", c.apiKey)
+		q.Set("pageToken", pageToken)
 		u.RawQuery = q.Encode()
 		reqURL = u.String()
 	}
@@ -75,6 +75,10 @@ func (c *Client) FetchPriceList(ctx context.Context) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("gcp client: create request: %w", err)
+	}
+
+	if c.apiKey != "" {
+		req.Header.Set("X-Goog-Api-Key", c.apiKey)
 	}
 
 	resp, err := c.httpClient.Do(req)

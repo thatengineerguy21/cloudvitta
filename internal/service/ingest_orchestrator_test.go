@@ -697,7 +697,15 @@ func TestOrchestrator_ConcurrentAWSAndAzure_Execution(t *testing.T) {
 }
 
 func TestOrchestrator_ConcurrentBigThree_Execution(t *testing.T) {
+	dbURL := testDatabaseURL(t)
 	ctx := context.Background()
+
+	pool, err := store.NewPool(ctx, parseDatabaseConfig(t, dbURL))
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	queries := store.New(pool)
 
 	awsAdapter := &mockFetcher{
 		result: domain.FetchResult{
@@ -744,7 +752,7 @@ func TestOrchestrator_ConcurrentBigThree_Execution(t *testing.T) {
 		Retry:          provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
 	}, gcpAdapter)
 
-	orch := service.NewOrchestrator(nil, nil, nil, factory, service.OrchestratorConfig{
+	orch := service.NewOrchestrator(queries, nil, nil, factory, service.OrchestratorConfig{
 		MaxConcurrency: 5,
 		LockTTL:        30 * time.Second,
 	})
@@ -763,4 +771,7 @@ func TestOrchestrator_ConcurrentBigThree_Execution(t *testing.T) {
 	if gcpAdapter.callCount.Load() != 1 {
 		t.Errorf("gcp fetch count = %d, want 1", gcpAdapter.callCount.Load())
 	}
+
+	// Cleanup
+	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-001'")
 }

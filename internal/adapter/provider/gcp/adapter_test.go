@@ -112,7 +112,7 @@ func TestAdapter_Fetch_HappyPath(t *testing.T) {
 func TestAdapter_Fetch_WithAPIKey(t *testing.T) {
 	var receivedKey string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedKey = r.URL.Query().Get("key")
+		receivedKey = r.Header.Get("X-Goog-Api-Key")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"skus": []}`))
@@ -181,7 +181,7 @@ func TestAdapter_Fetch_UnmappedRegion_FailsLoudly(t *testing.T) {
 		"skus": [
 			{
 				"skuId": "SKU-UNMAPPED-REGION",
-				"description": "GCP VM in unmapped region",
+				"description": "GCP VM in unmapped region (n1-standard-1)",
 				"category": {
 					"serviceDisplayName": "Compute Engine",
 					"usageType": "OnDemand"

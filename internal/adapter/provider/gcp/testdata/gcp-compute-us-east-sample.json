@@ -158,6 +158,39 @@
           }
         }
       ]
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-UNMAPPED",
+      "skuId": "SKU-GCP-UNMAPPED",
+      "description": "Unknown Instance Core and Ram running in Virginia (unknown-standard-2)",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "Unknown",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 194400000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
     }
   ]
 }

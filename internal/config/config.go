@@ -20,6 +20,7 @@ type Config struct {
 	Redis         RedisConfig         `koanf:"redis" validate:"required"`
 	Storage       StorageConfig       `koanf:"storage" validate:"required"`
 	Observability ObservabilityConfig `koanf:"observability"`
+	GCP           GCPConfig           `koanf:"gcp"`
 }
 
 type PrimaryConfig struct {
@@ -88,6 +89,10 @@ type StorageConfig struct {
 type ObservabilityConfig struct {
 	OTLPEndpoint string `koanf:"otlp_endpoint"`
 	OTLPHeaders  string `koanf:"otlp_headers"`
+}
+
+type GCPConfig struct {
+	APIKey string `koanf:"api_key"`
 }
 
 func Load() (*Config, error) {
@@ -179,6 +184,15 @@ func resolveEnvFallbacks(cfg *Config) error {
 	}
 	if cfg.Observability.OTLPHeaders == "" {
 		cfg.Observability.OTLPHeaders = os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+	}
+
+	// 7. Resolve GCP fallbacks
+	if cfg.GCP.APIKey == "" {
+		if val := os.Getenv("CLOUDVITTA_GCP_API_KEY"); val != "" {
+			cfg.GCP.APIKey = val
+		} else {
+			cfg.GCP.APIKey = os.Getenv("GCP_API_KEY")
+		}
 	}
 
 	return nil

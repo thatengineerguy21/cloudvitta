@@ -125,10 +125,8 @@ func run() error {
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
-	if gcpAPIKey := os.Getenv("CLOUDVITTA_GCP_API_KEY"); gcpAPIKey != "" {
-		gcpOpts = append(gcpOpts, gcp.WithAPIKey(gcpAPIKey))
-	} else if gcpAPIKey := os.Getenv("GCP_API_KEY"); gcpAPIKey != "" {
-		gcpOpts = append(gcpOpts, gcp.WithAPIKey(gcpAPIKey))
+	if cfg.GCP.APIKey != "" {
+		gcpOpts = append(gcpOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
 	}
 	gcpClient := gcp.NewClient(gcpOpts...)
 	gcpAdapter := gcp.NewAdapter(gcpClient, rawStorage)

@@ -50,71 +50,106 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 
 	slog.InfoContext(ctx, "starting gcp fetch")
 
-	if limiter != nil {
-		if err := limiter.Wait(ctx); err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-			return domain.FetchResult{}, fmt.Errorf("gcp adapter: rate limit wait: %w", err)
-		}
-	}
-
 	fetchedAt := time.Now().UTC()
 	fetchID := uuid.New().String()
 	dateStr := fetchedAt.Format("2006-01-02")
-	gcsPath := fmt.Sprintf("raw/gcp/compute/%s/%s.json", dateStr, fetchID)
+	firstGCSPath := fmt.Sprintf("raw/gcp/compute/%s/%s-page0.json", dateStr, fetchID)
 
-	body, err := a.client.FetchPriceList(ctx)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error")))
-		return domain.FetchResult{}, fmt.Errorf("gcp adapter: fetch price list: %w", err)
-	}
-	defer func() { _ = body.Close() }()
+	var allObservations []domain.PriceObservation
+	var pageToken string
+	pageIdx := 0
+	const maxPages = 500
 
-	pr, pw := io.Pipe()
-	tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
-
-	var observations []domain.PriceObservation
-	g, _ := errgroup.WithContext(ctx)
-
-	// Goroutine 1: Normalize reads from pr
-	g.Go(func() error {
-		var normErr error
-		observations, normErr = Normalize(pr, fetchedAt)
-		if normErr != nil {
-			_ = pr.CloseWithError(normErr)
-			return fmt.Errorf("gcp adapter: normalize: %w", normErr)
+	for {
+		if pageIdx >= maxPages {
+			slog.WarnContext(ctx, "gcp fetch hit max pages limit", "limit", maxPages)
+			break
 		}
-		_ = pr.Close()
-		return nil
-	})
 
-	// Goroutine 2: GCS reads from tee
-	g.Go(func() error {
-		defer func() { _ = pw.Close() }()
-		if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
-			_ = pw.CloseWithError(err)
-			return fmt.Errorf("gcp adapter: storage write: %w", err)
+		if limiter != nil {
+			if err := limiter.Wait(ctx); err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				return domain.FetchResult{}, fmt.Errorf("gcp adapter: rate limit wait: %w", err)
+			}
 		}
-		return nil
-	})
 
-	if err := g.Wait(); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error")))
-		slog.ErrorContext(ctx, "gcp fetch failed during stream processing", "error", err)
-		return domain.FetchResult{}, err
+		gcsPath := fmt.Sprintf("raw/gcp/compute/%s/%s-page%d.json", dateStr, fetchID, pageIdx)
+
+		body, err := a.client.FetchPriceList(ctx, pageToken)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error")))
+			return domain.FetchResult{}, fmt.Errorf("gcp adapter: fetch price list page %d: %w", pageIdx, err)
+		}
+
+		pr, pw := io.Pipe()
+		tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
+
+		var pageObservations []domain.PriceObservation
+		var pageNextToken string
+		g, _ := errgroup.WithContext(ctx)
+
+		// Goroutine 1: Normalize reads from pr
+		g.Go(func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					_ = pr.CloseWithError(fmt.Errorf("panic in normalize: %v", r))
+				}
+			}()
+			var normErr error
+			pageObservations, pageNextToken, normErr = Normalize(pr, fetchedAt)
+			if normErr != nil {
+				_ = pr.CloseWithError(normErr)
+				return fmt.Errorf("gcp adapter: normalize page %d: %w", pageIdx, normErr)
+			}
+			_ = pr.Close()
+			return nil
+		})
+
+		// Goroutine 2: GCS reads from tee
+		g.Go(func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					_ = pw.CloseWithError(fmt.Errorf("panic in storage write: %v", r))
+				}
+			}()
+			defer func() { _ = pw.Close() }()
+			// Must use parent ctx, not gctx, to ensure durability if normalize fails
+			if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
+				_ = pw.CloseWithError(err)
+				return fmt.Errorf("gcp adapter: storage write page %d: %w", pageIdx, err)
+			}
+			return nil
+		})
+
+		if err := g.Wait(); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error")))
+			slog.ErrorContext(ctx, "gcp fetch failed during stream processing", "error", err, "page", pageIdx)
+			_ = body.Close()
+			return domain.FetchResult{}, err
+		}
+		_ = body.Close()
+
+		allObservations = append(allObservations, pageObservations...)
+
+		if pageNextToken == "" {
+			break
+		}
+		pageToken = pageNextToken
+		pageIdx++
 	}
 
 	span.SetStatus(codes.Ok, "")
-	span.SetAttributes(attribute.Int("observations.count", len(observations)))
+	span.SetAttributes(attribute.Int("observations.count", len(allObservations)))
 	a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success")))
-	slog.InfoContext(ctx, "gcp fetch completed", "observations", len(observations))
+	slog.InfoContext(ctx, "gcp fetch completed", "observations", len(allObservations), "pages", pageIdx)
 
 	return domain.FetchResult{
-		Observations: observations,
-		RawGCSPath:   gcsPath,
+		Observations: allObservations,
+		RawGCSPath:   firstGCSPath,
 	}, nil
 }
