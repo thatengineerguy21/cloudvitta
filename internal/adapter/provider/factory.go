@@ -31,6 +31,12 @@ type Adapter interface {
 	Fetch(ctx context.Context) (domain.FetchResult, error)
 }
 
+// JobKey uniquely identifies a (provider, category) ingestion job.
+type JobKey struct {
+	Provider string
+	Category string
+}
+
 // Job represents a single (provider, category) ingestion unit
 // that the orchestrator can execute.
 type Job struct {
@@ -41,23 +47,59 @@ type Job struct {
 	Retry    RetryConfig
 }
 
+// Fetch executes the job's adapter Fetch with rate limiting if configured.
+func (j Job) Fetch(ctx context.Context) (domain.FetchResult, error) {
+	if j.Limiter != nil {
+		if err := j.Limiter.Wait(ctx); err != nil {
+			return domain.FetchResult{}, fmt.Errorf("rate limit wait for %s/%s: %w", j.Provider, j.Category, err)
+		}
+	}
+
+	slog.InfoContext(ctx, "starting provider fetch",
+		"provider", j.Provider,
+		"category", j.Category,
+	)
+
+	start := time.Now()
+	result, err := j.Adapter.Fetch(ctx)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		slog.ErrorContext(ctx, "provider fetch failed",
+			"provider", j.Provider,
+			"category", j.Category,
+			"elapsed", elapsed,
+			"error", err,
+		)
+		return domain.FetchResult{}, err
+	}
+
+	slog.InfoContext(ctx, "provider fetch completed",
+		"provider", j.Provider,
+		"category", j.Category,
+		"observations", len(result.Observations),
+		"elapsed", elapsed,
+	)
+	return result, nil
+}
+
 // Factory constructs configured provider jobs for the orchestrator.
 type Factory struct {
-	adapters map[string]Adapter // key: "provider:category"
-	configs  map[string]ProviderConfig
+	adapters map[JobKey]Adapter
+	configs  map[JobKey]ProviderConfig
 }
 
 // NewFactory creates a new provider factory.
 func NewFactory() *Factory {
 	return &Factory{
-		adapters: make(map[string]Adapter),
-		configs:  make(map[string]ProviderConfig),
+		adapters: make(map[JobKey]Adapter),
+		configs:  make(map[JobKey]ProviderConfig),
 	}
 }
 
 // Register adds a provider adapter with its configuration to the factory.
 func (f *Factory) Register(cfg ProviderConfig, adapter Adapter) {
-	key := fmt.Sprintf("%s:%s", cfg.Provider, cfg.Category)
+	key := JobKey{Provider: cfg.Provider, Category: cfg.Category}
 	f.adapters[key] = adapter
 	f.configs[key] = cfg
 }
@@ -88,41 +130,4 @@ func (f *Factory) BuildJobs() []Job {
 		})
 	}
 	return jobs
-}
-
-// RateLimitedFetch wraps an adapter's Fetch call with rate limiting.
-// If the job has a rate limiter, it waits for a token before calling Fetch.
-func RateLimitedFetch(ctx context.Context, job Job) (domain.FetchResult, error) {
-	if job.Limiter != nil {
-		if err := job.Limiter.Wait(ctx); err != nil {
-			return domain.FetchResult{}, fmt.Errorf("rate limit wait for %s/%s: %w", job.Provider, job.Category, err)
-		}
-	}
-
-	slog.InfoContext(ctx, "starting provider fetch",
-		"provider", job.Provider,
-		"category", job.Category,
-	)
-
-	start := time.Now()
-	result, err := job.Adapter.Fetch(ctx)
-	elapsed := time.Since(start)
-
-	if err != nil {
-		slog.ErrorContext(ctx, "provider fetch failed",
-			"provider", job.Provider,
-			"category", job.Category,
-			"elapsed", elapsed,
-			"error", err,
-		)
-		return domain.FetchResult{}, err
-	}
-
-	slog.InfoContext(ctx, "provider fetch completed",
-		"provider", job.Provider,
-		"category", job.Category,
-		"observations", len(result.Observations),
-		"elapsed", elapsed,
-	)
-	return result, nil
 }

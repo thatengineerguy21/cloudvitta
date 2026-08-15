@@ -114,7 +114,7 @@ func TestFactory_MultipleProviders(t *testing.T) {
 	}
 }
 
-func TestRateLimitedFetch_WithoutLimiter(t *testing.T) {
+func TestJob_Fetch_WithoutLimiter(t *testing.T) {
 	expected := domain.FetchResult{RawGCSPath: "test/path"}
 	adapter := &stubAdapter{result: expected}
 
@@ -125,7 +125,7 @@ func TestRateLimitedFetch_WithoutLimiter(t *testing.T) {
 		Limiter:  nil, // no rate limiting
 	}
 
-	result, err := provider.RateLimitedFetch(context.Background(), job)
+	result, err := job.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestRateLimitedFetch_WithoutLimiter(t *testing.T) {
 	}
 }
 
-func TestRateLimitedFetch_WithLimiter(t *testing.T) {
+func TestJob_Fetch_WithLimiter(t *testing.T) {
 	expected := domain.FetchResult{RawGCSPath: "test/path"}
 	adapter := &stubAdapter{result: expected}
 
@@ -150,7 +150,7 @@ func TestRateLimitedFetch_WithLimiter(t *testing.T) {
 	}, adapter)
 
 	jobs := f.BuildJobs()
-	result, err := provider.RateLimitedFetch(context.Background(), jobs[0])
+	result, err := jobs[0].Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestRateLimitedFetch_WithLimiter(t *testing.T) {
 	}
 }
 
-func TestRateLimitedFetch_CancelledContext(t *testing.T) {
+func TestJob_Fetch_CancelledContext(t *testing.T) {
 	adapter := &stubAdapter{}
 
 	f := provider.NewFactory()
@@ -174,13 +174,13 @@ func TestRateLimitedFetch_CancelledContext(t *testing.T) {
 
 	// Exhaust the burst
 	ctx := context.Background()
-	_, _ = provider.RateLimitedFetch(ctx, jobs[0])
+	_, _ = jobs[0].Fetch(ctx)
 
 	// Now cancel context before next attempt
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	_, err := provider.RateLimitedFetch(cancelCtx, jobs[0])
+	_, err := jobs[0].Fetch(cancelCtx)
 	if err == nil {
 		t.Error("expected error from cancelled context")
 	}

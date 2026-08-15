@@ -174,25 +174,3 @@ func TestGet_ReturnsEntryNotFoundForMissing(t *testing.T) {
 		t.Errorf("expected ErrEntryNotFound, got %v", err)
 	}
 }
-
-func TestList_ReturnsAllEntries(t *testing.T) {
-	d, _, teardown := setupTest(t)
-	defer teardown()
-
-	ctx := context.Background()
-	if err := d.Record(ctx, "aws", "metrics", errors.New("err1")); err != nil {
-		t.Fatalf("record 1 failed: %v", err)
-	}
-	if err := d.Record(ctx, "gcp", "logs", errors.New("err2")); err != nil {
-		t.Fatalf("record 2 failed: %v", err)
-	}
-
-	entries, err := d.List(ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(entries) != 2 {
-		t.Errorf("expected 2 entries, got %d", len(entries))
-	}
-}

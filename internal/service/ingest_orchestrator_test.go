@@ -610,3 +610,24 @@ func TestOrchestrator_WorksWithoutRedis(t *testing.T) {
 	// Cleanup
 	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-001'")
 }
+
+func TestDefaultOrchestratorConfig(t *testing.T) {
+	cfg := service.DefaultOrchestratorConfig()
+	if cfg.MaxConcurrency <= 0 {
+		t.Errorf("expected MaxConcurrency > 0, got %d", cfg.MaxConcurrency)
+	}
+	if cfg.LockTTL <= 0 {
+		t.Errorf("expected LockTTL > 0, got %v", cfg.LockTTL)
+	}
+}
+
+func TestNewOrchestrator_InitializesCleanly(t *testing.T) {
+	factory := provider.NewFactory()
+	cfg := service.DefaultOrchestratorConfig()
+
+	// Should not panic without tracer/meter
+	orch := service.NewOrchestrator(nil, nil, nil, factory, cfg)
+	if orch == nil {
+		t.Fatal("expected non-nil orchestrator")
+	}
+}

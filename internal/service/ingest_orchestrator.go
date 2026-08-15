@@ -5,12 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
+	"github.com/shopspring/decimal"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
@@ -32,6 +37,10 @@ type OrchestratorConfig struct {
 	MaxConcurrency int
 	// LockTTL is the duration for which an ingestion lock is held.
 	LockTTL time.Duration
+	// Tracer is the OpenTelemetry tracer instance for tracing ingestion jobs.
+	Tracer trace.Tracer
+	// Meter is the OpenTelemetry meter instance for recording job and anomaly metrics.
+	Meter metric.Meter
 }
 
 // DefaultOrchestratorConfig returns sensible defaults.
@@ -46,11 +55,14 @@ func DefaultOrchestratorConfig() OrchestratorConfig {
 // provider/category pairs. It handles locking, DLQ recording, anomaly
 // detection, and cache warming.
 type Orchestrator struct {
-	queries     *store.Queries
-	redisClient redis.Cmdable
-	dlq         *dlq.DLQ
-	factory     *provider.Factory
-	config      OrchestratorConfig
+	queries        *store.Queries
+	redisClient    redis.Cmdable
+	dlq            *dlq.DLQ
+	factory        *provider.Factory
+	config         OrchestratorConfig
+	tracer         trace.Tracer
+	jobsTotal      metric.Int64Counter
+	anomaliesTotal metric.Int64Counter
 }
 
 // NewOrchestrator constructs a new ingestion orchestrator.
@@ -61,12 +73,42 @@ func NewOrchestrator(
 	factory *provider.Factory,
 	cfg OrchestratorConfig,
 ) *Orchestrator {
+	tracer := cfg.Tracer
+	if tracer == nil {
+		tracer = noop.NewTracerProvider().Tracer("cloudvitta-orchestrator")
+	}
+
+	var jobsTotal metric.Int64Counter
+	var anomaliesTotal metric.Int64Counter
+	if cfg.Meter != nil {
+		var err error
+		jobsTotal, err = cfg.Meter.Int64Counter(
+			"ingest_jobs_total",
+			metric.WithDescription("Total number of provider ingestion jobs executed"),
+			metric.WithUnit("1"),
+		)
+		if err != nil {
+			slog.Warn("failed to initialize ingest_jobs_total metric", "error", err)
+		}
+		anomaliesTotal, err = cfg.Meter.Int64Counter(
+			"anomalies_detected_total",
+			metric.WithDescription("Total number of pricing anomalies detected during ingestion"),
+			metric.WithUnit("1"),
+		)
+		if err != nil {
+			slog.Warn("failed to initialize anomalies_detected_total metric", "error", err)
+		}
+	}
+
 	return &Orchestrator{
-		queries:     queries,
-		redisClient: redisClient,
-		dlq:         dlqSvc,
-		factory:     factory,
-		config:      cfg,
+		queries:        queries,
+		redisClient:    redisClient,
+		dlq:            dlqSvc,
+		factory:        factory,
+		config:         cfg,
+		tracer:         tracer,
+		jobsTotal:      jobsTotal,
+		anomaliesTotal: anomaliesTotal,
 	}
 }
 
@@ -107,6 +149,14 @@ func (o *Orchestrator) RunAll(ctx context.Context) []JobResult {
 // runJob executes a single (provider, category) ingestion job with locking,
 // retry, DLQ recording, and anomaly detection.
 func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
+	ctx, span := o.tracer.Start(ctx, "ingest.job",
+		trace.WithAttributes(
+			attribute.String("provider", job.Provider),
+			attribute.String("category", job.Category),
+		),
+	)
+	defer span.End()
+
 	result := JobResult{
 		Provider: job.Provider,
 		Category: job.Category,
@@ -121,6 +171,8 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 					"provider", job.Provider,
 					"category", job.Category,
 				)
+				span.SetAttributes(attribute.String("status", "skipped"))
+				o.recordJobMetric(ctx, job.Provider, job.Category, "skipped")
 				result.Skipped = true
 				return result
 			}
@@ -129,6 +181,9 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 				"category", job.Category,
 				"error", err,
 			)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			o.recordJobMetric(ctx, job.Provider, job.Category, "failed")
 			result.Err = fmt.Errorf("acquire lock for %s/%s: %w", job.Provider, job.Category, err)
 			return result
 		}
@@ -145,10 +200,14 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 
 	// Step 2: Fetch with retry and rate limiting
 	fetchResult, err := provider.Do(ctx, job.Retry, func(ctx context.Context) (domain.FetchResult, error) {
-		return provider.RateLimitedFetch(ctx, job)
+		return job.Fetch(ctx)
 	})
 	if err != nil {
 		result.Err = fmt.Errorf("fetch %s/%s: %w", job.Provider, job.Category, err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		o.recordJobMetric(ctx, job.Provider, job.Category, "failed")
+
 		// Step 2b: Record to DLQ on failure
 		if o.dlq != nil {
 			if dlqErr := o.dlq.Record(ctx, job.Provider, job.Category, err); dlqErr != nil {
@@ -180,6 +239,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		if anomalyStatus != "" {
 			params.AnomalyStatus = pgtype.Text{String: anomalyStatus, Valid: true}
 			result.AnomalyCount++
+			o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID)
 		}
 
 		if _, insertErr := o.queries.InsertPriceObservation(ctx, params); insertErr != nil {
@@ -209,6 +269,14 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		o.warmCache(ctx, job.Provider, job.Category, fetchResult.Observations)
 	}
 
+	span.SetStatus(codes.Ok, "")
+	span.SetAttributes(
+		attribute.String("status", "success"),
+		attribute.Int("inserted_count", result.InsertedCount),
+		attribute.Int("anomalies_count", result.AnomalyCount),
+	)
+	o.recordJobMetric(ctx, job.Provider, job.Category, "success")
+
 	slog.InfoContext(ctx, "ingestion job completed",
 		"provider", job.Provider,
 		"category", job.Category,
@@ -217,6 +285,26 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		"total_observations", len(fetchResult.Observations),
 	)
 	return result
+}
+
+func (o *Orchestrator) recordJobMetric(ctx context.Context, provider, category, status string) {
+	if o.jobsTotal != nil {
+		o.jobsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("provider", provider),
+			attribute.String("category", category),
+			attribute.String("status", status),
+		))
+	}
+}
+
+func (o *Orchestrator) recordAnomalyMetric(ctx context.Context, provider, category, sku string) {
+	if o.anomaliesTotal != nil {
+		o.anomaliesTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("provider", provider),
+			attribute.String("category", category),
+			attribute.String("sku", sku),
+		))
+	}
 }
 
 // checkAnomaly compares the incoming price against the latest recorded price
@@ -242,63 +330,33 @@ func (o *Orchestrator) checkAnomaly(ctx context.Context, obs domain.PriceObserva
 		return ""
 	}
 
-	// Convert pgtype.Numeric to big.Float for comparison
-	oldPrice := numericToBigFloat(prev.PriceAmount)
-	if oldPrice == nil || oldPrice.Sign() == 0 {
+	oldPrice, err := numericToDecimal(prev.PriceAmount)
+	if err != nil || oldPrice.IsZero() {
 		return ""
 	}
 
-	newPrice := new(big.Float).SetPrec(128)
-	newPrice.SetString(obs.PriceAmount.String())
-	if newPrice.Sign() == 0 {
+	newPrice := obs.PriceAmount
+	if newPrice.IsZero() {
 		return ""
 	}
 
 	// Calculate ratio = max(new/old, old/new)
-	ratio := new(big.Float).SetPrec(128)
-	ratio.Quo(newPrice, oldPrice)
-
-	one := new(big.Float).SetFloat64(1.0)
-	if ratio.Cmp(one) < 0 {
-		// ratio < 1, invert it
-		ratio.Quo(one, ratio)
+	ratio := newPrice.Div(oldPrice)
+	if ratio.LessThan(decimal.NewFromInt(1)) {
+		ratio = oldPrice.Div(newPrice)
 	}
 
-	threshold := new(big.Float).SetFloat64(float64(AnomalyThreshold))
-	if ratio.Cmp(threshold) >= 0 {
+	threshold := decimal.NewFromInt(AnomalyThreshold)
+	if ratio.GreaterThanOrEqual(threshold) {
 		slog.WarnContext(ctx, "price anomaly detected",
 			"provider", obs.Provider,
 			"sku", obs.SkuID,
 			"region", obs.Region,
-			"ratio", ratio.Text('f', 2),
+			"ratio", ratio.StringFixed(2),
 		)
 		return "pending_review"
 	}
 	return ""
-}
-
-// numericToBigFloat converts a pgtype.Numeric to *big.Float.
-func numericToBigFloat(n pgtype.Numeric) *big.Float {
-	if !n.Valid || n.Int == nil {
-		return nil
-	}
-
-	f := new(big.Float).SetPrec(128).SetInt(n.Int)
-	if n.Exp != 0 {
-		// Numeric stores as Int * 10^Exp
-		exp := new(big.Float).SetPrec(128)
-		ten := big.NewInt(10)
-		if n.Exp > 0 {
-			pow := new(big.Int).Exp(ten, big.NewInt(int64(n.Exp)), nil)
-			exp.SetInt(pow)
-			f.Mul(f, exp)
-		} else {
-			pow := new(big.Int).Exp(ten, big.NewInt(int64(-n.Exp)), nil)
-			exp.SetInt(pow)
-			f.Quo(f, exp)
-		}
-	}
-	return f
 }
 
 // warmCache writes observation data to Redis grouped by region.

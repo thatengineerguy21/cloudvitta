@@ -15,6 +15,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
+	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
@@ -33,17 +34,35 @@ func run() error {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	serviceName := "cloudvitta-ingest"
+
+	// --- Observability & OpenTelemetry Setup ---
+	otelProviders, err := observability.InitOTel(ctx, observability.Config{
+		ServiceName: serviceName,
+		Endpoint:    cfg.Observability.OTLPEndpoint,
+		Headers:     cfg.Observability.OTLPHeaders,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "OpenTelemetry initialization error: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		_ = otelProviders.Shutdown(shutdownCtx)
+	}()
+
 	var level slog.Level
 	if err := level.UnmarshalText([]byte(cfg.Primary.LogLevel)); err != nil {
 		level = slog.LevelInfo
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	logger := observability.SetupLogger(serviceName, level, otelProviders.LoggerProvider, os.Stdout)
 	slog.SetDefault(logger)
 
-	slog.Info("starting ingestion job runner...", "environment", cfg.Primary.Environment)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	defer cancel()
+	slog.InfoContext(ctx, "starting ingestion job runner...", "environment", cfg.Primary.Environment)
 
 	// --- Database ---
 	dbPool, err := store.NewPool(ctx, cfg.Database)
@@ -99,30 +118,34 @@ func run() error {
 
 	// --- Orchestrator ---
 	queries := store.New(dbPool)
+	orchConfig := service.DefaultOrchestratorConfig()
+	orchConfig.Tracer = otelProviders.Tracer
+	orchConfig.Meter = otelProviders.Meter
+
 	orchestrator := service.NewOrchestrator(
 		queries,
 		redisClient,
 		dlqSvc,
 		factory,
-		service.DefaultOrchestratorConfig(),
+		orchConfig,
 	)
 
 	// --- Execution ---
-	slog.Info("starting orchestrated ingestion run...")
+	slog.InfoContext(ctx, "starting orchestrated ingestion run...")
 	results := orchestrator.RunAll(ctx)
 
 	// Report results
 	var hasErrors bool
 	for _, r := range results {
 		if r.Skipped {
-			slog.Info("ingestion job skipped (lock held)",
+			slog.InfoContext(ctx, "ingestion job skipped (lock held)",
 				"provider", r.Provider,
 				"category", r.Category,
 			)
 			continue
 		}
 		if r.Err != nil {
-			slog.Error("ingestion job failed",
+			slog.ErrorContext(ctx, "ingestion job failed",
 				"provider", r.Provider,
 				"category", r.Category,
 				"error", r.Err,
@@ -130,7 +153,7 @@ func run() error {
 			hasErrors = true
 			continue
 		}
-		slog.Info("ingestion job completed",
+		slog.InfoContext(ctx, "ingestion job completed",
 			"provider", r.Provider,
 			"category", r.Category,
 			"inserted", r.InsertedCount,
@@ -142,6 +165,6 @@ func run() error {
 		return fmt.Errorf("one or more ingestion jobs failed")
 	}
 
-	slog.Info("all ingestion jobs completed successfully")
+	slog.InfoContext(ctx, "all ingestion jobs completed successfully")
 	return nil
 }

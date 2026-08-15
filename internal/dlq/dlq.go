@@ -102,35 +102,3 @@ func (d *DLQ) Get(ctx context.Context, provider, category string) (Entry, error)
 
 	return entry, nil
 }
-
-func (d *DLQ) List(ctx context.Context) ([]Entry, error) {
-	var cursor uint64
-	var entries []Entry
-	match := d.keyPrefix + ":*"
-
-	for {
-		keys, nextCursor, err := d.client.Scan(ctx, cursor, match, 10).Result()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, k := range keys {
-			val, err := d.client.Get(ctx, k).Result()
-			if err != nil {
-				continue // skip errors on read
-			}
-			var entry Entry
-			if err := json.Unmarshal([]byte(val), &entry); err != nil {
-				continue // skip corrupted
-			}
-			entries = append(entries, entry)
-		}
-
-		cursor = nextCursor
-		if cursor == 0 {
-			break
-		}
-	}
-
-	return entries, nil
-}
