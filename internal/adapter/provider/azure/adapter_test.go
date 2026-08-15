@@ -19,7 +19,7 @@ import (
 )
 
 func TestAdapter_Fetch_HappyPath(t *testing.T) {
-	fixtureBytes, err := os.ReadFile(filepath.Join("testdata", "azure-compute-eastus-sample.json"))
+	fixtureBytes, err := os.ReadFile(filepath.Join("testdata", "azure-compute-eastus-20260815-sample.json"))
 	if err != nil {
 		t.Fatalf("failed to read test fixture: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestAdapter_Fetch_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, err := adapter.Fetch(ctx)
+	result, err := adapter.Fetch(ctx, nil)
 	if err != nil {
 		t.Fatalf("Fetch() unexpected error: %v", err)
 	}
@@ -110,6 +110,62 @@ func TestAdapter_Fetch_HappyPath(t *testing.T) {
 	}
 }
 
+func TestAdapter_Fetch_Pagination(t *testing.T) {
+	page1Bytes, err := os.ReadFile(filepath.Join("testdata", "azure-compute-eastus-20260815-page1.json"))
+	if err != nil {
+		t.Fatalf("failed to read page 1 fixture: %v", err)
+	}
+	page2Bytes, err := os.ReadFile(filepath.Join("testdata", "azure-compute-eastus-20260815-page2.json"))
+	if err != nil {
+		t.Fatalf("failed to read page 2 fixture: %v", err)
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		if strings.Contains(r.URL.Path, "page2") {
+			_, _ = w.Write(page2Bytes)
+			return
+		}
+
+		// Replace placeholder with the actual page2 URL of the test server
+		page2URL := "http://" + r.Host + "/page2"
+		page1Str := strings.Replace(string(page1Bytes), "DYNAMIC_PAGE2_URL", page2URL, 1)
+		_, _ = w.Write([]byte(page1Str))
+	}))
+	defer ts.Close()
+
+	client := azure.NewClient(azure.WithURL(ts.URL), azure.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := azure.NewAdapter(client, memStorage)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := adapter.Fetch(ctx, nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
+	}
+
+	// We expect 3 total observations: 2 from page 1, 1 from page 2
+	if len(result.Observations) != 3 {
+		t.Fatalf("Fetch() returned %d observations, want 3", len(result.Observations))
+	}
+
+	// Verify that we wrote two raw GCS files
+	files := memStorage.GetFiles()
+	fileCount := 0
+	for path := range files {
+		if strings.Contains(path, "raw/azure/compute") {
+			fileCount++
+		}
+	}
+	if fileCount != 2 {
+		t.Errorf("Fetch() wrote %d raw files, want 2", fileCount)
+	}
+}
+
 func TestAdapter_Fetch_UnmappedProduct_FailsLoudly(t *testing.T) {
 	jsonBody := `{
 		"Items": [
@@ -135,7 +191,7 @@ func TestAdapter_Fetch_UnmappedProduct_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := azure.NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background(), nil)
 	if err == nil {
 		t.Fatalf("Fetch() expected error for unmapped product, got nil")
 	}
@@ -169,7 +225,7 @@ func TestAdapter_Fetch_UnmappedRegion_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := azure.NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background(), nil)
 	if err == nil {
 		t.Fatalf("Fetch() expected error for unmapped region, got nil")
 	}
@@ -188,7 +244,7 @@ func TestAdapter_Fetch_HTTPError_FailsCleanly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := azure.NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background())
+	_, err := adapter.Fetch(context.Background(), nil)
 	if err == nil {
 		t.Fatalf("Fetch() expected error for HTTP 500, got nil")
 	}
@@ -200,5 +256,40 @@ func TestSupportedCategories(t *testing.T) {
 	}
 	if azure.IsCategorySupported("unknown-category") {
 		t.Errorf("expected unknown-category to not be supported")
+	}
+}
+
+func TestAdapter_Fetch_GCSCompletesOnNormalizeFailure(t *testing.T) {
+	invalidJSON := `{"Items": [ { "broken_json_here`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(invalidJSON))
+	}))
+	defer ts.Close()
+
+	client := azure.NewClient(azure.WithURL(ts.URL), azure.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := azure.NewAdapter(client, memStorage)
+
+	_, err := adapter.Fetch(context.Background(), nil)
+	if err == nil {
+		t.Fatalf("Fetch() expected error due to invalid JSON, got nil")
+	}
+
+	files := memStorage.GetFiles()
+	if len(files) == 0 {
+		t.Fatalf("Fetch() did not write to GCS on normalize failure")
+	}
+
+	var storedBytes []byte
+	for _, v := range files {
+		storedBytes = v
+		break
+	}
+
+	if string(storedBytes) != invalidJSON {
+		t.Fatalf("Fetch() GCS payload mismatch.\nGot: %s\nWant: %s", string(storedBytes), invalidJSON)
 	}
 }

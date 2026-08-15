@@ -13,6 +13,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
+	"golang.org/x/time/rate"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
@@ -41,7 +42,7 @@ type mockFetcher struct {
 	delay     time.Duration
 }
 
-func (m *mockFetcher) Fetch(_ context.Context) (domain.FetchResult, error) {
+func (m *mockFetcher) Fetch(_ context.Context, _ *rate.Limiter) (domain.FetchResult, error) {
 	m.callCount.Add(1)
 	if m.delay > 0 {
 		time.Sleep(m.delay)
@@ -55,7 +56,7 @@ type failingFetcher struct {
 	callCount atomic.Int32
 }
 
-func (f *failingFetcher) Fetch(_ context.Context) (domain.FetchResult, error) {
+func (f *failingFetcher) Fetch(_ context.Context, _ *rate.Limiter) (domain.FetchResult, error) {
 	f.callCount.Add(1)
 	return domain.FetchResult{}, f.err
 }
@@ -633,7 +634,18 @@ func TestNewOrchestrator_InitializesCleanly(t *testing.T) {
 }
 
 func TestOrchestrator_ConcurrentAWSAndAzure_Execution(t *testing.T) {
+	dbURL := testDatabaseURL(t)
 	ctx := context.Background()
+
+	pool, err := store.NewPool(ctx, parseDatabaseConfig(t, dbURL))
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	queries := store.New(pool)
+
+	_, redisClient := setupTestRedis(t)
+	dlqSvc := dlq.New(redisClient)
 
 	awsAdapter := &mockFetcher{
 		result: domain.FetchResult{
@@ -666,7 +678,7 @@ func TestOrchestrator_ConcurrentAWSAndAzure_Execution(t *testing.T) {
 		Retry:          provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
 	}, azureAdapter)
 
-	orch := service.NewOrchestrator(nil, nil, nil, factory, service.OrchestratorConfig{
+	orch := service.NewOrchestrator(queries, redisClient, dlqSvc, factory, service.OrchestratorConfig{
 		MaxConcurrency: 5,
 		LockTTL:        30 * time.Second,
 	})

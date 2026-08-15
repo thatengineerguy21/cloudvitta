@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
@@ -83,8 +84,9 @@ func TestIngestionService_RunAWSComputeIngestion(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	awsClient := aws.NewClient(aws.WithURL(ts.URL), aws.WithHTTPClient(ts.Client()))
 	awsAdapter := aws.NewAdapter(awsClient, memStorage)
+	job := provider.Job{Adapter: awsAdapter}
 
-	ingestSvc := service.NewIngestionService(queries, awsAdapter, nil)
+	ingestSvc := service.NewIngestionService(queries, job, nil)
 
 	// First ingestion run
 	count1, err := ingestSvc.RunAWSComputeIngestion(ctx)

@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -28,7 +27,7 @@ type ProviderConfig struct {
 
 // Adapter defines the contract for a provider adapter that retrieves pricing data.
 type Adapter interface {
-	Fetch(ctx context.Context) (domain.FetchResult, error)
+	Fetch(ctx context.Context, limiter *rate.Limiter) (domain.FetchResult, error)
 }
 
 // JobKey uniquely identifies a (provider, category) ingestion job.
@@ -47,21 +46,15 @@ type Job struct {
 	Retry    RetryConfig
 }
 
-// Fetch executes the job's adapter Fetch with rate limiting if configured.
+// Fetch executes the job's adapter Fetch, passing down the rate limiter.
 func (j Job) Fetch(ctx context.Context) (domain.FetchResult, error) {
-	if j.Limiter != nil {
-		if err := j.Limiter.Wait(ctx); err != nil {
-			return domain.FetchResult{}, fmt.Errorf("rate limit wait for %s/%s: %w", j.Provider, j.Category, err)
-		}
-	}
-
 	slog.InfoContext(ctx, "starting provider fetch",
 		"provider", j.Provider,
 		"category", j.Category,
 	)
 
 	start := time.Now()
-	result, err := j.Adapter.Fetch(ctx)
+	result, err := j.Adapter.Fetch(ctx, j.Limiter)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -112,11 +105,7 @@ func (f *Factory) BuildJobs() []Job {
 
 		var limiter *rate.Limiter
 		if cfg.RateLimitRPS > 0 {
-			burst := cfg.RateLimitBurst
-			if burst <= 0 {
-				burst = 1
-			}
-			limiter = rate.NewLimiter(rate.Limit(cfg.RateLimitRPS), burst)
+			limiter = rate.NewLimiter(rate.Limit(cfg.RateLimitRPS), cfg.RateLimitBurst)
 		}
 
 		// Apply defaults if retry config is zero-valued

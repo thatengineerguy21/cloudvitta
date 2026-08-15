@@ -46,9 +46,14 @@ func NewClient(opts ...Option) *Client {
 }
 
 // FetchPriceList fetches the raw price list JSON response stream.
+// If urlOverride is not empty, it fetches from that URL instead of the default.
 // The caller is responsible for closing the returned io.ReadCloser.
-func (c *Client) FetchPriceList(ctx context.Context) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
+func (c *Client) FetchPriceList(ctx context.Context, urlOverride string) (io.ReadCloser, error) {
+	u := c.url
+	if urlOverride != "" {
+		u = urlOverride
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("azure client: create request: %w", err)
 	}

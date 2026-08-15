@@ -1,0 +1,30 @@
+{
+  "BillingCurrency": "USD",
+  "CustomerEntityId": "Default",
+  "CustomerEntityType": "Retail",
+  "Items": [
+    {
+      "currencyCode": "USD",
+      "tierMinimumUnits": 0.0,
+      "retailPrice": 0.0416,
+      "unitPrice": 0.0416,
+      "armRegionName": "eastus",
+      "location": "US East",
+      "effectiveStartDate": "2026-08-15T00:00:00Z",
+      "meterId": "000a7266-9b5d-4876-b605-e4065e8a7067",
+      "meterName": "B2s",
+      "productId": "DZH318Z0BQ4D",
+      "skuId": "DZH318Z0BQ4D/0001",
+      "productName": "Virtual Machines Bs Series",
+      "skuName": "B2s",
+      "serviceId": "DZH313Z7MMC8",
+      "serviceName": "Virtual Machines",
+      "serviceFamily": "Compute",
+      "unitOfMeasure": "1 Hour",
+      "type": "Consumption",
+      "isPrimaryMeterRegion": true,
+      "armSkuName": "Standard_B2s"
+    }
+  ],
+  "Count": 1
+}

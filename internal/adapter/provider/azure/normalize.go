@@ -16,26 +16,26 @@ import (
 )
 
 type azureItem struct {
-	CurrencyCode       string  `json:"currencyCode"`
-	TierMinimumUnits   float64 `json:"tierMinimumUnits"`
-	RetailPrice        float64 `json:"retailPrice"`
-	UnitPrice          float64 `json:"unitPrice"`
-	ArmRegionName      string  `json:"armRegionName"`
-	Location           string  `json:"location"`
-	EffectiveStartDate string  `json:"effectiveStartDate"`
-	MeterID            string  `json:"meterId"`
-	MeterName          string  `json:"meterName"`
-	ProductID          string  `json:"productId"`
-	SkuID              string  `json:"skuId"`
-	ProductName        string  `json:"productName"`
-	SkuName            string  `json:"skuName"`
-	ServiceID          string  `json:"serviceId"`
-	ServiceName        string  `json:"serviceName"`
-	ServiceFamily      string  `json:"serviceFamily"`
-	UnitOfMeasure      string  `json:"unitOfMeasure"`
-	Type               string  `json:"type"`
-	IsPrimaryMeter     bool    `json:"isPrimaryMeterRegion"`
-	ArmSkuName         string  `json:"armSkuName"`
+	CurrencyCode       string      `json:"currencyCode"`
+	TierMinimumUnits   float64     `json:"tierMinimumUnits"`
+	RetailPrice        json.Number `json:"retailPrice"`
+	UnitPrice          json.Number `json:"unitPrice"`
+	ArmRegionName      string      `json:"armRegionName"`
+	Location           string      `json:"location"`
+	EffectiveStartDate string      `json:"effectiveStartDate"`
+	MeterID            string      `json:"meterId"`
+	MeterName          string      `json:"meterName"`
+	ProductID          string      `json:"productId"`
+	SkuID              string      `json:"skuId"`
+	ProductName        string      `json:"productName"`
+	SkuName            string      `json:"skuName"`
+	ServiceID          string      `json:"serviceId"`
+	ServiceName        string      `json:"serviceName"`
+	ServiceFamily      string      `json:"serviceFamily"`
+	UnitOfMeasure      string      `json:"unitOfMeasure"`
+	Type               string      `json:"type"`
+	IsPrimaryMeter     bool        `json:"isPrimaryMeterRegion"`
+	ArmSkuName         string      `json:"armSkuName"`
 }
 
 type azurePriceListResponse struct {
@@ -82,13 +82,13 @@ var knownAzureVMSpecs = map[string]azureVMSpec{
 	"Standard_F8s_v2":  {vcpu: 8, ramGB: 16, family: "f"},
 }
 
-// Normalize parses an Azure Retail Prices API JSON stream and returns normalized domain observations.
+// Normalize parses an Azure Retail Prices API JSON stream and returns normalized domain observations and the next page link.
 // It fails loudly if an unmapped product code or region is encountered.
-func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, error) {
+func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, string, error) {
 	var payload azurePriceListResponse
 	dec := json.NewDecoder(r)
 	if err := dec.Decode(&payload); err != nil {
-		return nil, fmt.Errorf("azure normalize: decode JSON: %w", err)
+		return nil, "", fmt.Errorf("azure normalize: decode JSON: %w", err)
 	}
 
 	var observations []domain.PriceObservation
@@ -102,7 +102,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 		// Filter 2: Check service category mapping (fails loudly if unmapped)
 		category, err := catalogmap.MapAzureProduct(item.ServiceName)
 		if err != nil {
-			return nil, fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+			return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 		}
 
 		// Filter 3: Compute instance filters (Linux PayG only)
@@ -117,10 +117,13 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 		}
 		regionGroup, err := regionmap.MapAzureRegion(region)
 		if err != nil {
-			return nil, fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+			return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 		}
 
-		priceAmount := decimal.NewFromFloat(item.UnitPrice)
+		priceAmount, err := decimal.NewFromString(item.UnitPrice.String())
+		if err != nil {
+			return nil, "", fmt.Errorf("azure normalize sku %s: invalid unit price %q: %w", item.SkuID, item.UnitPrice, err)
+		}
 		vcpu, ram, family := parseAzureAttributes(item.ArmSkuName, item.SkuName, item.ProductName)
 
 		displayName := item.ArmSkuName
@@ -160,7 +163,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 		observations = append(observations, obs)
 	}
 
-	return observations, nil
+	return observations, payload.NextPageLink, nil
 }
 
 func isComputeInstance(item azureItem) bool {

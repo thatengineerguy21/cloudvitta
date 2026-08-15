@@ -6,6 +6,7 @@ import (
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"golang.org/x/time/rate"
 )
 
 // stubAdapter is a test double that records calls and returns configured results.
@@ -15,7 +16,12 @@ type stubAdapter struct {
 	err        error
 }
 
-func (s *stubAdapter) Fetch(_ context.Context) (domain.FetchResult, error) {
+func (s *stubAdapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.FetchResult, error) {
+	if limiter != nil {
+		if err := limiter.Wait(ctx); err != nil {
+			return domain.FetchResult{}, err
+		}
+	}
 	s.fetchCount++
 	return s.result, s.err
 }
