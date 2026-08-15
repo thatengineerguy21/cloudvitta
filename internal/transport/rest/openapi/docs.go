@@ -61,25 +61,89 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/rest.ComputeComparisonResponse"
+                            "$ref": "#/definitions/internal_transport_rest.ComputeComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/middleware.RFC7807Error"
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/middleware.RFC7807Error"
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/middleware.RFC7807Error"
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/prices/storage": {
+            "get": {
+                "description": "Returns normalized storage pricing across cloud providers (AWS, Azure, GCP) for requested specs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "prices"
+                ],
+                "summary": "Get storage pricing comparison",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Requested storage size in GB (e.g. 500, max 1000000)",
+                        "name": "size_gb",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Requested canonical storage class (e.g. standard, infrequent_access, archive)",
+                        "name": "storage_class",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Canonical region group (default: us-east)",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency code (default: USD)",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.StorageComparisonResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
                         }
                     }
                 }
@@ -87,7 +151,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "domain.ComputeAttributes": {
+        "github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes": {
             "type": "object",
             "properties": {
                 "family": {
@@ -101,7 +165,22 @@ const docTemplate = `{
                 }
             }
         },
-        "middleware.RFC7807Error": {
+        "github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes": {
+            "type": "object",
+            "properties": {
+                "iops": {
+                    "description": "IOPS holds provisioned IOPS where reported (e.g. block storage EBS gp3/io2).\nCurrently unpopulated for S3/Blob/GCS object storage in stage 1.4.",
+                    "type": "integer"
+                },
+                "size_gb": {
+                    "type": "number"
+                },
+                "storage_class": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error": {
             "type": "object",
             "properties": {
                 "detail": {
@@ -121,7 +200,7 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.ComputeComparisonMeta": {
+        "internal_transport_rest.ComputeComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -136,27 +215,27 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.ComputeComparisonResponse": {
+        "internal_transport_rest.ComputeComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/rest.ComputeComparisonMeta"
+                    "$ref": "#/definitions/internal_transport_rest.ComputeComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/rest.ComputeResultEntry"
+                        "$ref": "#/definitions/internal_transport_rest.ComputeResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/rest.ProviderWarning"
+                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
                     }
                 }
             }
         },
-        "rest.ComputeResultEntry": {
+        "internal_transport_rest.ComputeResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -169,7 +248,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/domain.ComputeAttributes"
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -181,7 +260,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/rest.PriceDetail"
+                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -194,7 +273,7 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.PriceDetail": {
+        "internal_transport_rest.PriceDetail": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -208,7 +287,7 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.ProviderWarning": {
+        "internal_transport_rest.ProviderWarning": {
             "type": "object",
             "properties": {
                 "code": {
@@ -219,6 +298,76 @@ const docTemplate = `{
                 },
                 "provider": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.StorageComparisonMeta": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "query": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "internal_transport_rest.StorageComparisonResponse": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/internal_transport_rest.StorageComparisonMeta"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.StorageResultEntry"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                    }
+                }
+            }
+        },
+        "internal_transport_rest.StorageResultEntry": {
+            "type": "object",
+            "properties": {
+                "fetched_at": {
+                    "type": "string"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "matched_spec": {
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "monthly_cost_usd": {
+                    "type": "number"
+                },
+                "price": {
+                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
                 }
             }
         }

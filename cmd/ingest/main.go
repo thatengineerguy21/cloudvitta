@@ -135,7 +135,7 @@ func run() error {
 	}, azureAdapter)
 
 	// Register Azure storage adapter with rate limiting and retry config
-	azureStorageClient := azure.NewClient(azure.WithURL("https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20%27Storage%27"))
+	azureStorageClient := azure.NewClient(azure.WithURL(azure.DefaultStorageRetailPricesURL))
 	azureStorageAdapter := azure.NewAdapter(azureStorageClient, rawStorage)
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",

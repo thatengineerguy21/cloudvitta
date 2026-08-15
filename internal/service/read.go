@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -58,10 +57,10 @@ func NewPricingService(queries *store.Queries, redisClient redis.Cmdable, opts .
 	return s
 }
 
-// GetComputePrices retrieves compute pricing observations for provider, category, and regionGroup.
+// GetPrices retrieves pricing observations for provider, category, and regionGroup.
 // It attempts a Redis read first; on miss, it uses singleflight to collapse concurrent DB queries,
 // queries Postgres by regionGroup, and warms the cache before returning.
-func (s *PricingService) GetComputePrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
+func (s *PricingService) GetPrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
 	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, regionGroup)
 
 	// 1. Try Cache-Aside Read from Redis
@@ -149,24 +148,10 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 	}
 }
 
-// GetStoragePrices retrieves storage pricing observations for provider, category, and regionGroup.
-func (s *PricingService) GetStoragePrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
-	return s.GetComputePrices(ctx, provider, category, regionGroup)
-}
-
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {
-	var computeAttrs domain.ComputeAttributes
-	var storageAttrs domain.StorageAttributes
-	if len(row.Attributes) > 0 {
-		if row.ServiceCategory == "storage" {
-			if err := json.Unmarshal(row.Attributes, &storageAttrs); err != nil {
-				return domain.PriceObservation{}, fmt.Errorf("unmarshal storage attributes: %w", err)
-			}
-		} else {
-			if err := json.Unmarshal(row.Attributes, &computeAttrs); err != nil {
-				return domain.PriceObservation{}, fmt.Errorf("unmarshal compute attributes: %w", err)
-			}
-		}
+	computeAttrs, storageAttrs, err := domain.UnmarshalAttributes(row.ServiceCategory, row.Attributes)
+	if err != nil {
+		return domain.PriceObservation{}, err
 	}
 
 	priceDec, err := numericToDecimal(row.PriceAmount)

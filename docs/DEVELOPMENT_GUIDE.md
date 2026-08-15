@@ -160,6 +160,7 @@ The orchestrator concurrently fetches pricing data from all registered provider/
 | `/metrics` | `GET` | Prometheus metrics endpoint (includes `cache_requests_total`) |
 | `/docs/` | `GET` | Interactive Swagger UI OpenAPI documentation |
 | `/api/v1/prices/compute` | `GET` | Compute pricing lookup & SKU comparison endpoint |
+| `/api/v1/prices/storage` | `GET` | Storage pricing lookup & cost comparison endpoint |
 
 ### Local Verification Commands
 
@@ -169,9 +170,10 @@ The orchestrator concurrently fetches pricing data from all registered provider/
    curl http://localhost:8080/readyz
    ```
 
-2. **Query Compute Pricing Endpoint**:
+2. **Query Compute & Storage Pricing Endpoints**:
    ```bash
-   curl "http://localhost:8080/api/v1/prices/compute?vcpu=4&ram_gb=16&region=us-east-1"
+   curl "http://localhost:8080/api/v1/prices/compute?vcpu=4&ram_gb=16&region=us-east"
+   curl "http://localhost:8080/api/v1/prices/storage?size_gb=500&storage_class=standard&region=us-east"
    ```
 
 3. **Verify Rate Limiter (60 req/min)**:

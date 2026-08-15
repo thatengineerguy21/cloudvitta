@@ -1,5 +1,5 @@
 definitions:
-  domain.ComputeAttributes:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes:
     properties:
       family:
         type: string
@@ -8,7 +8,19 @@ definitions:
       vcpu:
         type: number
     type: object
-  middleware.RFC7807Error:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes:
+    properties:
+      iops:
+        description: |-
+          IOPS holds provisioned IOPS where reported (e.g. block storage EBS gp3/io2).
+          Currently unpopulated for S3/Blob/GCS object storage in stage 1.4.
+        type: integer
+      size_gb:
+        type: number
+      storage_class:
+        type: string
+    type: object
+  github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error:
     properties:
       detail:
         type: string
@@ -21,7 +33,7 @@ definitions:
       type:
         type: string
     type: object
-  rest.ComputeComparisonMeta:
+  internal_transport_rest.ComputeComparisonMeta:
     properties:
       api_version:
         type: string
@@ -31,20 +43,20 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  rest.ComputeComparisonResponse:
+  internal_transport_rest.ComputeComparisonResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.ComputeComparisonMeta'
+        $ref: '#/definitions/internal_transport_rest.ComputeComparisonMeta'
       results:
         items:
-          $ref: '#/definitions/rest.ComputeResultEntry'
+          $ref: '#/definitions/internal_transport_rest.ComputeResultEntry'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.ComputeResultEntry:
+  internal_transport_rest.ComputeResultEntry:
     properties:
       fetched_at:
         type: string
@@ -53,7 +65,7 @@ definitions:
       match_quality:
         type: string
       matched_spec:
-        $ref: '#/definitions/domain.ComputeAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes'
       missing_attributes:
         items:
           type: string
@@ -61,7 +73,7 @@ definitions:
       normalized_hourly_usd:
         type: number
       price:
-        $ref: '#/definitions/rest.PriceDetail'
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
       provider:
         type: string
       sku_id:
@@ -69,7 +81,7 @@ definitions:
       stale:
         type: boolean
     type: object
-  rest.PriceDetail:
+  internal_transport_rest.PriceDetail:
     properties:
       amount:
         type: number
@@ -78,7 +90,7 @@ definitions:
       unit:
         type: string
     type: object
-  rest.ProviderWarning:
+  internal_transport_rest.ProviderWarning:
     properties:
       code:
         type: string
@@ -86,6 +98,52 @@ definitions:
         type: string
       provider:
         type: string
+    type: object
+  internal_transport_rest.StorageComparisonMeta:
+    properties:
+      api_version:
+        type: string
+      generated_at:
+        type: string
+      query:
+        additionalProperties: true
+        type: object
+    type: object
+  internal_transport_rest.StorageComparisonResponse:
+    properties:
+      meta:
+        $ref: '#/definitions/internal_transport_rest.StorageComparisonMeta'
+      results:
+        items:
+          $ref: '#/definitions/internal_transport_rest.StorageResultEntry'
+        type: array
+      warnings:
+        items:
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
+        type: array
+    type: object
+  internal_transport_rest.StorageResultEntry:
+    properties:
+      fetched_at:
+        type: string
+      match_quality:
+        type: string
+      matched_spec:
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes'
+      missing_attributes:
+        items:
+          type: string
+        type: array
+      monthly_cost_usd:
+        type: number
+      price:
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
+      provider:
+        type: string
+      sku_id:
+        type: string
+      stale:
+        type: boolean
     type: object
 info:
   contact: {}
@@ -121,20 +179,64 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.ComputeComparisonResponse'
+            $ref: '#/definitions/internal_transport_rest.ComputeComparisonResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get compute pricing comparison
+      tags:
+      - prices
+  /api/v1/prices/storage:
+    get:
+      description: Returns normalized storage pricing across cloud providers (AWS,
+        Azure, GCP) for requested specs.
+      parameters:
+      - description: Requested storage size in GB (e.g. 500, max 1000000)
+        in: query
+        name: size_gb
+        type: string
+      - description: Requested canonical storage class (e.g. standard, infrequent_access,
+          archive)
+        in: query
+        name: storage_class
+        type: string
+      - description: 'Canonical region group (default: us-east)'
+        in: query
+        name: region
+        type: string
+      - description: 'Target currency code (default: USD)'
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_transport_rest.StorageComparisonResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+      summary: Get storage pricing comparison
       tags:
       - prices
 swagger: "2.0"

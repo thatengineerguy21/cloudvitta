@@ -24,7 +24,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 )
 
-func TestPricingService_GetComputePrices_CacheHit(t *testing.T) {
+func TestPricingService_GetPrices_CacheHit(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -57,9 +57,9 @@ func TestPricingService_GetComputePrices_CacheHit(t *testing.T) {
 	// Passing nil queries to verify DB is never touched on cache hit
 	svc := service.NewPricingService(nil, rdb)
 
-	got, err := svc.GetComputePrices(ctx, "aws", "compute", "us-east-1")
+	got, err := svc.GetPrices(ctx, "aws", "compute", "us-east-1")
 	if err != nil {
-		t.Fatalf("GetComputePrices unexpected error: %v", err)
+		t.Fatalf("GetPrices unexpected error: %v", err)
 	}
 
 	if len(got) != 1 {
@@ -113,7 +113,7 @@ func setupTestDBPool(t *testing.T, ctx context.Context, dbURL string) (*url.URL,
 	return u, pool
 }
 
-func TestPricingService_GetComputePrices_SingleflightCollapse(t *testing.T) {
+func TestPricingService_GetPrices_SingleflightCollapse(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -181,7 +181,7 @@ func TestPricingService_GetComputePrices_SingleflightCollapse(t *testing.T) {
 		workerID := i
 		go func() {
 			defer wg.Done()
-			results[workerID], errorsList[workerID] = svc.GetComputePrices(ctx, "aws", "compute", "us-east-1")
+			results[workerID], errorsList[workerID] = svc.GetPrices(ctx, "aws", "compute", "us-east-1")
 		}()
 	}
 	wg.Wait()
@@ -216,7 +216,7 @@ func TestPricingService_GetComputePrices_SingleflightCollapse(t *testing.T) {
 	}
 }
 
-func TestPricingService_GetComputePrices_CacheMissTTLFallback(t *testing.T) {
+func TestPricingService_GetPrices_CacheMissTTLFallback(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -271,9 +271,9 @@ func TestPricingService_GetComputePrices_CacheMissTTLFallback(t *testing.T) {
 	svc := service.NewPricingService(queries, rdb)
 
 	// Fetch without cache warming first (trigger miss & fallback)
-	got, err := svc.GetComputePrices(ctx, "aws", "compute", "us-east-1")
+	got, err := svc.GetPrices(ctx, "aws", "compute", "us-east-1")
 	if err != nil {
-		t.Fatalf("GetComputePrices failed: %v", err)
+		t.Fatalf("GetPrices failed: %v", err)
 	}
 	if len(got) == 0 {
 		t.Fatalf("expected rows from DB fallback, got 0")
@@ -293,7 +293,7 @@ func TestPricingService_GetComputePrices_CacheMissTTLFallback(t *testing.T) {
 	}
 }
 
-func TestPricingService_GetComputePrices_SingleflightCancellation(t *testing.T) {
+func TestPricingService_GetPrices_SingleflightCancellation(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -333,7 +333,7 @@ func TestPricingService_GetComputePrices_SingleflightCancellation(t *testing.T) 
 	var err1 error
 	go func() {
 		defer wg.Done()
-		_, err1 = svc.GetComputePrices(ctx1, "aws", "compute", "us-cancel-test")
+		_, err1 = svc.GetPrices(ctx1, "aws", "compute", "us-cancel-test")
 	}()
 
 	// Caller 2 context remains live
@@ -345,7 +345,7 @@ func TestPricingService_GetComputePrices_SingleflightCancellation(t *testing.T) 
 		defer wg.Done()
 		// Sleep slightly to ensure Caller 1 starts the singleflight block first
 		time.Sleep(10 * time.Millisecond)
-		_, err2 = svc.GetComputePrices(ctx2, "aws", "compute", "us-cancel-test")
+		_, err2 = svc.GetPrices(ctx2, "aws", "compute", "us-cancel-test")
 	}()
 
 	// Cancel Caller 1 after giving it a chance to enter Singleflight DoChan

@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -17,7 +19,9 @@ type ComputeAttributes struct {
 type StorageAttributes struct {
 	SizeGB       float64 `json:"size_gb"`
 	StorageClass string  `json:"storage_class"`
-	IOPS         *int    `json:"iops,omitempty"`
+	// IOPS holds provisioned IOPS where reported (e.g. block storage EBS gp3/io2).
+	// Currently unpopulated for S3/Blob/GCS object storage in stage 1.4.
+	IOPS *int `json:"iops,omitempty"`
 }
 
 // PriceObservation represents a single normalized cloud pricing observation.
@@ -51,11 +55,32 @@ type ScoredComputeObservation struct {
 	MissingAttributes []string
 }
 
-// ScoredStorageObservation represents a scored and filtered storage observation.
-type ScoredStorageObservation struct {
-	Observation       PriceObservation
-	MatchQuality      string
-	MatchDeltaPct     float64
-	MissingAttributes []string
-	MonthlyCost       decimal.Decimal
+// MarshalAttributes serializes the category-specific attributes of an observation to JSON bytes.
+func MarshalAttributes(obs PriceObservation) ([]byte, error) {
+	if obs.ServiceCategory == "storage" {
+		return json.Marshal(obs.StorageAttributes)
+	}
+	return json.Marshal(obs.Attributes)
+}
+
+// UnmarshalAttributes deserializes raw JSON bytes into the corresponding category attribute struct.
+func UnmarshalAttributes(serviceCategory string, raw []byte) (ComputeAttributes, StorageAttributes, error) {
+	var computeAttrs ComputeAttributes
+	var storageAttrs StorageAttributes
+
+	if len(raw) == 0 {
+		return computeAttrs, storageAttrs, nil
+	}
+
+	if serviceCategory == "storage" {
+		if err := json.Unmarshal(raw, &storageAttrs); err != nil {
+			return computeAttrs, storageAttrs, fmt.Errorf("unmarshal storage attributes: %w", err)
+		}
+	} else {
+		if err := json.Unmarshal(raw, &computeAttrs); err != nil {
+			return computeAttrs, storageAttrs, fmt.Errorf("unmarshal compute attributes: %w", err)
+		}
+	}
+
+	return computeAttrs, storageAttrs, nil
 }

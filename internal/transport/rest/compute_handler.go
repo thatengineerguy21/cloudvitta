@@ -146,7 +146,7 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch compute prices from PricingService (which uses cache-aside + singleflight)
-	obsList, err := h.pricingSvc.GetComputePrices(r.Context(), "aws", "compute", region)
+	obsList, err := h.pricingSvc.GetPrices(r.Context(), "aws", "compute", region)
 	if err != nil {
 		status, errType, title := middleware.MapServiceError(err)
 		middleware.WriteJSONError(w, r, status, errType, title, err.Error())

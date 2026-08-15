@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -80,13 +79,7 @@ func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, err
 }
 
 func toInsertParams(obs domain.PriceObservation, rawGCSPath string) (store.InsertPriceObservationParams, error) {
-	var attrBytes []byte
-	var err error
-	if obs.ServiceCategory == "storage" {
-		attrBytes, err = json.Marshal(obs.StorageAttributes)
-	} else {
-		attrBytes, err = json.Marshal(obs.Attributes)
-	}
+	attrBytes, err := domain.MarshalAttributes(obs)
 	if err != nil {
 		return store.InsertPriceObservationParams{}, fmt.Errorf("ingest service: marshal attributes for sku %s: %w", obs.SkuID, err)
 	}

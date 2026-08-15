@@ -171,9 +171,6 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 					}
 
 					displayName := prod.Attributes["description"]
-					if displayName == "" {
-						displayName = fmt.Sprintf("S3 %s Storage", rawStorageClass)
-					}
 
 					meta := awsProductMeta{
 						sku:         sku,
@@ -249,7 +246,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 							}
 						} else {
 							// Discard non-matching terms without memory allocation
-							if err := skipValue(dec); err != nil {
+							if err := provider.SkipJSONValue(dec); err != nil {
 								return nil, fmt.Errorf("aws normalize: skip sku terms for %s: %w", sku, err)
 							}
 						}
@@ -260,7 +257,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 					}
 				} else {
 					// Discard non-OnDemand terms (e.g. Reserved) without memory allocation
-					if err := skipValue(dec); err != nil {
+					if err := provider.SkipJSONValue(dec); err != nil {
 						return nil, fmt.Errorf("aws normalize: skip term %s: %w", termType, err)
 					}
 				}
@@ -276,41 +273,13 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 
 		default:
 			// Discard unknown top-level section without memory allocation
-			if err := skipValue(dec); err != nil {
+			if err := provider.SkipJSONValue(dec); err != nil {
 				return nil, fmt.Errorf("aws normalize: skip top-level key %s: %w", key, err)
 			}
 		}
 	}
 
 	return observations, nil
-}
-
-func skipValue(dec *json.Decoder) error {
-	t, err := dec.Token()
-	if err != nil {
-		return err
-	}
-	_, isDelim := t.(json.Delim)
-	if !isDelim {
-		return nil
-	}
-
-	depth := 1
-	for depth > 0 {
-		t, err := dec.Token()
-		if err != nil {
-			return err
-		}
-		if d, ok := t.(json.Delim); ok {
-			switch d {
-			case '{', '[':
-				depth++
-			case '}', ']':
-				depth--
-			}
-		}
-	}
-	return nil
 }
 
 func buildObservation(meta awsProductMeta, unit string, price decimal.Decimal, fetchedAt time.Time) domain.PriceObservation {

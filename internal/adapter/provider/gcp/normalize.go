@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
@@ -330,7 +331,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 			}
 		default:
 			// Discard other top-level keys
-			if err := skipGCPValue(dec); err != nil {
+			if err := provider.SkipJSONValue(dec); err != nil {
 				return nil, "", fmt.Errorf("gcp normalize: skip key %s: %w", key, err)
 			}
 		}
@@ -397,32 +398,4 @@ func parseGCPAttributes(description, name string) (domain.ComputeAttributes, boo
 		}
 	}
 	return domain.ComputeAttributes{}, false
-}
-
-func skipGCPValue(dec *json.Decoder) error {
-	t, err := dec.Token()
-	if err != nil {
-		return err
-	}
-	_, ok := t.(json.Delim)
-	if !ok {
-		return nil
-	}
-
-	depth := 1
-	for depth > 0 {
-		t, err := dec.Token()
-		if err != nil {
-			return err
-		}
-		if d, ok := t.(json.Delim); ok {
-			switch d {
-			case '{', '[':
-				depth++
-			case '}', ']':
-				depth--
-			}
-		}
-	}
-	return nil
 }

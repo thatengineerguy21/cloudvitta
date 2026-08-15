@@ -3,7 +3,6 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -11,6 +10,9 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
+
+// maxAllowedSizeGB represents the upper bound on single-request storage size (1 PB).
+var maxAllowedSizeGB = decimal.NewFromInt(1_000_000)
 
 // StorageComparisonMeta represents meta info in the storage comparison response envelope.
 type StorageComparisonMeta struct {
@@ -25,7 +27,6 @@ type StorageResultEntry struct {
 	SkuID             string                   `json:"sku_id"`
 	MatchedSpec       domain.StorageAttributes `json:"matched_spec"`
 	MatchQuality      string                   `json:"match_quality"`
-	MatchDeltaPct     float64                  `json:"match_delta_pct"`
 	MissingAttributes []string                 `json:"missing_attributes"`
 	Price             PriceDetail              `json:"price"`
 	MonthlyCostUSD    decimal.Decimal          `json:"monthly_cost_usd"`
@@ -56,7 +57,7 @@ func NewStorageHandler(pricingSvc *service.PricingService) *StorageHandler {
 // @Description  Returns normalized storage pricing across cloud providers (AWS, Azure, GCP) for requested specs.
 // @Tags         prices
 // @Produce      json
-// @Param        size_gb        query     number  false  "Requested storage size in GB (e.g. 500)"
+// @Param        size_gb        query     string  false  "Requested storage size in GB (e.g. 500, max 1000000)"
 // @Param        storage_class  query     string  false  "Requested canonical storage class (e.g. standard, infrequent_access, archive)"
 // @Param        region         query     string  false  "Canonical region group (default: us-east)"
 // @Param        currency       query     string  false  "Target currency code (default: USD)"
@@ -100,63 +101,81 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	currency = "USD"
 
-	reqSizeGB := 1.0
+	sizeGB := decimal.NewFromInt(1)
 	hasExplicitSize := false
 	if sizeStr := q.Get("size_gb"); sizeStr != "" {
-		v, err := strconv.ParseFloat(sizeStr, 64)
-		if err != nil || v <= 0 {
-			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", "size_gb must be a positive number")
+		parsed, err := decimal.NewFromString(sizeStr)
+		if err != nil || parsed.LessThanOrEqual(decimal.Zero) || parsed.GreaterThan(maxAllowedSizeGB) {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", "size_gb must be a positive number no greater than 1000000")
 			return
 		}
-		reqSizeGB = v
+		sizeGB = parsed
 		hasExplicitSize = true
 	}
 
 	storageClass := q.Get("storage_class")
 
 	providers := []string{"aws", "azure", "gcp"}
-	var allObservations []domain.PriceObservation
+	var results []StorageResultEntry
+	var providerErrors int
 
 	for _, prov := range providers {
-		obsList, err := h.pricingSvc.GetStoragePrices(r.Context(), prov, "storage", region)
+		obsList, err := h.pricingSvc.GetPrices(r.Context(), prov, "storage", region)
 		if err != nil {
-			status, errType, title := middleware.MapServiceError(err)
-			middleware.WriteJSONError(w, r, status, errType, title, err.Error())
-			return
+			providerErrors++
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "fetch_failed",
+				Message:  err.Error(),
+			})
+			continue
 		}
-		allObservations = append(allObservations, obsList...)
+
+		if len(obsList) == 0 {
+			warnings = append(warnings, ProviderWarning{
+				Provider: prov,
+				Code:     "no_data_available",
+				Message:  "No storage pricing data available for this region.",
+			})
+			continue
+		}
+
+		for _, obs := range obsList {
+			matchedSpec := obs.StorageAttributes
+			if hasExplicitSize {
+				f, _ := sizeGB.Float64()
+				matchedSpec.SizeGB = f
+			}
+
+			unit := obs.Unit
+			if unit == "" {
+				unit = "GB-Mo"
+			}
+
+			// In stage 1.4, matching thresholds are deferred to stage 1.6.
+			// Honesty vocabulary: "not_yet_scored" accurately describes status without fake numbers.
+			results = append(results, StorageResultEntry{
+				Provider:          obs.Provider,
+				SkuID:             obs.SkuID,
+				MatchedSpec:       matchedSpec,
+				MatchQuality:      "not_yet_scored", // match scoring lands in 1.6
+				MissingAttributes: []string{},
+				Price: PriceDetail{
+					Amount:   obs.PriceAmount,
+					Unit:     unit,
+					Currency: currency,
+				},
+				MonthlyCostUSD: obs.PriceAmount.Mul(sizeGB),
+				FetchedAt:      obs.FetchedAt,
+				Stale:          false,
+			})
+		}
 	}
 
-	scoredList := service.ScoreStorageObservations(reqSizeGB, storageClass, allObservations)
-
-	var results []StorageResultEntry
-	for _, scored := range scoredList {
-		matchedSpec := scored.Observation.StorageAttributes
-		if hasExplicitSize {
-			matchedSpec.SizeGB = reqSizeGB
-		}
-
-		unit := scored.Observation.Unit
-		if unit == "" {
-			unit = "GB-Mo"
-		}
-
-		results = append(results, StorageResultEntry{
-			Provider:          scored.Observation.Provider,
-			SkuID:             scored.Observation.SkuID,
-			MatchedSpec:       matchedSpec,
-			MatchQuality:      scored.MatchQuality,
-			MatchDeltaPct:     scored.MatchDeltaPct,
-			MissingAttributes: scored.MissingAttributes,
-			Price: PriceDetail{
-				Amount:   scored.Observation.PriceAmount,
-				Unit:     unit,
-				Currency: currency,
-			},
-			MonthlyCostUSD: scored.MonthlyCost,
-			FetchedAt:      scored.Observation.FetchedAt,
-			Stale:          false,
-		})
+	// If all providers errored and produced zero results, return a 500 error
+	if len(results) == 0 && providerErrors == len(providers) {
+		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-error", "Storage pricing unavailable", "All providers failed to retrieve pricing data")
+		return
 	}
 
 	queryMeta := map[string]interface{}{
@@ -165,7 +184,7 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"currency": reqCurrency,
 	}
 	if hasExplicitSize {
-		queryMeta["size_gb"] = reqSizeGB
+		queryMeta["size_gb"] = sizeGB
 	}
 	if storageClass != "" {
 		queryMeta["storage_class"] = storageClass
