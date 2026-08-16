@@ -121,6 +121,10 @@ func (m *mockQuerier) InsertPriceObservation(ctx context.Context, arg store.Inse
 	return 0, errors.New("InsertPriceObservation not implemented")
 }
 
+func (m *mockQuerier) GetProviderCategoryStatus(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error) {
+	return nil, errors.New("GetProviderCategoryStatus not implemented")
+}
+
 type mockTransactor struct {
 	q store.Querier
 }

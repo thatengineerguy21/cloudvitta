@@ -25,3 +25,13 @@ func IsProviderCategorySupported(provider, category string) bool {
 func SupportedProviders() []string {
 	return []string{"aws", "azure", "gcp"}
 }
+
+// SupportedCategoriesForProvider returns a slice of category names supported by the provider in canonical order.
+func SupportedCategoriesForProvider(provider string) []string {
+	switch provider {
+	case "aws", "azure", "gcp":
+		return []string{"compute", "storage", "network"}
+	default:
+		return nil
+	}
+}

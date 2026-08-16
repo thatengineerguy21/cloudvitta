@@ -19,7 +19,7 @@ import (
 )
 
 // NewRouter constructs a net/http.ServeMux with all API routes, health probes, metrics, and middlewares wired.
-func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
+func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, freshnessSvc *service.FreshnessService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Probes & Metrics (unlimited)
@@ -59,6 +59,7 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	storageHandler := NewStorageHandler(pricingSvc)
 	networkHandler := NewNetworkHandler(pricingSvc)
 	calculateHandler := NewCalculateHandler(pricingSvc)
+	statusHandler := NewStatusHandler(freshnessSvc)
 
 	// Auth Handlers
 	signupHandler := NewSignupHandler(authSvc)
@@ -69,6 +70,7 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	mux.Handle("GET /api/v1/prices/compute", limiter.Handler(computeHandler))
 	mux.Handle("GET /api/v1/prices/storage", limiter.Handler(storageHandler))
 	mux.Handle("GET /api/v1/prices/network", limiter.Handler(networkHandler))
+	mux.Handle("GET /api/v1/providers/{provider}/status", limiter.Handler(statusHandler))
 	mux.Handle("POST /api/v1/calculate", limiter.Handler(calculateHandler))
 	mux.Handle("POST /api/v1/auth/signup", limiter.Handler(signupHandler))
 	// Rate limit: login gets a stricter profile as credential-guessing mitigation.

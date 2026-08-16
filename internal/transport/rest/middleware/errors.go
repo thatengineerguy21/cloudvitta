@@ -60,6 +60,9 @@ func MapServiceError(err error) (status int, errorType string, title string) {
 		return http.StatusBadGateway, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable"
 	case errors.Is(err, service.ErrNoMatchFound):
 		return http.StatusNotFound, "https://cloudvitta.dev/errors/not-found", "Not Found"
+	case errors.Is(err, service.ErrProviderNotFound):
+		return http.StatusNotFound, "https://cloudvitta.dev/errors/provider-not-found", "Provider Not Found"
+
 	default:
 		return http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-server-error", "Internal Server Error"
 	}

@@ -210,7 +210,7 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			},
 			NormalizedHourlyUSD: catResult.HourlyCost,
 			FetchedAt:           obs.FetchedAt,
-			Stale:               false,
+			Stale:               catResult.Stale,
 		})
 	}
 

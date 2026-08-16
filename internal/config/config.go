@@ -24,6 +24,7 @@ type Config struct {
 	CORS          CORSConfig          `koanf:"cors"`
 	Observability ObservabilityConfig `koanf:"observability"`
 	GCP           GCPConfig           `koanf:"gcp"`
+	Freshness     FreshnessConfig     `koanf:"freshness"`
 }
 
 type PrimaryConfig struct {
@@ -113,6 +114,10 @@ type ObservabilityConfig struct {
 
 type GCPConfig struct {
 	APIKey string `koanf:"api_key"`
+}
+
+type FreshnessConfig struct {
+	StalenessThresholdHours int64 `koanf:"staleness_threshold_hours"`
 }
 
 func Load() (*Config, error) {
@@ -329,6 +334,11 @@ func resolveEnvFallbacks(cfg *Config) error {
 		} else {
 			cfg.CORS.AllowedOrigins = []string{"*"}
 		}
+	}
+
+	// 12. Resolve Freshness fallbacks & defaults
+	if cfg.Freshness.StalenessThresholdHours == 0 {
+		cfg.Freshness.StalenessThresholdHours = resolveEnvInt64("CLOUDVITTA_FRESHNESS_STALENESS_THRESHOLD_HOURS", "FRESHNESS_STALENESS_THRESHOLD_HOURS", 168)
 	}
 
 	return nil

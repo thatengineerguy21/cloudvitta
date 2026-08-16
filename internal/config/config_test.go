@@ -212,6 +212,11 @@ func TestLoad_RateLimitAndCORSDefaults(t *testing.T) {
 	if !cfg.CORS.AllowCredentials {
 		t.Errorf("expected default AllowCredentials true, got %v", cfg.CORS.AllowCredentials)
 	}
+
+	// Freshness default (168 hours / 7 days)
+	if cfg.Freshness.StalenessThresholdHours != 168 {
+		t.Errorf("expected default StalenessThresholdHours 168, got %d", cfg.Freshness.StalenessThresholdHours)
+	}
 }
 
 func TestLoad_RateLimitAndCORSOverrides(t *testing.T) {
@@ -227,6 +232,7 @@ func TestLoad_RateLimitAndCORSOverrides(t *testing.T) {
 	t.Setenv("CLOUDVITTA_RATELIMIT_LOGIN_RATE", "5")
 	t.Setenv("CLOUDVITTA_CORS_ALLOWED_ORIGINS", "https://cloudvitta.dev,https://app.cloudvitta.dev")
 	t.Setenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS", "false")
+	t.Setenv("CLOUDVITTA_FRESHNESS_STALENESS_THRESHOLD_HOURS", "72")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -253,6 +259,27 @@ func TestLoad_RateLimitAndCORSOverrides(t *testing.T) {
 	}
 	if cfg.CORS.AllowCredentials {
 		t.Errorf("expected AllowCredentials false, got %v", cfg.CORS.AllowCredentials)
+	}
+	if cfg.Freshness.StalenessThresholdHours != 72 {
+		t.Errorf("expected custom StalenessThresholdHours 72, got %d", cfg.Freshness.StalenessThresholdHours)
+	}
+}
+
+func TestLoad_FreshnessConfigFallback(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("FRESHNESS_STALENESS_THRESHOLD_HOURS", "48")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	if cfg.Freshness.StalenessThresholdHours != 48 {
+		t.Errorf("expected secondary env StalenessThresholdHours 48, got %d", cfg.Freshness.StalenessThresholdHours)
 	}
 }
 

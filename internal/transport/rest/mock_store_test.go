@@ -21,6 +21,7 @@ type mockQuerier struct {
 	revokeRefreshTokenByHashFunc          func(ctx context.Context, arg store.RevokeRefreshTokenByHashParams) error
 	revokeRefreshTokenFamilyFunc          func(ctx context.Context, arg store.RevokeRefreshTokenFamilyParams) error
 	listRefreshTokensByFamilyIDFunc       func(ctx context.Context, familyID pgtype.UUID) ([]store.RefreshToken, error)
+	getProviderCategoryStatusFunc         func(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error)
 }
 
 func (m *mockQuerier) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
@@ -109,4 +110,11 @@ func (m *mockQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.GetLat
 
 func (m *mockQuerier) InsertPriceObservation(ctx context.Context, arg store.InsertPriceObservationParams) (int64, error) {
 	return 0, errors.New("InsertPriceObservation not implemented")
+}
+
+func (m *mockQuerier) GetProviderCategoryStatus(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error) {
+	if m.getProviderCategoryStatusFunc != nil {
+		return m.getProviderCategoryStatusFunc(ctx, provider)
+	}
+	return nil, nil
 }

@@ -19,6 +19,8 @@ var (
 	ErrNoCategoriesRequested = errors.New("no categories requested")
 	// ErrUserAlreadyExists is returned when attempting to signup with an existing email.
 	ErrUserAlreadyExists = errors.New("user with this email already exists")
+	// ErrProviderNotFound is returned when a requested cloud provider is unrecognized or invalid.
+	ErrProviderNotFound = errors.New("provider not found")
 
 	// Consolidated auth error sentinels
 	ErrInvalidCredentials    = auth.ErrInvalidCredentials

@@ -158,7 +158,7 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 				MatchQuality:        catResult.MatchResult.MatchQuality,
 				MatchDeltaPct:       catResult.MatchResult.MatchDeltaPct,
 				MissingAttributes:   catResult.MatchResult.MissingAttributes,
-				Stale:               false, // Staleness flag will be hooked up in 1.11
+				Stale:               catResult.Stale,
 				NormalizedHourlyUSD: catResult.HourlyCost,
 			}
 			providerTotal = providerTotal.Add(catResult.HourlyCost)

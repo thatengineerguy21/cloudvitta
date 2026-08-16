@@ -51,8 +51,49 @@ sequenceDiagram
     Calc->>Match: Apply Weighted-Distance Matching (Attributes)
     Match-->>Calc: Return Best Matched SKUs
     
+    Calc->>Fresh: Evaluate Data Staleness (IsStale)
+    Fresh-->>Calc: Return Staleness Flag (Source Data Age vs Threshold)
+
     Calc->>Calc: Filter, Sort, apply partial/anomalous warnings
     
-    Calc-->>HTTP: Return Comparison Result
+    Calc-->>HTTP: Return Comparison Result with Stale Flag
     HTTP-->>Client: JSON Response with X-RateLimit-* Headers
 ```
+
+## Provider Status & Freshness Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RateLimit as Rate Limiter
+    participant StatusH as Status Handler
+    participant Fresh as Freshness Service
+    participant DLQ as Redis DLQ
+    participant DB as Postgres (price_observations)
+
+    Client->>RateLimit: GET /api/v1/providers/{provider}/status
+    RateLimit->>StatusH: Forward Request
+    StatusH->>Fresh: GetProviderStatus(ctx, provider)
+
+    alt Stage 3 Provider (oracle, ibm, alibaba, digitalocean)
+        Fresh-->>StatusH: Return status "not_yet_ingested", stale=true, warning
+    else Big 3 Provider (aws, azure, gcp)
+        Fresh->>DB: GetProviderCategoryStatus(provider)
+        DB-->>Fresh: Rows (category, last_fetched_at, last_seen_at, count)
+        
+        loop Each Supported Category
+            Fresh->>Fresh: Evaluate Staleness (now - last_fetched_at > threshold)
+            Fresh->>DLQ: Inspect Active Job Failure (Get provider, category)
+            DLQ-->>Fresh: DLQ Entry (if present)
+        end
+
+        Fresh->>Fresh: Aggregate Status (healthy / degraded / stale / blocked)
+        Fresh-->>StatusH: Return ProviderStatus Domain Model
+    else Unknown Provider
+        Fresh-->>StatusH: ErrProviderNotFound
+        StatusH-->>Client: 404 Not Found (RFC 7807)
+    end
+
+    StatusH-->>Client: 200 OK ProviderStatus JSON
+```
+

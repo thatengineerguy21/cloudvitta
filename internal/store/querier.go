@@ -14,6 +14,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceForSKUParams) (PriceObservation, error)
 	GetPriceObservations(ctx context.Context, arg GetPriceObservationsParams) ([]PriceObservation, error)
+	GetProviderCategoryStatus(ctx context.Context, provider string) ([]GetProviderCategoryStatusRow, error)
 	GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRefreshTokenByID(ctx context.Context, id pgtype.UUID) (RefreshToken, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)

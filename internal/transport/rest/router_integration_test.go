@@ -47,7 +47,7 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 	}
 
 	pricingSvc := service.NewPricingService(nil, rdb)
-	router := rest.NewRouter(pricingSvc, nil, nil, rdb, cfg)
+	router := rest.NewRouter(pricingSvc, nil, nil, nil, rdb, cfg)
 
 	ts := httptest.NewServer(router)
 	defer ts.Close()

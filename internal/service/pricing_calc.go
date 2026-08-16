@@ -39,6 +39,7 @@ type CategoryPricingResult struct {
 	HourlyCost  decimal.Decimal
 	MonthlyCost decimal.Decimal
 	Unit        string
+	Stale       bool
 }
 
 // MatchAndCalculate encapsulates the fetch, matching, and cost calculation for any category.
@@ -108,10 +109,16 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		}
 	}
 
+	var isStale bool
+	if s.freshnessSvc != nil {
+		isStale = s.freshnessSvc.IsStale(provider, category, matchResult.Observation.FetchedAt)
+	}
+
 	return &CategoryPricingResult{
 		MatchResult: matchResult,
 		HourlyCost:  hourlyCost,
 		MonthlyCost: monthlyCost,
 		Unit:        unit,
+		Stale:       isStale,
 	}, nil
 }

@@ -180,7 +180,7 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			},
 			MonthlyCostUSD: catResult.MonthlyCost,
 			FetchedAt:      obs.FetchedAt,
-			Stale:          false,
+			Stale:          catResult.Stale,
 		})
 	}
 

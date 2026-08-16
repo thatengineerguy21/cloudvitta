@@ -26,6 +26,7 @@ type PricingService struct {
 	tracer       trace.Tracer
 	cacheMetrics *observability.CacheMetrics
 	sfGroup      singleflight.Group
+	freshnessSvc *FreshnessService
 }
 
 // PricingOption allows configuring optional dependencies for PricingService.
@@ -42,6 +43,13 @@ func WithTracer(tracer trace.Tracer) PricingOption {
 func WithCacheMetrics(metrics *observability.CacheMetrics) PricingOption {
 	return func(s *PricingService) {
 		s.cacheMetrics = metrics
+	}
+}
+
+// WithFreshnessService attaches a FreshnessService to PricingService for staleness evaluation.
+func WithFreshnessService(freshnessSvc *FreshnessService) PricingOption {
+	return func(s *PricingService) {
+		s.freshnessSvc = freshnessSvc
 	}
 }
 

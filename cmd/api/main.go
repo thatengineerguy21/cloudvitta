@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
@@ -90,11 +91,23 @@ func main() {
 	// --- Services & Router ---
 	queries := store.New(dbPool)
 	transactor := store.NewTransactor(dbPool)
+
+	var dlqReader service.DLQReader
+	if redisClient != nil {
+		dlqReader = dlq.New(redisClient)
+	}
+	freshnessSvc := service.NewFreshnessService(
+		queries,
+		dlqReader,
+		service.WithDefaultThreshold(time.Duration(cfg.Freshness.StalenessThresholdHours)*time.Hour),
+	)
+
 	pricingSvc := service.NewPricingService(
 		queries,
 		redisClient,
 		service.WithTracer(otelProviders.Tracer),
 		service.WithCacheMetrics(cacheMetrics),
+		service.WithFreshnessService(freshnessSvc),
 	)
 	authSvc := service.NewAuthService(
 		queries,
@@ -102,7 +115,7 @@ func main() {
 		service.WithTransactor(transactor),
 		service.WithAuthTracer(otelProviders.Tracer),
 	)
-	router := rest.NewRouter(pricingSvc, authSvc, dbPool, redisClient, cfg)
+	router := rest.NewRouter(pricingSvc, authSvc, freshnessSvc, dbPool, redisClient, cfg)
 
 	// --- HTTP Server ---
 	server := &http.Server{
