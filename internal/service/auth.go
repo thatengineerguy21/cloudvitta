@@ -336,10 +336,12 @@ func (s *AuthService) Logout(ctx context.Context, rawRefreshToken string) error 
 	now := s.clock().UTC()
 
 	if s.queries != nil {
-		_ = s.queries.RevokeRefreshTokenByHash(ctx, store.RevokeRefreshTokenByHashParams{
+		if err := s.queries.RevokeRefreshTokenByHash(ctx, store.RevokeRefreshTokenByHashParams{
 			TokenHash: tokenHash,
 			RevokedAt: store.TimestamptzFromTime(now),
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to revoke refresh token: %w", err)
+		}
 	}
 
 	s.rotationCache.Delete(tokenHash)

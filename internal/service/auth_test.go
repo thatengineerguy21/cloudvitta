@@ -675,3 +675,21 @@ func TestLogout_Success(t *testing.T) {
 		t.Errorf("expected ErrInvalidToken for empty logout token, got: %v", err)
 	}
 }
+
+func TestLogout_DatabaseError(t *testing.T) {
+	ctx := context.Background()
+	rawToken := "logout-raw-token-xyz"
+
+	dbErr := errors.New("database connection failed")
+	mock := &mockQuerier{
+		revokeRefreshTokenByHashFunc: func(ctx context.Context, arg store.RevokeRefreshTokenByHashParams) error {
+			return dbErr
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret)
+	err := authSvc.Logout(ctx, rawToken)
+	if err == nil {
+		t.Fatalf("expected error on DB failure during logout, got nil")
+	}
+}

@@ -31,6 +31,16 @@ func NewRotationCache() *RotationCache {
 func (c *RotationCache) Put(tokenHash string, idempotencyKey string, pair domain.TokenPair, now time.Time, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Prune expired entries when cache size grows to prevent unbounded memory growth
+	if len(c.items) > 100 {
+		for k, item := range c.items {
+			if now.After(item.ExpiresAt) {
+				delete(c.items, k)
+			}
+		}
+	}
+
 	c.items[tokenHash] = CachedRotation{
 		IdempotencyKey: idempotencyKey,
 		TokenPair:      pair,

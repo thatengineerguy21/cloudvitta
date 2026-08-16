@@ -61,12 +61,8 @@ func (h *RefreshHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB maximum payload
-
 	var req RefreshRequest
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
+	if err := DecodeJSONBody(w, r, &req); err != nil {
 		middleware.WriteJSONError(
 			w, r,
 			http.StatusBadRequest,

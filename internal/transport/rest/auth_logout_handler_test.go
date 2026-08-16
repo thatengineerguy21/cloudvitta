@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -85,5 +86,27 @@ func TestLogoutHandler_MethodNotAllowed(t *testing.T) {
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want 405 Method Not Allowed", rec.Code)
+	}
+}
+
+func TestLogoutHandler_DatabaseError(t *testing.T) {
+	mock := &mockQuerier{
+		revokeRefreshTokenByHashFunc: func(ctx context.Context, arg store.RevokeRefreshTokenByHashParams) error {
+			return errors.New("database connection failed")
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret)
+	handler := rest.NewLogoutHandler(authSvc)
+
+	body := `{"refresh_token": "valid-raw-refresh-token"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 Internal Server Error, got %d", rec.Code, rec.Code)
 	}
 }
