@@ -11,6 +11,51 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getRefreshTokenByHashForUpdate = `-- name: GetRefreshTokenByHashForUpdate :one
+SELECT id, user_id, family_id, token_hash, created_at, expires_at, revoked_at, replaced_by
+FROM refresh_tokens
+WHERE token_hash = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, getRefreshTokenByHashForUpdate, tokenHash)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.FamilyID,
+		&i.TokenHash,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.ReplacedBy,
+	)
+	return i, err
+}
+
+const getRefreshTokenByID = `-- name: GetRefreshTokenByID :one
+SELECT id, user_id, family_id, token_hash, created_at, expires_at, revoked_at, replaced_by
+FROM refresh_tokens
+WHERE id = $1
+`
+
+func (q *Queries) GetRefreshTokenByID(ctx context.Context, id pgtype.UUID) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, getRefreshTokenByID, id)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.FamilyID,
+		&i.TokenHash,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.ReplacedBy,
+	)
+	return i, err
+}
+
 const insertRefreshToken = `-- name: InsertRefreshToken :one
 INSERT INTO refresh_tokens (
     user_id,
@@ -49,4 +94,90 @@ func (q *Queries) InsertRefreshToken(ctx context.Context, arg InsertRefreshToken
 		&i.ReplacedBy,
 	)
 	return i, err
+}
+
+const listRefreshTokensByFamilyID = `-- name: ListRefreshTokensByFamilyID :many
+SELECT id, user_id, family_id, token_hash, created_at, expires_at, revoked_at, replaced_by
+FROM refresh_tokens
+WHERE family_id = $1
+ORDER BY created_at ASC
+`
+
+func (q *Queries) ListRefreshTokensByFamilyID(ctx context.Context, familyID pgtype.UUID) ([]RefreshToken, error) {
+	rows, err := q.db.Query(ctx, listRefreshTokensByFamilyID, familyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RefreshToken
+	for rows.Next() {
+		var i RefreshToken
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FamilyID,
+			&i.TokenHash,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.ReplacedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const revokeRefreshTokenByHash = `-- name: RevokeRefreshTokenByHash :exec
+UPDATE refresh_tokens
+SET revoked_at = $2
+WHERE token_hash = $1 AND revoked_at IS NULL
+`
+
+type RevokeRefreshTokenByHashParams struct {
+	TokenHash string             `json:"token_hash"`
+	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+}
+
+func (q *Queries) RevokeRefreshTokenByHash(ctx context.Context, arg RevokeRefreshTokenByHashParams) error {
+	_, err := q.db.Exec(ctx, revokeRefreshTokenByHash, arg.TokenHash, arg.RevokedAt)
+	return err
+}
+
+const revokeRefreshTokenFamily = `-- name: RevokeRefreshTokenFamily :exec
+UPDATE refresh_tokens
+SET revoked_at = $2
+WHERE family_id = $1 AND revoked_at IS NULL
+`
+
+type RevokeRefreshTokenFamilyParams struct {
+	FamilyID  pgtype.UUID        `json:"family_id"`
+	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+}
+
+func (q *Queries) RevokeRefreshTokenFamily(ctx context.Context, arg RevokeRefreshTokenFamilyParams) error {
+	_, err := q.db.Exec(ctx, revokeRefreshTokenFamily, arg.FamilyID, arg.RevokedAt)
+	return err
+}
+
+const revokeRefreshTokenWithReplacement = `-- name: RevokeRefreshTokenWithReplacement :exec
+UPDATE refresh_tokens
+SET revoked_at = $2,
+    replaced_by = $3
+WHERE id = $1
+`
+
+type RevokeRefreshTokenWithReplacementParams struct {
+	ID         pgtype.UUID        `json:"id"`
+	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
+	ReplacedBy pgtype.UUID        `json:"replaced_by"`
+}
+
+func (q *Queries) RevokeRefreshTokenWithReplacement(ctx context.Context, arg RevokeRefreshTokenWithReplacementParams) error {
+	_, err := q.db.Exec(ctx, revokeRefreshTokenWithReplacement, arg.ID, arg.RevokedAt, arg.ReplacedBy)
+	return err
 }

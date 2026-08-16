@@ -21,8 +21,13 @@ var (
 	ErrUserAlreadyExists = errors.New("user with this email already exists")
 
 	// Consolidated auth error sentinels
-	ErrInvalidCredentials = auth.ErrInvalidCredentials
-	ErrInvalidEmail       = auth.ErrInvalidEmail
-	ErrPasswordTooShort   = auth.ErrPasswordTooShort
-	ErrPasswordTooLong    = auth.ErrPasswordTooLong
+	ErrInvalidCredentials    = auth.ErrInvalidCredentials
+	ErrInvalidEmail          = auth.ErrInvalidEmail
+	ErrPasswordTooShort      = auth.ErrPasswordTooShort
+	ErrPasswordTooLong       = auth.ErrPasswordTooLong
+	ErrInvalidToken          = auth.ErrInvalidToken
+	ErrExpiredToken          = auth.ErrExpiredToken
+	ErrRevokedToken          = auth.ErrRevokedToken
+	ErrTokenFamilyRevoked    = auth.ErrTokenFamilyRevoked
+	ErrMissingIdempotencyKey = auth.ErrMissingIdempotencyKey
 )

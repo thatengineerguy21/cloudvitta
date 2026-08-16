@@ -254,4 +254,88 @@ func TestUserAndRefreshTokenIntegration(t *testing.T) {
 	if !store.IsUniqueViolation(err) {
 		t.Errorf("expected store.IsUniqueViolation(err) = true, got false for error: %v", err)
 	}
+
+	// 5. GetRefreshTokenByHashForUpdate
+	lockedToken, err := queries.GetRefreshTokenByHashForUpdate(ctx, tokenHash)
+	if err != nil {
+		t.Fatalf("GetRefreshTokenByHashForUpdate failed: %v", err)
+	}
+	if lockedToken.ID != refreshToken.ID {
+		t.Errorf("lockedToken.ID = %v, want %v", lockedToken.ID, refreshToken.ID)
+	}
+
+	// 6. GetRefreshTokenByID
+	byIdToken, err := queries.GetRefreshTokenByID(ctx, refreshToken.ID)
+	if err != nil {
+		t.Fatalf("GetRefreshTokenByID failed: %v", err)
+	}
+	if byIdToken.ID != refreshToken.ID {
+		t.Errorf("byIdToken.ID = %v, want %v", byIdToken.ID, refreshToken.ID)
+	}
+
+	// 7. Insert replacement token and revoke old token with replacement
+	_, replacementHash, err := auth.GenerateRefreshToken()
+	if err != nil {
+		t.Fatalf("GenerateRefreshToken: %v", err)
+	}
+	replacementToken, err := queries.InsertRefreshToken(ctx, store.InsertRefreshTokenParams{
+		UserID:    user.ID,
+		FamilyID:  refreshToken.FamilyID,
+		TokenHash: replacementHash,
+		ExpiresAt: pgtype.Timestamptz{Time: expiresAt.Add(24 * time.Hour), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("InsertRefreshToken replacement failed: %v", err)
+	}
+
+	now := time.Now().UTC()
+	err = queries.RevokeRefreshTokenWithReplacement(ctx, store.RevokeRefreshTokenWithReplacementParams{
+		ID:         refreshToken.ID,
+		RevokedAt:  pgtype.Timestamptz{Time: now, Valid: true},
+		ReplacedBy: replacementToken.ID,
+	})
+	if err != nil {
+		t.Fatalf("RevokeRefreshTokenWithReplacement failed: %v", err)
+	}
+
+	// Verify replacement recorded
+	revokedToken, err := queries.GetRefreshTokenByID(ctx, refreshToken.ID)
+	if err != nil {
+		t.Fatalf("GetRefreshTokenByID after revocation failed: %v", err)
+	}
+	if !revokedToken.RevokedAt.Valid {
+		t.Errorf("expected revoked_at to be valid")
+	}
+	if revokedToken.ReplacedBy != replacementToken.ID {
+		t.Errorf("revokedToken.ReplacedBy = %v, want %v", revokedToken.ReplacedBy, replacementToken.ID)
+	}
+
+	// 8. List tokens by family ID
+	familyTokens, err := queries.ListRefreshTokensByFamilyID(ctx, refreshToken.FamilyID)
+	if err != nil {
+		t.Fatalf("ListRefreshTokensByFamilyID failed: %v", err)
+	}
+	if len(familyTokens) != 2 {
+		t.Errorf("len(familyTokens) = %d, want 2", len(familyTokens))
+	}
+
+	// 9. RevokeRefreshTokenFamily
+	err = queries.RevokeRefreshTokenFamily(ctx, store.RevokeRefreshTokenFamilyParams{
+		FamilyID:  refreshToken.FamilyID,
+		RevokedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
+	}
+
+	// Verify all tokens in family are revoked
+	familyTokensAfter, err := queries.ListRefreshTokensByFamilyID(ctx, refreshToken.FamilyID)
+	if err != nil {
+		t.Fatalf("ListRefreshTokensByFamilyID after family revoke failed: %v", err)
+	}
+	for _, tok := range familyTokensAfter {
+		if !tok.RevokedAt.Valid {
+			t.Errorf("expected token %v in family to be revoked", tok.ID)
+		}
+	}
 }

@@ -13,6 +13,12 @@ var (
 	ErrPasswordTooLong = errors.New("password exceeds maximum allowed length of 72 characters")
 	// ErrInvalidToken is returned when a JWT or refresh token is malformed or invalid.
 	ErrInvalidToken = errors.New("invalid or malformed token")
-	// ErrExpiredToken is returned when an access token has expired.
+	// ErrExpiredToken is returned when an access token or refresh token has expired.
 	ErrExpiredToken = errors.New("token has expired")
+	// ErrRevokedToken is returned when an already revoked refresh token is presented.
+	ErrRevokedToken = errors.New("token has been revoked")
+	// ErrTokenFamilyRevoked is returned when token theft is detected and the entire family is invalidated.
+	ErrTokenFamilyRevoked = errors.New("token family revoked due to theft detection")
+	// ErrMissingIdempotencyKey is returned when a refresh request is missing the required idempotency key.
+	ErrMissingIdempotencyKey = errors.New("idempotency_key is required for refresh token rotation")
 )

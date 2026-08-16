@@ -37,6 +37,8 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	// Auth Handlers
 	signupHandler := NewSignupHandler(authSvc)
 	loginHandler := NewLoginHandler(authSvc)
+	refreshHandler := NewRefreshHandler(authSvc)
+	logoutHandler := NewLogoutHandler(authSvc)
 
 	mux.Handle("GET /api/v1/prices/compute", limiter.Handler(computeHandler))
 	mux.Handle("GET /api/v1/prices/storage", limiter.Handler(storageHandler))
@@ -45,6 +47,8 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	mux.Handle("POST /api/v1/auth/signup", limiter.Handler(signupHandler))
 	// Rate limit: login gets a stricter 10 req/min/IP profile ahead of 1.10 as credential-guessing mitigation.
 	mux.Handle("POST /api/v1/auth/login", limiter.WithProfile("login", 10)(loginHandler))
+	mux.Handle("POST /api/v1/auth/refresh", limiter.Handler(refreshHandler))
+	mux.Handle("POST /api/v1/auth/logout", limiter.Handler(logoutHandler))
 
 	// Wrap with recovery middleware and OpenTelemetry HTTP instrumentation
 	recoveredHandler := middleware.RecoverMiddleware(mux)

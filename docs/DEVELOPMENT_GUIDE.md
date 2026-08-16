@@ -199,6 +199,16 @@ The orchestrator concurrently fetches pricing data from all registered provider/
    curl -X POST "http://localhost:8080/api/v1/auth/login" \
      -H "Content-Type: application/json" \
      -d '{"email":"user@example.com","password":"securePassword123"}'
+
+   # Rotate refresh token (requires idempotency_key)
+   curl -X POST "http://localhost:8080/api/v1/auth/refresh" \
+     -H "Content-Type: application/json" \
+     -d '{"refresh_token":"<raw_refresh_token>","idempotency_key":"b57422f1-6789-4a0b-93f4-2f22c544e311"}'
+
+   # Logout / Revoke session
+   curl -X POST "http://localhost:8080/api/v1/auth/logout" \
+     -H "Content-Type: application/json" \
+     -d '{"refresh_token":"<raw_refresh_token>"}'
    ```
 
 5. **Verify Rate Limiter (60 req/min generic, 10 req/min login)**:

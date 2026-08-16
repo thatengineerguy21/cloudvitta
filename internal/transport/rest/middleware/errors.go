@@ -45,9 +45,14 @@ func MapServiceError(err error) (status int, errorType string, title string) {
 		errors.Is(err, service.ErrInvalidEmail),
 		errors.Is(err, service.ErrPasswordTooShort),
 		errors.Is(err, service.ErrPasswordTooLong),
-		errors.Is(err, service.ErrNoCategoriesRequested):
+		errors.Is(err, service.ErrNoCategoriesRequested),
+		errors.Is(err, service.ErrMissingIdempotencyKey):
 		return http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters"
-	case errors.Is(err, service.ErrInvalidCredentials):
+	case errors.Is(err, service.ErrInvalidCredentials),
+		errors.Is(err, service.ErrInvalidToken),
+		errors.Is(err, service.ErrExpiredToken),
+		errors.Is(err, service.ErrRevokedToken),
+		errors.Is(err, service.ErrTokenFamilyRevoked):
 		return http.StatusUnauthorized, "https://cloudvitta.dev/errors/unauthorized", "Unauthorized"
 	case errors.Is(err, service.ErrUserAlreadyExists):
 		return http.StatusConflict, "https://cloudvitta.dev/errors/conflict", "Conflict"

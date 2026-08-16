@@ -62,6 +62,7 @@ FROM users
 WHERE id = $1
 `
 
+// Note: Retained for Stage 1.9 user profile/tier lookup during token refresh rotation.
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i User

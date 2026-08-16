@@ -89,13 +89,19 @@ func main() {
 
 	// --- Services & Router ---
 	queries := store.New(dbPool)
+	transactor := store.NewTransactor(dbPool)
 	pricingSvc := service.NewPricingService(
 		queries,
 		redisClient,
 		service.WithTracer(otelProviders.Tracer),
 		service.WithCacheMetrics(cacheMetrics),
 	)
-	authSvc := service.NewAuthService(queries, []byte(cfg.Auth.JWTSecret))
+	authSvc := service.NewAuthService(
+		queries,
+		[]byte(cfg.Auth.JWTSecret),
+		service.WithTransactor(transactor),
+		service.WithAuthTracer(otelProviders.Tracer),
+	)
 	router := rest.NewRouter(pricingSvc, authSvc, dbPool, redisClient)
 
 	// --- HTTP Server ---

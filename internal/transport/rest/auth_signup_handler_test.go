@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
@@ -21,66 +19,20 @@ import (
 
 var testJWTSecret = []byte("super-secret-jwt-key-with-at-least-32-bytes-length!")
 
-// testRow implements pgx.Row for mocked query responses.
-type testRow struct {
-	scanFn func(dest ...interface{}) error
-}
-
-func (r *testRow) Scan(dest ...interface{}) error {
-	if r.scanFn != nil {
-		return r.scanFn(dest...)
-	}
-	return pgx.ErrNoRows
-}
-
-// testDBTX implements store.DBTX for testing handlers with *store.Queries.
-type testDBTX struct {
-	queryRowFn func(ctx context.Context, sql string, args ...interface{}) pgx.Row
-}
-
-func (t *testDBTX) Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
-}
-
-func (t *testDBTX) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
-	return nil, nil
-}
-
-func (t *testDBTX) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
-	if t.queryRowFn != nil {
-		return t.queryRowFn(ctx, sql, args...)
-	}
-	return &testRow{}
-}
-
 func TestSignupHandler_Success(t *testing.T) {
 	userUUID := uuid.New()
-	dbtx := &testDBTX{
-		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
-			argEmail, _ := args[0].(string)
-			argHash, _ := args[1].(string)
-			return &testRow{
-				scanFn: func(dest ...interface{}) error {
-					if idPtr, ok := dest[0].(*pgtype.UUID); ok {
-						*idPtr = store.UUIDToPg(userUUID)
-					}
-					if emailPtr, ok := dest[1].(*string); ok {
-						*emailPtr = argEmail
-					}
-					if hashPtr, ok := dest[2].(*string); ok {
-						*hashPtr = argHash
-					}
-					if createdPtr, ok := dest[3].(*pgtype.Timestamptz); ok {
-						*createdPtr = store.TimestamptzFromTime(time.Now().UTC())
-					}
-					return nil
-				},
-			}
+	mock := &mockQuerier{
+		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
+			return store.User{
+				ID:           store.UUIDToPg(userUUID),
+				Email:        arg.Email,
+				PasswordHash: arg.PasswordHash,
+				CreatedAt:    store.TimestamptzFromTime(time.Now().UTC()),
+			}, nil
 		},
 	}
 
-	queries := store.New(dbtx)
-	authSvc := service.NewAuthService(queries, testJWTSecret)
+	authSvc := service.NewAuthService(mock, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	body := `{"email": "user@example.com", "password": "securePassword123"}`
@@ -108,8 +60,7 @@ func TestSignupHandler_Success(t *testing.T) {
 }
 
 func TestSignupHandler_MethodNotAllowed(t *testing.T) {
-	queries := store.New(&testDBTX{})
-	authSvc := service.NewAuthService(queries, testJWTSecret)
+	authSvc := service.NewAuthService(&mockQuerier{}, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/signup", nil)
@@ -123,8 +74,7 @@ func TestSignupHandler_MethodNotAllowed(t *testing.T) {
 }
 
 func TestSignupHandler_MalformedJSON(t *testing.T) {
-	queries := store.New(&testDBTX{})
-	authSvc := service.NewAuthService(queries, testJWTSecret)
+	authSvc := service.NewAuthService(&mockQuerier{}, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/signup", bytes.NewBufferString(`{invalid-json`))
@@ -138,8 +88,7 @@ func TestSignupHandler_MalformedJSON(t *testing.T) {
 }
 
 func TestSignupHandler_ShortPassword(t *testing.T) {
-	queries := store.New(&testDBTX{})
-	authSvc := service.NewAuthService(queries, testJWTSecret)
+	authSvc := service.NewAuthService(&mockQuerier{}, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	body := `{"email": "user@example.com", "password": "123"}`
@@ -160,21 +109,16 @@ func TestSignupHandler_ShortPassword(t *testing.T) {
 }
 
 func TestSignupHandler_DuplicateEmail(t *testing.T) {
-	dbtx := &testDBTX{
-		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
-			return &testRow{
-				scanFn: func(dest ...interface{}) error {
-					return &pgconn.PgError{
-						Code:           "23505",
-						ConstraintName: "users_email_key",
-					}
-				},
+	mock := &mockQuerier{
+		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
+			return store.User{}, &pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: "users_email_key",
 			}
 		},
 	}
 
-	queries := store.New(dbtx)
-	authSvc := service.NewAuthService(queries, testJWTSecret)
+	authSvc := service.NewAuthService(mock, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	body := `{"email": "existing@example.com", "password": "securePassword123"}`
