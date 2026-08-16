@@ -2,61 +2,45 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/shopspring/decimal"
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
-
-// CalculateComputeTarget defines compute parameters for composite calculation.
-type CalculateComputeTarget struct {
-	VCPU         float64
-	RAMGB        float64
-	Family       string
-	StrictFamily bool
-}
-
-// CalculateStorageTarget defines storage parameters for composite calculation.
-type CalculateStorageTarget struct {
-	SizeGB       decimal.Decimal
-	StorageClass string
-}
-
-// CalculateNetworkTarget defines network parameters for composite calculation.
-type CalculateNetworkTarget struct {
-	EgressGB     decimal.Decimal
-	TransferType string
-}
 
 // CalculateRequest specifies the input parameters for a composite workload calculation.
 type CalculateRequest struct {
-	Region   string
-	Currency string
-	Compute  *CalculateComputeTarget
-	Storage  *CalculateStorageTarget
-	Network  *CalculateNetworkTarget
+	Region       string
+	Currency     string
+	StrictFamily bool
+	Compute      *domain.ComputeAttributes
+	Storage      *domain.StorageAttributes
+	Network      *domain.NetworkAttributes
 }
 
 // CalculateCategoryResult contains the matched SKU and normalized hourly cost for a single category.
 type CalculateCategoryResult struct {
-	SkuID               string          `json:"sku_id"`
-	MatchQuality        string          `json:"match_quality"`
-	NormalizedHourlyUSD decimal.Decimal `json:"normalized_hourly_usd"`
+	SkuID               string
+	MatchQuality        string
+	MatchDeltaPct       float64
+	MissingAttributes   []string
+	Stale               bool
+	NormalizedHourlyUSD decimal.Decimal
 }
 
 // CalculateProviderResult holds the per-provider aggregated calculation outcome.
 type CalculateProviderResult struct {
-	Provider                        string                             `json:"provider"`
-	Categories                      map[string]CalculateCategoryResult `json:"categories"`
-	TotalNormalizedHourlyUSD        *decimal.Decimal                   `json:"total_normalized_hourly_usd,omitempty"`
-	PartialTotalNormalizedHourlyUSD *decimal.Decimal                   `json:"partial_total_normalized_hourly_usd,omitempty"`
-	Partial                         bool                               `json:"partial"`
+	Provider                        string
+	Categories                      map[string]CalculateCategoryResult
+	TotalNormalizedHourlyUSD        *decimal.Decimal
+	PartialTotalNormalizedHourlyUSD *decimal.Decimal
+	Partial                         bool
 }
 
 // CalculateWarning represents a warning entry explaining omissions or system constraints.
 type CalculateWarning struct {
-	Provider string `json:"provider"`
-	Code     string `json:"code"`
-	Message  string `json:"message"`
+	Provider string
+	Code     string
+	Message  string
 }
 
 // CalculateResult contains the complete composite calculation response.
@@ -91,25 +75,15 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 
 	var warnings []CalculateWarning
 
-	// Stage 3 provider warnings
-	stage3Providers := []string{"oracle", "ibm", "alibaba", "digitalocean"}
-	for _, prov := range stage3Providers {
-		warnings = append(warnings, CalculateWarning{
-			Provider: prov,
-			Code:     "not_yet_ingested",
-			Message:  fmt.Sprintf("%s ingestion lands in stage 3.", formatProviderDisplayName(prov)),
-		})
-	}
-
 	if req.Currency != "" && req.Currency != "USD" {
 		warnings = append(warnings, CalculateWarning{
 			Provider: "system",
 			Code:     "currency_conversion_not_yet_supported",
-			Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
+			Message:  "Only USD is currently supported. Returning results in USD.",
 		})
 	}
 
-	providers := []string{"aws", "azure", "gcp"}
+	providers := SupportedProviders()
 	var results []CalculateProviderResult
 	var totalProviderFailures int
 
@@ -120,129 +94,75 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 		var matchedCategories int
 
 		for _, category := range requestedCategories {
-			if !IsProviderCategorySupported(prov, category) {
-				warnings = append(warnings, CalculateWarning{
-					Provider: prov,
-					Code:     "category_not_supported",
-					Message:  fmt.Sprintf("%s category is not supported by %s", category, prov),
-				})
-				continue
-			}
-
-			obsList, err := s.GetPrices(ctx, prov, category, region)
-			if err != nil {
-				categoryErrors++
-				warnings = append(warnings, CalculateWarning{
-					Provider: prov,
-					Code:     "fetch_failed",
-					Message:  err.Error(),
-				})
-				continue
-			}
-
-			if len(obsList) == 0 {
-				warnings = append(warnings, CalculateWarning{
-					Provider: prov,
-					Code:     "no_data_available",
-					Message:  fmt.Sprintf("No %s pricing data available for this region.", category),
-				})
-				continue
-			}
-
+			var target MatchTarget
 			switch category {
 			case "compute":
-				target := MatchTarget{
+				target = MatchTarget{
 					VCPU:         req.Compute.VCPU,
 					RAMGB:        req.Compute.RAMGB,
 					Family:       req.Compute.Family,
-					StrictFamily: req.Compute.StrictFamily,
+					StrictFamily: req.StrictFamily,
 					Category:     "compute",
 				}
-				matchResult := MatchObservations(
-					ComputeScorer{}, obsList, target, ThresholdsForCategory("compute"),
-				)
-				if matchResult == nil {
-					warnings = append(warnings, CalculateWarning{
-						Provider: prov,
-						Code:     "no_match",
-						Message:  "No compute SKU matched the requested spec within acceptable thresholds.",
-					})
-					continue
-				}
-
-				hourlyCost := matchResult.Observation.PriceAmount
-				categoriesMap["compute"] = CalculateCategoryResult{
-					SkuID:               matchResult.Observation.SkuID,
-					MatchQuality:        matchResult.MatchQuality,
-					NormalizedHourlyUSD: hourlyCost,
-				}
-				providerTotal = providerTotal.Add(hourlyCost)
-				matchedCategories++
-
 			case "storage":
-				sizeGB := decimal.NewFromInt(1)
-				if req.Storage.SizeGB.GreaterThan(decimal.Zero) {
-					sizeGB = req.Storage.SizeGB
-				}
-				sizeF, _ := sizeGB.Float64()
-				target := MatchTarget{
-					SizeGB:       sizeF,
+				target = MatchTarget{
+					SizeGB:       req.Storage.SizeGB,
 					StorageClass: req.Storage.StorageClass,
 					Category:     "storage",
 				}
-				matchResult := MatchObservations(
-					StorageScorer{}, obsList, target, ThresholdsForCategory("storage"),
-				)
-				if matchResult == nil {
-					warnings = append(warnings, CalculateWarning{
-						Provider: prov,
-						Code:     "no_match",
-						Message:  "No storage SKU matched the requested spec within acceptable thresholds.",
-					})
-					continue
-				}
-
-				hourlyCost := CalculateStorageHourlyCost(matchResult.Observation.PriceAmount, sizeGB)
-				categoriesMap["storage"] = CalculateCategoryResult{
-					SkuID:               matchResult.Observation.SkuID,
-					MatchQuality:        matchResult.MatchQuality,
-					NormalizedHourlyUSD: hourlyCost,
-				}
-				providerTotal = providerTotal.Add(hourlyCost)
-				matchedCategories++
-
 			case "network":
-				egressGB := decimal.NewFromInt(1)
-				if req.Network.EgressGB.GreaterThan(decimal.Zero) {
-					egressGB = req.Network.EgressGB
-				}
-				egressF, _ := egressGB.Float64()
-				target := MatchTarget{
-					EgressGB:     egressF,
+				target = MatchTarget{
+					EgressGB:     req.Network.EgressGB,
 					TransferType: req.Network.TransferType,
 					Category:     "network",
 				}
-				matchResult := MatchObservations(
-					NetworkScorer{}, obsList, target, ThresholdsForCategory("network"),
-				)
-				if matchResult == nil {
+			}
+
+			catResult, err := s.MatchAndCalculate(ctx, prov, category, region, target)
+			if err != nil {
+				switch err {
+				case ErrCategoryNotSupported:
+					warnings = append(warnings, CalculateWarning{
+						Provider: prov,
+						Code:     "category_not_supported",
+						Message:  category + " category is not supported by " + prov,
+					})
+				case ErrNoMatchFound:
 					warnings = append(warnings, CalculateWarning{
 						Provider: prov,
 						Code:     "no_match",
-						Message:  "No network SKU matched the requested spec within acceptable thresholds.",
+						Message:  "No " + category + " SKU matched the requested spec within acceptable thresholds.",
 					})
-					continue
+				default:
+					categoryErrors++
+					warnings = append(warnings, CalculateWarning{
+						Provider: prov,
+						Code:     "fetch_failed",
+						Message:  err.Error(),
+					})
 				}
-
-				hourlyCost := CalculateNetworkHourlyCost(matchResult.Observation.PriceAmount, egressGB)
-				categoriesMap["network"] = CalculateCategoryResult{
-					SkuID:               matchResult.Observation.SkuID,
-					MatchQuality:        matchResult.MatchQuality,
-					NormalizedHourlyUSD: hourlyCost,
-				}
-				providerTotal = providerTotal.Add(hourlyCost)
-				matchedCategories++
+				continue
 			}
+
+			if catResult == nil {
+				warnings = append(warnings, CalculateWarning{
+					Provider: prov,
+					Code:     "no_data_available",
+					Message:  "No " + category + " pricing data available for this region.",
+				})
+				continue
+			}
+
+			categoriesMap[category] = CalculateCategoryResult{
+				SkuID:               catResult.MatchResult.Observation.SkuID,
+				MatchQuality:        catResult.MatchResult.MatchQuality,
+				MatchDeltaPct:       catResult.MatchResult.MatchDeltaPct,
+				MissingAttributes:   catResult.MatchResult.MissingAttributes,
+				Stale:               false, // Staleness flag will be hooked up in 1.11
+				NormalizedHourlyUSD: catResult.HourlyCost,
+			}
+			providerTotal = providerTotal.Add(catResult.HourlyCost)
+			matchedCategories++
 		}
 
 		if categoryErrors == len(requestedCategories) {
@@ -282,19 +202,4 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 		Results:  results,
 		Warnings: warnings,
 	}, nil
-}
-
-func formatProviderDisplayName(provider string) string {
-	switch provider {
-	case "oracle":
-		return "Oracle OCI"
-	case "ibm":
-		return "IBM Cloud"
-	case "alibaba":
-		return "Alibaba Cloud"
-	case "digitalocean":
-		return "DigitalOcean"
-	default:
-		return provider
-	}
 }

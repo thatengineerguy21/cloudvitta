@@ -1,6 +1,10 @@
 package service
 
-import "github.com/shopspring/decimal"
+import (
+	"context"
+
+	"github.com/shopspring/decimal"
+)
 
 // CalculateStorageMonthlyCost calculates the estimated monthly storage cost given unit price and size in GB.
 // This encapsulates pricing arithmetic in the service layer (08-CONSISTENCY-RULES.md).
@@ -27,4 +31,87 @@ func CalculateStorageHourlyCost(unitPrice, sizeGB decimal.Decimal) decimal.Decim
 // Formula: (unitPrice * egressGB) / 730
 func CalculateNetworkHourlyCost(unitPrice, egressGB decimal.Decimal) decimal.Decimal {
 	return CalculateNetworkMonthlyCost(unitPrice, egressGB).Div(HoursInMonth)
+}
+
+// CategoryPricingResult contains the match result along with computed costs.
+type CategoryPricingResult struct {
+	MatchResult *MatchResult
+	HourlyCost  decimal.Decimal
+	MonthlyCost decimal.Decimal
+	Unit        string
+}
+
+// MatchAndCalculate encapsulates the fetch, matching, and cost calculation for any category.
+// It acts as the single source of truth for tying MatchObservations to Calculate*Costs.
+func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, category, region string, target MatchTarget) (*CategoryPricingResult, error) {
+	if !IsProviderCategorySupported(provider, category) {
+		return nil, ErrCategoryNotSupported
+	}
+
+	obsList, err := s.GetPrices(ctx, provider, category, region)
+	if err != nil {
+		return nil, err
+	}
+	if len(obsList) == 0 {
+		return nil, nil // No data available
+	}
+
+	var scorer CategoryScorer
+	switch category {
+	case "compute":
+		scorer = ComputeScorer{}
+	case "storage":
+		scorer = StorageScorer{}
+	case "network":
+		scorer = NetworkScorer{}
+	default:
+		return nil, ErrInvalidParameters
+	}
+
+	matchResult := MatchObservations(scorer, obsList, target, ThresholdsForCategory(category))
+	if matchResult == nil {
+		return nil, ErrNoMatchFound
+	}
+
+	var hourlyCost, monthlyCost decimal.Decimal
+	var unit string
+
+	switch category {
+	case "compute":
+		hourlyCost = matchResult.Observation.PriceAmount
+		monthlyCost = hourlyCost.Mul(HoursInMonth)
+		unit = matchResult.Observation.Unit
+		if unit == "" {
+			unit = "hour"
+		}
+	case "storage":
+		sizeGB := decimal.NewFromFloat(target.SizeGB)
+		if sizeGB.LessThanOrEqual(decimal.Zero) {
+			sizeGB = decimal.NewFromInt(1)
+		}
+		hourlyCost = CalculateStorageHourlyCost(matchResult.Observation.PriceAmount, sizeGB)
+		monthlyCost = CalculateStorageMonthlyCost(matchResult.Observation.PriceAmount, sizeGB)
+		unit = matchResult.Observation.Unit
+		if unit == "" {
+			unit = "GB-Mo"
+		}
+	case "network":
+		egressGB := decimal.NewFromFloat(target.EgressGB)
+		if egressGB.LessThanOrEqual(decimal.Zero) {
+			egressGB = decimal.NewFromInt(1)
+		}
+		hourlyCost = CalculateNetworkHourlyCost(matchResult.Observation.PriceAmount, egressGB)
+		monthlyCost = CalculateNetworkMonthlyCost(matchResult.Observation.PriceAmount, egressGB)
+		unit = matchResult.Observation.Unit
+		if unit == "" {
+			unit = "GB"
+		}
+	}
+
+	return &CategoryPricingResult{
+		MatchResult: matchResult,
+		HourlyCost:  hourlyCost,
+		MonthlyCost: monthlyCost,
+		Unit:        unit,
+	}, nil
 }

@@ -20,3 +20,8 @@ func IsProviderCategorySupported(provider, category string) bool {
 		return false
 	}
 }
+
+// SupportedProviders returns a list of actively supported cloud providers.
+func SupportedProviders() []string {
+	return []string{"aws", "azure", "gcp"}
+}

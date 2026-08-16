@@ -151,35 +151,6 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var providerErrors int
 
 	for _, prov := range providers {
-		if !service.IsProviderCategorySupported(prov, "compute") {
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "category_not_supported",
-				Message:  "Compute category is not supported by " + prov,
-			})
-			continue
-		}
-
-		obsList, err := h.pricingSvc.GetPrices(r.Context(), prov, "compute", region)
-		if err != nil {
-			providerErrors++
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "fetch_failed",
-				Message:  err.Error(),
-			})
-			continue
-		}
-
-		if len(obsList) == 0 {
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "no_data_available",
-				Message:  "No compute pricing data available for this region.",
-			})
-			continue
-		}
-
 		// Score & match results using the service layer matching engine
 		target := service.MatchTarget{
 			VCPU:         reqVCPU,
@@ -189,32 +160,55 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Category:     "compute",
 		}
 
-		matchResult := service.MatchObservations(
-			service.ComputeScorer{}, obsList, target, service.ThresholdsForCategory("compute"),
-		)
-		if matchResult == nil {
+		catResult, err := h.pricingSvc.MatchAndCalculate(r.Context(), prov, "compute", region, target)
+		if err != nil {
+			switch err {
+			case service.ErrCategoryNotSupported:
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "category_not_supported",
+					Message:  "Compute category is not supported by " + prov,
+				})
+			case service.ErrNoMatchFound:
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "no_match",
+					Message:  "No compute SKU matched the requested spec within acceptable thresholds.",
+				})
+			default:
+				providerErrors++
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "fetch_failed",
+					Message:  err.Error(),
+				})
+			}
+			continue
+		}
+
+		if catResult == nil {
 			warnings = append(warnings, ProviderWarning{
 				Provider: prov,
-				Code:     "no_match",
-				Message:  "No compute SKU matched the requested spec within acceptable thresholds.",
+				Code:     "no_data_available",
+				Message:  "No compute pricing data available for this region.",
 			})
 			continue
 		}
 
-		obs := matchResult.Observation
+		obs := catResult.MatchResult.Observation
 		results = append(results, ComputeResultEntry{
 			Provider:          obs.Provider,
 			SkuID:             obs.SkuID,
 			MatchedSpec:       obs.Attributes,
-			MatchQuality:      matchResult.MatchQuality,
-			MatchDeltaPct:     matchResult.MatchDeltaPct,
-			MissingAttributes: matchResult.MissingAttributes,
+			MatchQuality:      catResult.MatchResult.MatchQuality,
+			MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
+			MissingAttributes: catResult.MatchResult.MissingAttributes,
 			Price: PriceDetail{
 				Amount:   obs.PriceAmount,
-				Unit:     "hour",
+				Unit:     catResult.Unit,
 				Currency: currency,
 			},
-			NormalizedHourlyUSD: obs.PriceAmount,
+			NormalizedHourlyUSD: catResult.HourlyCost,
 			FetchedAt:           obs.FetchedAt,
 			Stale:               false,
 		})

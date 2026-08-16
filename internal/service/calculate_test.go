@@ -84,18 +84,17 @@ func TestPricingService_Calculate_CompleteAllCategories(t *testing.T) {
 	req := service.CalculateRequest{
 		Region:   regionGroup,
 		Currency: "USD",
-		Compute: &service.CalculateComputeTarget{
-			VCPU:         4,
-			RAMGB:        16,
-			Family:       "general_purpose",
-			StrictFamily: true,
+		Compute: &domain.ComputeAttributes{
+			VCPU:   4,
+			RAMGB:  16,
+			Family: "general_purpose",
 		},
-		Storage: &service.CalculateStorageTarget{
-			SizeGB:       decimal.NewFromInt(500),
+		Storage: &domain.StorageAttributes{
+			SizeGB:       500,
 			StorageClass: "standard",
 		},
-		Network: &service.CalculateNetworkTarget{
-			EgressGB:     decimal.NewFromInt(100),
+		Network: &domain.NetworkAttributes{
+			EgressGB:     100,
 			TransferType: "internet_egress",
 		},
 	}
@@ -248,16 +247,16 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 	req := service.CalculateRequest{
 		Region:   regionGroup,
 		Currency: "USD",
-		Compute: &service.CalculateComputeTarget{
+		Compute: &domain.ComputeAttributes{
 			VCPU:  4,
 			RAMGB: 16,
 		},
-		Storage: &service.CalculateStorageTarget{
-			SizeGB:       decimal.NewFromInt(500),
+		Storage: &domain.StorageAttributes{
+			SizeGB:       500,
 			StorageClass: "standard",
 		},
-		Network: &service.CalculateNetworkTarget{
-			EgressGB:     decimal.NewFromInt(100),
+		Network: &domain.NetworkAttributes{
+			EgressGB:     100,
 			TransferType: "internet_egress",
 		},
 	}
@@ -380,7 +379,7 @@ func TestPricingService_Calculate_CurrencyWarning(t *testing.T) {
 	req := service.CalculateRequest{
 		Region:   regionGroup,
 		Currency: "EUR",
-		Compute: &service.CalculateComputeTarget{
+		Compute: &domain.ComputeAttributes{
 			VCPU:  4,
 			RAMGB: 16,
 		},

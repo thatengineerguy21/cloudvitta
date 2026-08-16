@@ -121,35 +121,6 @@ func (h *NetworkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var providerErrors int
 
 	for _, prov := range providers {
-		if !service.IsProviderCategorySupported(prov, "network") {
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "category_not_supported",
-				Message:  "Network category is not supported by " + prov,
-			})
-			continue
-		}
-
-		obsList, err := h.pricingSvc.GetPrices(r.Context(), prov, "network", region)
-		if err != nil {
-			providerErrors++
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "fetch_failed",
-				Message:  err.Error(),
-			})
-			continue
-		}
-
-		if len(obsList) == 0 {
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "no_data_available",
-				Message:  "No network pricing data available for this region.",
-			})
-			continue
-		}
-
 		// Build match target from query parameters.
 		egressF, _ := egressGB.Float64()
 		target := service.MatchTarget{
@@ -158,37 +129,56 @@ func (h *NetworkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Category:     "network",
 		}
 
-		matchResult := service.MatchObservations(
-			service.NetworkScorer{}, obsList, target, service.ThresholdsForCategory("network"),
-		)
-		if matchResult == nil {
+		catResult, err := h.pricingSvc.MatchAndCalculate(r.Context(), prov, "network", region, target)
+		if err != nil {
+			switch err {
+			case service.ErrCategoryNotSupported:
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "category_not_supported",
+					Message:  "Network category is not supported by " + prov,
+				})
+			case service.ErrNoMatchFound:
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "no_match",
+					Message:  "No network SKU matched the requested spec within acceptable thresholds.",
+				})
+			default:
+				providerErrors++
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "fetch_failed",
+					Message:  err.Error(),
+				})
+			}
+			continue
+		}
+
+		if catResult == nil {
 			warnings = append(warnings, ProviderWarning{
 				Provider: prov,
-				Code:     "no_match",
-				Message:  "No network SKU matched the requested spec within acceptable thresholds.",
+				Code:     "no_data_available",
+				Message:  "No network pricing data available for this region.",
 			})
 			continue
 		}
 
-		obs := matchResult.Observation
-		unit := obs.Unit
-		if unit == "" {
-			unit = "GB"
-		}
+		obs := catResult.MatchResult.Observation
 
 		results = append(results, NetworkResultEntry{
 			Provider:          obs.Provider,
 			SkuID:             obs.SkuID,
 			MatchedSpec:       obs.NetworkAttributes,
-			MatchQuality:      matchResult.MatchQuality,
-			MatchDeltaPct:     matchResult.MatchDeltaPct,
-			MissingAttributes: matchResult.MissingAttributes,
+			MatchQuality:      catResult.MatchResult.MatchQuality,
+			MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
+			MissingAttributes: catResult.MatchResult.MissingAttributes,
 			Price: PriceDetail{
 				Amount:   obs.PriceAmount,
-				Unit:     unit,
+				Unit:     catResult.Unit,
 				Currency: currency,
 			},
-			MonthlyCostUSD: service.CalculateNetworkMonthlyCost(obs.PriceAmount, egressGB),
+			MonthlyCostUSD: catResult.MonthlyCost,
 			FetchedAt:      obs.FetchedAt,
 			Stale:          false,
 		})

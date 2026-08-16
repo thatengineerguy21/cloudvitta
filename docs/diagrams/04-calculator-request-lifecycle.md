@@ -11,7 +11,8 @@ sequenceDiagram
     participant FX as FX Service
     participant Match as SKU Matching
 
-    Client->>HTTP: GET /calculate?provider=...&category=...
+    Client->>HTTP: GET /api/v1/prices/{category}?provider=...
+    Client->>HTTP: POST /api/v1/calculate (Composite)
     HTTP->>Calc: Calculate(context, request)
     
     %% Caching and DB Access

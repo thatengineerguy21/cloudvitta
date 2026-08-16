@@ -121,35 +121,6 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var providerErrors int
 
 	for _, prov := range providers {
-		if !service.IsProviderCategorySupported(prov, "storage") {
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "category_not_supported",
-				Message:  "Storage category is not supported by " + prov,
-			})
-			continue
-		}
-
-		obsList, err := h.pricingSvc.GetPrices(r.Context(), prov, "storage", region)
-		if err != nil {
-			providerErrors++
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "fetch_failed",
-				Message:  err.Error(),
-			})
-			continue
-		}
-
-		if len(obsList) == 0 {
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "no_data_available",
-				Message:  "No storage pricing data available for this region.",
-			})
-			continue
-		}
-
 		// Build match target from query parameters.
 		sizeF, _ := sizeGB.Float64()
 		target := service.MatchTarget{
@@ -158,37 +129,56 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Category:     "storage",
 		}
 
-		matchResult := service.MatchObservations(
-			service.StorageScorer{}, obsList, target, service.ThresholdsForCategory("storage"),
-		)
-		if matchResult == nil {
+		catResult, err := h.pricingSvc.MatchAndCalculate(r.Context(), prov, "storage", region, target)
+		if err != nil {
+			switch err {
+			case service.ErrCategoryNotSupported:
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "category_not_supported",
+					Message:  "Storage category is not supported by " + prov,
+				})
+			case service.ErrNoMatchFound:
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "no_match",
+					Message:  "No storage SKU matched the requested spec within acceptable thresholds.",
+				})
+			default:
+				providerErrors++
+				warnings = append(warnings, ProviderWarning{
+					Provider: prov,
+					Code:     "fetch_failed",
+					Message:  err.Error(),
+				})
+			}
+			continue
+		}
+
+		if catResult == nil {
 			warnings = append(warnings, ProviderWarning{
 				Provider: prov,
-				Code:     "no_match",
-				Message:  "No storage SKU matched the requested spec within acceptable thresholds.",
+				Code:     "no_data_available",
+				Message:  "No storage pricing data available for this region.",
 			})
 			continue
 		}
 
-		obs := matchResult.Observation
-		unit := obs.Unit
-		if unit == "" {
-			unit = "GB-Mo"
-		}
+		obs := catResult.MatchResult.Observation
 
 		results = append(results, StorageResultEntry{
 			Provider:          obs.Provider,
 			SkuID:             obs.SkuID,
 			MatchedSpec:       obs.StorageAttributes,
-			MatchQuality:      matchResult.MatchQuality,
-			MatchDeltaPct:     matchResult.MatchDeltaPct,
-			MissingAttributes: matchResult.MissingAttributes,
+			MatchQuality:      catResult.MatchResult.MatchQuality,
+			MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
+			MissingAttributes: catResult.MatchResult.MissingAttributes,
 			Price: PriceDetail{
 				Amount:   obs.PriceAmount,
-				Unit:     unit,
+				Unit:     catResult.Unit,
 				Currency: currency,
 			},
-			MonthlyCostUSD: service.CalculateStorageMonthlyCost(obs.PriceAmount, sizeGB),
+			MonthlyCostUSD: catResult.MonthlyCost,
 			FetchedAt:      obs.FetchedAt,
 			Stale:          false,
 		})

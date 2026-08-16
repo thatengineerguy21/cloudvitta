@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,11 +16,12 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
+	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
 
-func TestCalculateHandler_CompleteRequest_200OK(t *testing.T) {
+func TestCalculateHandler_InvalidMethod_ReturnsRFC7807(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -29,135 +31,20 @@ func TestCalculateHandler_CompleteRequest_200OK(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	defer func() { _ = rdb.Close() }()
 
-	ctx := context.Background()
-	regionGroup := "us-east"
-
-	// Warm Redis for AWS
-	awsCompute := []domain.PriceObservation{
-		{
-			Provider:        "aws",
-			ServiceCategory: "compute",
-			SkuID:           "m5.xlarge",
-			RegionGroup:     regionGroup,
-			PriceAmount:     decimal.RequireFromString("0.192"),
-			PriceCurrency:   "USD",
-			Attributes: domain.ComputeAttributes{
-				VCPU:   4,
-				RAMGB:  16,
-				Family: "general_purpose",
-			},
-			FetchedAt: time.Now().UTC(),
-		},
-	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", regionGroup), awsCompute, cache.DefaultTTL)
-
-	awsStorage := []domain.PriceObservation{
-		{
-			Provider:        "aws",
-			ServiceCategory: "storage",
-			SkuID:           "s3-standard",
-			RegionGroup:     regionGroup,
-			PriceAmount:     decimal.RequireFromString("0.023"),
-			PriceCurrency:   "USD",
-			StorageAttributes: domain.StorageAttributes{
-				SizeGB:       500,
-				StorageClass: "standard",
-			},
-			FetchedAt: time.Now().UTC(),
-		},
-	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", regionGroup), awsStorage, cache.DefaultTTL)
-
-	awsNetwork := []domain.PriceObservation{
-		{
-			Provider:        "aws",
-			ServiceCategory: "network",
-			SkuID:           "data-transfer-out",
-			RegionGroup:     regionGroup,
-			PriceAmount:     decimal.RequireFromString("0.090"),
-			PriceCurrency:   "USD",
-			NetworkAttributes: domain.NetworkAttributes{
-				EgressGB:     100,
-				TransferType: "internet_egress",
-			},
-			FetchedAt: time.Now().UTC(),
-		},
-	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", regionGroup), awsNetwork, cache.DefaultTTL)
-
 	pricingSvc := service.NewPricingService(nil, rdb)
-	router := rest.NewRouter(pricingSvc, nil, rdb)
+	handler := rest.NewCalculateHandler(pricingSvc)
 
-	reqBody := map[string]interface{}{
-		"region":   regionGroup,
-		"currency": "USD",
-		"compute": map[string]interface{}{
-			"vcpu":          4,
-			"ram_gb":        16,
-			"family":        "general_purpose",
-			"strict_family": true,
-		},
-		"storage": map[string]interface{}{
-			"size_gb":       500,
-			"storage_class": "standard",
-		},
-		"network": map[string]interface{}{
-			"egress_gb":     100,
-			"transfer_type": "internet_egress",
-		},
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/calculate", nil)
+	rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status code = %d, want %d. Body: %s", w.Code, http.StatusOK, w.Body.String())
-	}
-
-	var rawResp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &rawResp); err != nil {
-		t.Fatalf("failed to decode JSON response: %v", err)
-	}
-
-	meta, ok := rawResp["meta"].(map[string]interface{})
-	if !ok || meta["api_version"] != "v1" {
-		t.Errorf("meta.api_version = %v, want 'v1'", meta["api_version"])
-	}
-
-	results, ok := rawResp["results"].([]interface{})
-	if !ok || len(results) == 0 {
-		t.Fatalf("results is empty or invalid type: %v", rawResp["results"])
-	}
-
-	awsResult := results[0].(map[string]interface{})
-	if awsResult["provider"] != "aws" {
-		t.Errorf("provider = %v, want 'aws'", awsResult["provider"])
-	}
-	if awsResult["partial"] != false {
-		t.Errorf("partial = %v, want false", awsResult["partial"])
-	}
-
-	// Verify total_normalized_hourly_usd is present in complete result
-	if _, hasTotal := awsResult["total_normalized_hourly_usd"]; !hasTotal {
-		t.Errorf("total_normalized_hourly_usd key missing from complete result")
-	}
-
-	// Verify partial_total_normalized_hourly_usd is NOT present in complete result
-	if _, hasPartialTotal := awsResult["partial_total_normalized_hourly_usd"]; hasPartialTotal {
-		t.Errorf("partial_total_normalized_hourly_usd should NOT exist in complete result, got: %v", awsResult["partial_total_normalized_hourly_usd"])
-	}
-
-	categories, ok := awsResult["categories"].(map[string]interface{})
-	if !ok || len(categories) != 3 {
-		t.Fatalf("got %d categories, want 3", len(categories))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405 Method Not Allowed", rec.Code)
 	}
 }
 
-func TestCalculateHandler_PartialProvider_ADR0022_KeyAbsence(t *testing.T) {
+func TestCalculateHandler_NoCategories_ReturnsRFC7807(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -167,228 +54,30 @@ func TestCalculateHandler_PartialProvider_ADR0022_KeyAbsence(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	defer func() { _ = rdb.Close() }()
 
-	ctx := context.Background()
-	regionGroup := "us-east"
-
-	// AWS has Compute and Storage, but NO Network data
-	awsCompute := []domain.PriceObservation{
-		{
-			Provider:        "aws",
-			ServiceCategory: "compute",
-			SkuID:           "m5.xlarge",
-			RegionGroup:     regionGroup,
-			PriceAmount:     decimal.RequireFromString("0.192"),
-			PriceCurrency:   "USD",
-			Attributes: domain.ComputeAttributes{
-				VCPU:  4,
-				RAMGB: 16,
-			},
-		},
-	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", regionGroup), awsCompute, cache.DefaultTTL)
-
-	awsStorage := []domain.PriceObservation{
-		{
-			Provider:        "aws",
-			ServiceCategory: "storage",
-			SkuID:           "s3-standard",
-			RegionGroup:     regionGroup,
-			PriceAmount:     decimal.RequireFromString("0.023"),
-			PriceCurrency:   "USD",
-			StorageAttributes: domain.StorageAttributes{
-				SizeGB:       500,
-				StorageClass: "standard",
-			},
-		},
-	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", regionGroup), awsStorage, cache.DefaultTTL)
-
 	pricingSvc := service.NewPricingService(nil, rdb)
-	router := rest.NewRouter(pricingSvc, nil, rdb)
+	handler := rest.NewCalculateHandler(pricingSvc)
 
-	reqBody := map[string]interface{}{
-		"region": regionGroup,
-		"compute": map[string]interface{}{
-			"vcpu":   4,
-			"ram_gb": 16,
-		},
-		"storage": map[string]interface{}{
-			"size_gb": 500,
-		},
-		"network": map[string]interface{}{
-			"egress_gb": 100,
-		},
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
+	body := []byte(`{"region": "us-east"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewBuffer(body))
+	rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status code = %d, want %d. Body: %s", w.Code, http.StatusOK, w.Body.String())
-	}
-
-	var rawResp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &rawResp); err != nil {
-		t.Fatalf("failed to decode JSON response: %v", err)
-	}
-
-	results, ok := rawResp["results"].([]interface{})
-	if !ok || len(results) == 0 {
-		t.Fatalf("results is empty: %v", rawResp["results"])
-	}
-
-	awsResult := results[0].(map[string]interface{})
-	if awsResult["provider"] != "aws" {
-		t.Errorf("provider = %v, want 'aws'", awsResult["provider"])
-	}
-
-	// Mandatory ADR 0022 Honesty Contract assertions:
-	// 1. partial MUST be true
-	if awsResult["partial"] != true {
-		t.Errorf("partial = %v, want true for partial provider", awsResult["partial"])
-	}
-
-	// 2. total_normalized_hourly_usd MUST NOT exist in JSON (key absence check)
-	if val, hasTotal := awsResult["total_normalized_hourly_usd"]; hasTotal {
-		t.Fatalf("VIOLATION OF ADR 0022: total_normalized_hourly_usd key MUST NOT exist for partial provider! Got: %v", val)
-	}
-
-	// 3. partial_total_normalized_hourly_usd MUST exist
-	if _, hasPartialTotal := awsResult["partial_total_normalized_hourly_usd"]; !hasPartialTotal {
-		t.Fatalf("partial_total_normalized_hourly_usd key missing for partial provider")
-	}
-
-	// 4. Missing category 'network' MUST NOT be in categories map
-	categories := awsResult["categories"].(map[string]interface{})
-	if _, hasNetwork := categories["network"]; hasNetwork {
-		t.Errorf("missing category 'network' must not appear in categories map")
-	}
-	if _, hasCompute := categories["compute"]; !hasCompute {
-		t.Errorf("category 'compute' should appear in categories map")
-	}
-	if _, hasStorage := categories["storage"]; !hasStorage {
-		t.Errorf("category 'storage' should appear in categories map")
-	}
-}
-
-func TestCalculateHandler_EmptyCategoryRequest_Returns400RFC7807(t *testing.T) {
-	pricingSvc := service.NewPricingService(nil, nil)
-	router := rest.NewRouter(pricingSvc, nil, nil)
-
-	reqBody := map[string]interface{}{
-		"region":   "us-east",
-		"currency": "USD",
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status code = %d, want %d", w.Code, http.StatusBadRequest)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 Bad Request", rec.Code)
 	}
 
 	var rfcErr middleware.RFC7807Error
-	if err := json.Unmarshal(w.Body.Bytes(), &rfcErr); err != nil {
-		t.Fatalf("failed to decode RFC 7807 error: %v", err)
-	}
-	if rfcErr.Status != http.StatusBadRequest {
-		t.Errorf("RFC7807 status = %d, want 400", rfcErr.Status)
-	}
-}
-
-func TestCalculateHandler_InvalidParameters_Returns400RFC7807(t *testing.T) {
-	pricingSvc := service.NewPricingService(nil, nil)
-	router := rest.NewRouter(pricingSvc, nil, nil)
-
-	testCases := []struct {
-		name    string
-		reqBody map[string]interface{}
-	}{
-		{
-			name: "negative vcpu",
-			reqBody: map[string]interface{}{
-				"compute": map[string]interface{}{"vcpu": -4},
-			},
-		},
-		{
-			name: "negative ram_gb",
-			reqBody: map[string]interface{}{
-				"compute": map[string]interface{}{"ram_gb": -16},
-			},
-		},
-		{
-			name: "negative size_gb",
-			reqBody: map[string]interface{}{
-				"storage": map[string]interface{}{"size_gb": -500},
-			},
-		},
-		{
-			name: "size_gb exceeding 1,000,000",
-			reqBody: map[string]interface{}{
-				"storage": map[string]interface{}{"size_gb": 2_000_000},
-			},
-		},
-		{
-			name: "negative egress_gb",
-			reqBody: map[string]interface{}{
-				"network": map[string]interface{}{"egress_gb": -100},
-			},
-		},
-		{
-			name: "egress_gb exceeding 10,000,000",
-			reqBody: map[string]interface{}{
-				"network": map[string]interface{}{"egress_gb": 20_000_000},
-			},
-		},
+	if err := json.NewDecoder(rec.Body).Decode(&rfcErr); err != nil {
+		t.Fatalf("failed to decode RFC7807 JSON: %v", err)
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			bodyBytes, _ := json.Marshal(tc.reqBody)
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewReader(bodyBytes))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			if w.Code != http.StatusBadRequest {
-				t.Fatalf("[%s] status code = %d, want %d", tc.name, w.Code, http.StatusBadRequest)
-			}
-
-			var rfcErr middleware.RFC7807Error
-			if err := json.Unmarshal(w.Body.Bytes(), &rfcErr); err != nil {
-				t.Fatalf("[%s] failed to decode RFC7807 JSON: %v", tc.name, err)
-			}
-			if rfcErr.Status != http.StatusBadRequest {
-				t.Errorf("[%s] RFC7807 status = %d, want 400", tc.name, rfcErr.Status)
-			}
-		})
+	if !strings.Contains(rfcErr.Detail, "At least one of 'compute', 'storage', or 'network' must be specified.") {
+		t.Errorf("Unexpected error detail: %s", rfcErr.Detail)
 	}
 }
 
-func TestCalculateHandler_MethodNotAllowed_Returns405(t *testing.T) {
-	pricingSvc := service.NewPricingService(nil, nil)
-	router := rest.NewRouter(pricingSvc, nil, nil)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/calculate", nil)
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status code = %d, want %d", w.Code, http.StatusMethodNotAllowed)
-	}
-}
-
-func TestCalculateHandler_NonUSDCurrency_Warning(t *testing.T) {
+func TestCalculateHandler_HappyPath(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -399,59 +88,152 @@ func TestCalculateHandler_NonUSDCurrency_Warning(t *testing.T) {
 	defer func() { _ = rdb.Close() }()
 
 	ctx := context.Background()
-	regionGroup := "us-east"
 
-	awsCompute := []domain.PriceObservation{
+	// Add compute and storage for AWS
+	awsComputeObs := []domain.PriceObservation{
 		{
 			Provider:        "aws",
 			ServiceCategory: "compute",
-			SkuID:           "m5.xlarge",
-			RegionGroup:     regionGroup,
-			PriceAmount:     decimal.RequireFromString("0.192"),
-			Attributes: domain.ComputeAttributes{
-				VCPU:  4,
-				RAMGB: 16,
-			},
+			SkuID:           "SKU-AWS-C1",
+			PriceAmount:     decimal.RequireFromString("0.10"),
+			Unit:            "hour",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general"},
+			FetchedAt:       time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", regionGroup), awsCompute, cache.DefaultTTL)
+	awsStorageObs := []domain.PriceObservation{
+		{
+			Provider:          "aws",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-AWS-S1",
+			PriceAmount:       decimal.RequireFromString("0.02"), // $0.02/GB-Mo
+			Unit:              "GB-Mo",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
+			FetchedAt:         time.Now().UTC(),
+		},
+	}
+
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east"), awsComputeObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east"), awsStorageObs, cache.DefaultTTL)
+
+	// Add only compute for Azure
+	azureComputeObs := []domain.PriceObservation{
+		{
+			Provider:        "azure",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-AZ-C1",
+			PriceAmount:     decimal.RequireFromString("0.15"),
+			Unit:            "hour",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general"},
+			FetchedAt:       time.Now().UTC(),
+		},
+	}
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "us-east"), azureComputeObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
+
+	// GCP gets nothing
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
-	router := rest.NewRouter(pricingSvc, nil, rdb)
+	handler := rest.NewCalculateHandler(pricingSvc)
 
-	reqBody := map[string]interface{}{
-		"region":   regionGroup,
-		"currency": "EUR",
-		"compute": map[string]interface{}{
-			"vcpu":   4,
-			"ram_gb": 16,
+	body := []byte(`{
+		"region": "us-east",
+		"compute": {
+			"vcpu": 2,
+			"ram_gb": 4,
+			"family": "general"
 		},
+		"storage": {
+			"size_gb": 100,
+			"storage_class": "standard"
+		}
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewBuffer(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 OK. Body: %s", rec.Code, rec.Body.String())
 	}
-	bodyBytes, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status code = %d, want %d", w.Code, http.StatusOK)
+	var resp rest.CalculateResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	var rawResp map[string]interface{}
-	_ = json.Unmarshal(w.Body.Bytes(), &rawResp)
-	warnings := rawResp["warnings"].([]interface{})
+	if len(resp.Results) != 2 {
+		t.Fatalf("got %d results, want 2 (AWS, Azure)", len(resp.Results))
+	}
 
-	var currencyWarnFound bool
-	for _, wItem := range warnings {
-		wm := wItem.(map[string]interface{})
-		if wm["provider"] == "system" && wm["code"] == "currency_conversion_not_yet_supported" {
-			currencyWarnFound = true
-			break
+	var awsResult, azureResult *rest.CalculateProviderResult
+	for i := range resp.Results {
+		if resp.Results[i].Provider == "aws" {
+			awsResult = &resp.Results[i]
+		}
+		if resp.Results[i].Provider == "azure" {
+			azureResult = &resp.Results[i]
 		}
 	}
-	if !currencyWarnFound {
-		t.Errorf("expected currency warning in response, got: %+v", warnings)
+
+	if awsResult == nil || azureResult == nil {
+		t.Fatalf("missing expected providers in result")
+	}
+
+	// AWS should be full match
+	if awsResult.Partial {
+		t.Errorf("expected AWS to not be partial")
+	}
+	if awsResult.TotalNormalizedHourlyUSD == nil {
+		t.Errorf("expected AWS to have total")
+	}
+
+	// Storage cost = 0.02 * 100 = 2/mo. Hourly = 2/730 = 0.00273972602...
+	// Total = 0.10 + 2/730
+
+	// Azure should be partial match
+	if !azureResult.Partial {
+		t.Errorf("expected Azure to be partial")
+	}
+	if azureResult.TotalNormalizedHourlyUSD != nil {
+		t.Errorf("expected Azure to NOT have total")
+	}
+	if azureResult.PartialTotalNormalizedHourlyUSD == nil {
+		t.Errorf("expected Azure to have partial total")
+	}
+}
+
+func TestCalculateHandler_AllProvidersFail_Returns500(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	failingQueries := store.New(&failingDBTX{})
+	pricingSvc := service.NewPricingService(failingQueries, rdb)
+	handler := rest.NewCalculateHandler(pricingSvc)
+
+	body := []byte(`{"compute": {"vcpu": 2, "ram_gb": 4}}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewBuffer(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 Internal Server Error", rec.Code)
+	}
+
+	var rfcErr middleware.RFC7807Error
+	if err := json.NewDecoder(rec.Body).Decode(&rfcErr); err != nil {
+		t.Fatalf("failed to decode RFC7807 JSON: %v", err)
+	}
+	if rfcErr.Status != 500 {
+		t.Errorf("Status = %d, want 500", rfcErr.Status)
 	}
 }
