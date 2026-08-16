@@ -149,7 +149,31 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	if mainConfig.CORS.AllowCredentials {
+		for _, origin := range mainConfig.CORS.AllowedOrigins {
+			if origin == "*" {
+				return nil, fmt.Errorf("config: CORS AllowCredentials cannot be true when AllowedOrigins contains wildcard '*'")
+			}
+		}
+	}
+
 	return mainConfig, nil
+}
+
+func resolveEnvInt64(primaryEnv, secondaryEnv string, fallback int64) int64 {
+	if val := os.Getenv(primaryEnv); val != "" {
+		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	if secondaryEnv != "" {
+		if val := os.Getenv(secondaryEnv); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				return parsed
+			}
+		}
+	}
+	return fallback
 }
 
 // resolveEnvFallbacks populates configuration fields with standard environment variables
@@ -239,66 +263,31 @@ func resolveEnvFallbacks(cfg *Config) error {
 
 	// 10. Resolve RateLimit fallbacks & defaults
 	if cfg.RateLimit.StandardTierRate == 0 {
-		if val := os.Getenv("CLOUDVITTA_RATELIMIT_STANDARD_TIER_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.StandardTierRate = parsed
-			}
-		} else if val := os.Getenv("RATELIMIT_STANDARD_TIER_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.StandardTierRate = parsed
-			}
-		}
-	}
-	if cfg.RateLimit.StandardTierRate == 0 {
-		cfg.RateLimit.StandardTierRate = 120
-	}
-
-	if cfg.RateLimit.FreeTierRate == 0 {
-		if val := os.Getenv("CLOUDVITTA_RATELIMIT_FREE_TIER_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.FreeTierRate = parsed
-			}
-		} else if val := os.Getenv("RATELIMIT_FREE_TIER_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.FreeTierRate = parsed
-			}
-		}
+		cfg.RateLimit.StandardTierRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_STANDARD_TIER_RATE", "RATELIMIT_STANDARD_TIER_RATE", 120)
 	}
 	if cfg.RateLimit.FreeTierRate == 0 {
-		cfg.RateLimit.FreeTierRate = 20
-	}
-
-	if cfg.RateLimit.IPCeilingRate == 0 {
-		if val := os.Getenv("CLOUDVITTA_RATELIMIT_IP_CEILING_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.IPCeilingRate = parsed
-			}
-		} else if val := os.Getenv("RATELIMIT_IP_CEILING_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.IPCeilingRate = parsed
-			}
-		}
+		cfg.RateLimit.FreeTierRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_FREE_TIER_RATE", "RATELIMIT_FREE_TIER_RATE", 20)
 	}
 	if cfg.RateLimit.IPCeilingRate == 0 {
-		cfg.RateLimit.IPCeilingRate = 60
-	}
-
-	if cfg.RateLimit.LoginRate == 0 {
-		if val := os.Getenv("CLOUDVITTA_RATELIMIT_LOGIN_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.LoginRate = parsed
-			}
-		} else if val := os.Getenv("RATELIMIT_LOGIN_RATE"); val != "" {
-			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
-				cfg.RateLimit.LoginRate = parsed
-			}
-		}
+		cfg.RateLimit.IPCeilingRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_IP_CEILING_RATE", "RATELIMIT_IP_CEILING_RATE", 60)
 	}
 	if cfg.RateLimit.LoginRate == 0 {
-		cfg.RateLimit.LoginRate = 10
+		cfg.RateLimit.LoginRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_LOGIN_RATE", "RATELIMIT_LOGIN_RATE", 10)
 	}
 
 	// 11. Resolve CORS fallbacks & defaults
+	corsCredsVal := os.Getenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS")
+	if corsCredsVal == "" {
+		corsCredsVal = os.Getenv("CORS_ALLOW_CREDENTIALS")
+	}
+	if corsCredsVal != "" {
+		if parsed, err := strconv.ParseBool(corsCredsVal); err == nil {
+			cfg.CORS.AllowCredentials = parsed
+		}
+	} else if len(cfg.CORS.AllowedOrigins) == 0 {
+		cfg.CORS.AllowCredentials = true
+	}
+
 	corsOriginsVal := os.Getenv("CLOUDVITTA_CORS_ALLOWED_ORIGINS")
 	if corsOriginsVal == "" {
 		corsOriginsVal = os.Getenv("CORS_ALLOWED_ORIGINS")
@@ -331,20 +320,15 @@ func resolveEnvFallbacks(cfg *Config) error {
 	}
 
 	if len(cfg.CORS.AllowedOrigins) == 0 {
-		cfg.CORS.AllowedOrigins = []string{"*"}
-	}
-
-	corsCredsVal := os.Getenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS")
-	if corsCredsVal == "" {
-		corsCredsVal = os.Getenv("CORS_ALLOW_CREDENTIALS")
-	}
-	if corsCredsVal != "" {
-		if parsed, err := strconv.ParseBool(corsCredsVal); err == nil {
-			cfg.CORS.AllowCredentials = parsed
+		if cfg.CORS.AllowCredentials {
+			cfg.CORS.AllowedOrigins = []string{
+				"https://cloudvitta.dev",
+				"http://localhost:3000",
+				"http://localhost:5173",
+			}
+		} else {
+			cfg.CORS.AllowedOrigins = []string{"*"}
 		}
-	} else {
-		// Default to true if not explicitly specified
-		cfg.CORS.AllowCredentials = true
 	}
 
 	return nil

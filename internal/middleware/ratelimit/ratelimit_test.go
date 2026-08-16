@@ -398,3 +398,45 @@ func TestRateLimiter_RateLimitExceeded_FreeTier(t *testing.T) {
 		t.Errorf("expected valid future reset timestamp, got %s", rec3.Header().Get("X-RateLimit-Reset"))
 	}
 }
+
+func TestRateLimiter_AuthenticatedUser_BypassesIPCeiling(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	// Standard rate is 10, but IP ceiling is only 3
+	rl, mr, rdb := setupTestRateLimiter(t, ratelimit.Config{
+		StandardTierRate: 10,
+		FreeTierRate:     2,
+		IPCeilingRate:    3,
+		Clock:            func() time.Time { return fixedTime },
+	})
+	defer mr.Close()
+	defer func() { _ = rdb.Close() }()
+
+	userID := uuid.New().String()
+	handler := rl.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	clientIP := "198.51.100.77"
+
+	// Authenticated user makes 6 requests from the same IP (which is greater than IPCeilingRate=3)
+	for i := 1; i <= 6; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute", nil)
+		req.Header.Set("X-Forwarded-For", clientIP)
+		ctx := authmw.ContextWithAuth(req.Context(), authmw.AuthContext{
+			UserID: userID,
+			Tier:   "standard",
+			IsAuth: true,
+		})
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("request %d failed with status %d (should not be blocked by IP ceiling of 3)", i, rec.Code)
+		}
+		if limit := rec.Header().Get("X-RateLimit-Limit"); limit != "10" {
+			t.Errorf("expected X-RateLimit-Limit 10, got %s", limit)
+		}
+	}
+}

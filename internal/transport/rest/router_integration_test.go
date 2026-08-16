@@ -54,12 +54,12 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 
 	client := ts.Client()
 
-	t.Run("Anonymous First Request issues cv_anon_id cookie and free tier limit", func(t *testing.T) {
+	t.Run("Anonymous First Request issues cv_anon_id cookie, free tier limit, and permissive CORS on prices", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/compute?vcpu=2&ram=4", nil)
 		if err != nil {
 			t.Fatalf("failed to create request: %v", err)
 		}
-		req.Header.Set("Origin", "https://cloudvitta.dev")
+		req.Header.Set("Origin", "https://thirdparty.org")
 		req.Header.Set("X-Forwarded-For", "198.51.100.100")
 
 		resp, err := client.Do(req)
@@ -73,12 +73,12 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 			t.Errorf("expected X-RateLimit-Limit 20 for anonymous user, got %s", limit)
 		}
 
-		// Verify CORS headers
-		if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "https://cloudvitta.dev" {
-			t.Errorf("expected reflected Access-Control-Allow-Origin, got %s", origin)
+		// Verify Permissive CORS on public read path
+		if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "*" {
+			t.Errorf("expected permissive Access-Control-Allow-Origin '*', got %s", origin)
 		}
-		if creds := resp.Header.Get("Access-Control-Allow-Credentials"); creds != "true" {
-			t.Errorf("expected Access-Control-Allow-Credentials true, got %s", creds)
+		if creds := resp.Header.Get("Access-Control-Allow-Credentials"); creds != "" {
+			t.Errorf("expected empty Access-Control-Allow-Credentials on public read path, got %s", creds)
 		}
 
 		// Verify cv_anon_id cookie issued
@@ -95,7 +95,7 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 
 		// Subsequent request presenting cookie uses anon tier
 		req2, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/compute?vcpu=2&ram=4", nil)
-		req2.Header.Set("Origin", "https://cloudvitta.dev")
+		req2.Header.Set("Origin", "https://thirdparty.org")
 		req2.Header.Set("X-Forwarded-For", "198.51.100.100")
 		req2.AddCookie(anonCookie)
 
@@ -136,12 +136,13 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 		}
 	})
 
-	t.Run("CORS Disallowed Origin receives no CORS headers", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/compute?vcpu=2&ram=4", nil)
+	t.Run("Narrowed CORS on Calculate with Allowed Origin", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/calculate", strings.NewReader(`{}`))
 		if err != nil {
 			t.Fatalf("failed to create request: %v", err)
 		}
-		req.Header.Set("Origin", "https://malicious-site.com")
+		req.Header.Set("Origin", "https://cloudvitta.dev")
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Forwarded-For", "198.51.100.102")
 
 		resp, err := client.Do(req)
@@ -150,12 +151,35 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 		}
 		defer func() { _ = resp.Body.Close() }()
 
-		if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "" {
-			t.Errorf("expected empty Access-Control-Allow-Origin for unauthorized origin, got %s", origin)
+		if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "https://cloudvitta.dev" {
+			t.Errorf("expected reflected Access-Control-Allow-Origin, got %s", origin)
+		}
+		if creds := resp.Header.Get("Access-Control-Allow-Credentials"); creds != "true" {
+			t.Errorf("expected Access-Control-Allow-Credentials true, got %s", creds)
 		}
 	})
 
-	t.Run("Preflight OPTIONS returns 204 and preflight headers", func(t *testing.T) {
+	t.Run("Narrowed CORS on Calculate with Disallowed Origin", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/calculate", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Origin", "https://malicious-site.com")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Forwarded-For", "198.51.100.103")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "" {
+			t.Errorf("expected empty Access-Control-Allow-Origin for unauthorized origin on calculate, got %s", origin)
+		}
+	})
+
+	t.Run("Preflight OPTIONS on calculate returns 204 and preflight headers", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodOptions, ts.URL+"/api/v1/calculate", nil)
 		if err != nil {
 			t.Fatalf("failed to create request: %v", err)

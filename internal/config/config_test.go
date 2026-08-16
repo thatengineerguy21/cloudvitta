@@ -205,9 +205,9 @@ func TestLoad_RateLimitAndCORSDefaults(t *testing.T) {
 		t.Errorf("expected default AnonCookieSecret fallback %s, got %s", testJWTSecret, cfg.Auth.AnonCookieSecret)
 	}
 
-	// CORS defaults
-	if len(cfg.CORS.AllowedOrigins) != 1 || cfg.CORS.AllowedOrigins[0] != "*" {
-		t.Errorf("expected default AllowedOrigins [*], got %v", cfg.CORS.AllowedOrigins)
+	// CORS defaults with credentials require explicit origins
+	if len(cfg.CORS.AllowedOrigins) != 3 || cfg.CORS.AllowedOrigins[0] != "https://cloudvitta.dev" {
+		t.Errorf("expected default AllowedOrigins [https://cloudvitta.dev, ...], got %v", cfg.CORS.AllowedOrigins)
 	}
 	if !cfg.CORS.AllowCredentials {
 		t.Errorf("expected default AllowCredentials true, got %v", cfg.CORS.AllowCredentials)
@@ -253,5 +253,30 @@ func TestLoad_RateLimitAndCORSOverrides(t *testing.T) {
 	}
 	if cfg.CORS.AllowCredentials {
 		t.Errorf("expected AllowCredentials false, got %v", cfg.CORS.AllowCredentials)
+	}
+}
+
+func TestLoad_CORS_WildcardWithCredentials_Validation(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("CLOUDVITTA_CORS_ALLOWED_ORIGINS", "*")
+	t.Setenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS", "true")
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("expected error when AllowCredentials=true with AllowedOrigins=['*'], got nil")
+	}
+
+	// Wildcard without credentials should succeed
+	t.Setenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS", "false")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error when AllowCredentials=false with AllowedOrigins=['*'], got %v", err)
+	}
+	if len(cfg.CORS.AllowedOrigins) != 1 || cfg.CORS.AllowedOrigins[0] != "*" {
+		t.Errorf("expected AllowedOrigins ['*'], got %v", cfg.CORS.AllowedOrigins)
 	}
 }

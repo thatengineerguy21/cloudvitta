@@ -181,10 +181,49 @@ func TestCORS_WildcardSubdomain(t *testing.T) {
 	}
 }
 
-func TestCORS_WildcardOriginWithoutCredentials(t *testing.T) {
+func TestCORS_PublicReadPath_PermissiveWithoutCredentials(t *testing.T) {
 	cfg := config.CORSConfig{
-		AllowedOrigins:   []string{"*"},
-		AllowCredentials: false,
+		AllowedOrigins:   []string{"https://cloudvitta.dev"},
+		AllowCredentials: true,
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("public price data"))
+	})
+
+	corsMw := middleware.NewCORSMiddleware(cfg)
+	ts := httptest.NewServer(corsMw.Handler(handler))
+	defer ts.Close()
+
+	// Calling a public prices endpoint from an arbitrary third-party origin
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/compute", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Origin", "https://third-party-aggregator.com")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+	if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "*" {
+		t.Errorf("expected Access-Control-Allow-Origin '*', got '%s'", origin)
+	}
+	if creds := resp.Header.Get("Access-Control-Allow-Credentials"); creds != "" {
+		t.Errorf("expected empty Access-Control-Allow-Credentials for public read path, got '%s'", creds)
+	}
+}
+
+func TestCORS_CredentialedPath_NarrowedWithCredentials(t *testing.T) {
+	cfg := config.CORSConfig{
+		AllowedOrigins:   []string{"https://cloudvitta.dev"},
+		AllowCredentials: true,
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -195,22 +234,37 @@ func TestCORS_WildcardOriginWithoutCredentials(t *testing.T) {
 	ts := httptest.NewServer(corsMw.Handler(handler))
 	defer ts.Close()
 
-	req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	req.Header.Set("Origin", "https://anydomain.com")
+	// 1. Allowed origin on calculate endpoint
+	reqAllowed, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/calculate", nil)
+	reqAllowed.Header.Set("Origin", "https://cloudvitta.dev")
 
-	resp, err := http.DefaultClient.Do(req)
+	respAllowed, err := http.DefaultClient.Do(reqAllowed)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = respAllowed.Body.Close() }()
 
-	if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "*" {
-		t.Errorf("expected Access-Control-Allow-Origin '*', got '%s'", origin)
+	if origin := respAllowed.Header.Get("Access-Control-Allow-Origin"); origin != "https://cloudvitta.dev" {
+		t.Errorf("expected Access-Control-Allow-Origin 'https://cloudvitta.dev', got '%s'", origin)
 	}
-	if creds := resp.Header.Get("Access-Control-Allow-Credentials"); creds != "" {
-		t.Errorf("expected empty Access-Control-Allow-Credentials when allowCredentials is false, got '%s'", creds)
+	if creds := respAllowed.Header.Get("Access-Control-Allow-Credentials"); creds != "true" {
+		t.Errorf("expected Access-Control-Allow-Credentials 'true', got '%s'", creds)
+	}
+
+	// 2. Disallowed origin on calculate endpoint
+	reqDisallowed, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/calculate", nil)
+	reqDisallowed.Header.Set("Origin", "https://unauthorized-domain.com")
+
+	respDisallowed, err := http.DefaultClient.Do(reqDisallowed)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = respDisallowed.Body.Close() }()
+
+	if origin := respDisallowed.Header.Get("Access-Control-Allow-Origin"); origin != "" {
+		t.Errorf("expected empty Access-Control-Allow-Origin for unauthorized origin on credentialed path, got '%s'", origin)
+	}
+	if creds := respDisallowed.Header.Get("Access-Control-Allow-Credentials"); creds != "" {
+		t.Errorf("expected empty Access-Control-Allow-Credentials, got '%s'", creds)
 	}
 }
