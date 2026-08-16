@@ -775,3 +775,207 @@ func TestOrchestrator_ConcurrentBigThree_Execution(t *testing.T) {
 	// Cleanup
 	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-001'")
 }
+
+func TestOrchestrator_UpsertWithHistory_UnchangedPriceBumpsLastSeenAt(t *testing.T) {
+	dbURL := testDatabaseURL(t)
+	ctx := context.Background()
+
+	pool, err := store.NewPool(ctx, parseDatabaseConfig(t, dbURL))
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	queries := store.New(pool)
+
+	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-UPSERT'")
+	defer func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-UPSERT'")
+	}()
+
+	t0 := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
+	price0, _ := decimal.NewFromString("0.50000000")
+	obs0 := domain.PriceObservation{
+		Provider:        "aws",
+		ServiceCategory: "compute",
+		SkuID:           "SKU-TEST-UPSERT",
+		DisplayName:     "test-upsert-instance",
+		Region:          "us-east-1",
+		RegionGroup:     "us-east",
+		Unit:            "Hrs",
+		PriceAmount:     price0,
+		PriceCurrency:   "USD",
+		PricingModel:    "OnDemand",
+		Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 8, Family: "general"},
+		FetchedAt:       t0,
+	}
+
+	adapter := &mockFetcher{
+		result: domain.FetchResult{
+			Observations: []domain.PriceObservation{obs0},
+			RawGCSPath:   "raw/aws/compute/upsert-1.json",
+		},
+	}
+
+	factory := provider.NewFactory()
+	factory.Register(provider.ProviderConfig{
+		Provider: "aws",
+		Category: "compute",
+		Retry:    provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
+	}, adapter)
+
+	orch := service.NewOrchestrator(queries, nil, nil, factory, service.OrchestratorConfig{
+		MaxConcurrency: 1,
+		LockTTL:        30 * time.Second,
+	})
+
+	// Run 1: First ingestion inserts new row
+	res1 := orch.RunAll(ctx)
+	if len(res1) != 1 || res1[0].Err != nil {
+		t.Fatalf("Run 1 failed: %v", res1)
+	}
+	if res1[0].InsertedCount != 1 {
+		t.Errorf("Run 1 InsertedCount = %d, want 1", res1[0].InsertedCount)
+	}
+
+	// Verify row in DB
+	var rowCount int
+	var fetchedAt, lastSeenAt time.Time
+	err = pool.QueryRow(ctx, "SELECT COUNT(*), MIN(fetched_at), MAX(last_seen_at) FROM price_observations WHERE sku_id = 'SKU-TEST-UPSERT'").Scan(&rowCount, &fetchedAt, &lastSeenAt)
+	if err != nil {
+		t.Fatalf("query row count after run 1: %v", err)
+	}
+	if rowCount != 1 {
+		t.Fatalf("expected 1 row after run 1, got %d", rowCount)
+	}
+	if !fetchedAt.Equal(t0) {
+		t.Errorf("fetched_at after run 1 = %v, want %v", fetchedAt, t0)
+	}
+
+	// Run 2: Second ingestion with IDENTICAL price at t1
+	t1 := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
+	obs1 := obs0
+	obs1.FetchedAt = t1
+
+	adapter.result = domain.FetchResult{
+		Observations: []domain.PriceObservation{obs1},
+		RawGCSPath:   "raw/aws/compute/upsert-2.json",
+	}
+
+	res2 := orch.RunAll(ctx)
+	if len(res2) != 1 || res2[0].Err != nil {
+		t.Fatalf("Run 2 failed: %v", res2)
+	}
+	if res2[0].UpdatedCount != 1 {
+		t.Errorf("Run 2 UpdatedCount = %d, want 1", res2[0].UpdatedCount)
+	}
+	if res2[0].InsertedCount != 0 {
+		t.Errorf("Run 2 InsertedCount = %d, want 0", res2[0].InsertedCount)
+	}
+
+	// Verify still exactly 1 row in DB with updated last_seen_at
+	err = pool.QueryRow(ctx, "SELECT COUNT(*), MIN(fetched_at), MAX(last_seen_at) FROM price_observations WHERE sku_id = 'SKU-TEST-UPSERT'").Scan(&rowCount, &fetchedAt, &lastSeenAt)
+	if err != nil {
+		t.Fatalf("query row count after run 2: %v", err)
+	}
+	if rowCount != 1 {
+		t.Fatalf("expected exactly 1 row after run 2 (upsert-with-history), got %d", rowCount)
+	}
+	if !fetchedAt.Equal(t0) {
+		t.Errorf("fetched_at after run 2 = %v, want preserved initial %v", fetchedAt, t0)
+	}
+	if !lastSeenAt.Equal(t1) {
+		t.Errorf("last_seen_at after run 2 = %v, want bumped %v", lastSeenAt, t1)
+	}
+}
+
+func TestOrchestrator_UpsertWithHistory_PriceChangeInsertsNewRow(t *testing.T) {
+	dbURL := testDatabaseURL(t)
+	ctx := context.Background()
+
+	pool, err := store.NewPool(ctx, parseDatabaseConfig(t, dbURL))
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	queries := store.New(pool)
+
+	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-CHANGE'")
+	defer func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-CHANGE'")
+	}()
+
+	t0 := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
+	price0, _ := decimal.NewFromString("0.50000000")
+	obs0 := domain.PriceObservation{
+		Provider:        "aws",
+		ServiceCategory: "compute",
+		SkuID:           "SKU-TEST-CHANGE",
+		DisplayName:     "test-change-instance",
+		Region:          "us-east-1",
+		RegionGroup:     "us-east",
+		Unit:            "Hrs",
+		PriceAmount:     price0,
+		PriceCurrency:   "USD",
+		PricingModel:    "OnDemand",
+		Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 8, Family: "general"},
+		FetchedAt:       t0,
+	}
+
+	adapter := &mockFetcher{
+		result: domain.FetchResult{
+			Observations: []domain.PriceObservation{obs0},
+			RawGCSPath:   "raw/aws/compute/change-1.json",
+		},
+	}
+
+	factory := provider.NewFactory()
+	factory.Register(provider.ProviderConfig{
+		Provider: "aws",
+		Category: "compute",
+		Retry:    provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
+	}, adapter)
+
+	orch := service.NewOrchestrator(queries, nil, nil, factory, service.OrchestratorConfig{
+		MaxConcurrency: 1,
+		LockTTL:        30 * time.Second,
+	})
+
+	// Run 1: First ingestion inserts new row
+	res1 := orch.RunAll(ctx)
+	if len(res1) != 1 || res1[0].Err != nil {
+		t.Fatalf("Run 1 failed: %v", res1)
+	}
+	if res1[0].InsertedCount != 1 {
+		t.Errorf("Run 1 InsertedCount = %d, want 1", res1[0].InsertedCount)
+	}
+
+	// Run 2: Price changed from 0.50 to 0.60
+	t1 := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
+	price1, _ := decimal.NewFromString("0.60000000")
+	obs1 := obs0
+	obs1.PriceAmount = price1
+	obs1.FetchedAt = t1
+
+	adapter.result = domain.FetchResult{
+		Observations: []domain.PriceObservation{obs1},
+		RawGCSPath:   "raw/aws/compute/change-2.json",
+	}
+
+	res2 := orch.RunAll(ctx)
+	if len(res2) != 1 || res2[0].Err != nil {
+		t.Fatalf("Run 2 failed: %v", res2)
+	}
+	if res2[0].InsertedCount != 1 {
+		t.Errorf("Run 2 InsertedCount = %d, want 1", res2[0].InsertedCount)
+	}
+
+	// Verify exactly 2 rows in DB
+	var rowCount int
+	err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM price_observations WHERE sku_id = 'SKU-TEST-CHANGE'").Scan(&rowCount)
+	if err != nil {
+		t.Fatalf("query row count after run 2: %v", err)
+	}
+	if rowCount != 2 {
+		t.Fatalf("expected 2 rows after price change, got %d", rowCount)
+	}
+}

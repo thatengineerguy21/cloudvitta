@@ -147,7 +147,7 @@ func TestComputeHandler_HappyPath_MultiProvider(t *testing.T) {
 			ServiceCategory: "compute",
 			SkuID:           "SKU-GCP-E2-STD-2",
 			DisplayName:     "e2-standard-2",
-			Region:          "us-east1",
+			Region:          "us-east4",
 			RegionGroup:     "us-east",
 			Unit:            "hour",
 			PriceAmount:     decimal.RequireFromString("0.067"),
@@ -158,9 +158,9 @@ func TestComputeHandler_HappyPath_MultiProvider(t *testing.T) {
 		},
 	}
 
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east"), awsObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "us-east"), azureObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4"), gcpObs, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewComputeHandler(pricingSvc)
@@ -215,9 +215,9 @@ func TestComputeHandler_CurrencyWarning(t *testing.T) {
 	handler := rest.NewComputeHandler(pricingSvc)
 
 	// Pre-warm the cache so it doesn't hit the nil DB
-	cacheKeyAWS := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east")
-	cacheKeyAzure := cache.BuildKey(cache.SchemaVersion, "azure", "compute", "us-east")
-	cacheKeyGCP := cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east")
+	cacheKeyAWS := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1")
+	cacheKeyAzure := cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus")
+	cacheKeyGCP := cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4")
 	_ = cache.Warm(context.Background(), rdb, cacheKeyAWS, []domain.PriceObservation{}, cache.DefaultTTL)
 	_ = cache.Warm(context.Background(), rdb, cacheKeyAzure, []domain.PriceObservation{}, cache.DefaultTTL)
 	_ = cache.Warm(context.Background(), rdb, cacheKeyGCP, []domain.PriceObservation{}, cache.DefaultTTL)
@@ -266,9 +266,9 @@ func TestComputeHandler_StrictFamily(t *testing.T) {
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewComputeHandler(pricingSvc)
 
-	cacheKeyAWS := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east")
-	cacheKeyAzure := cache.BuildKey(cache.SchemaVersion, "azure", "compute", "us-east")
-	cacheKeyGCP := cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east")
+	cacheKeyAWS := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1")
+	cacheKeyAzure := cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus")
+	cacheKeyGCP := cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4")
 	_ = cache.Warm(context.Background(), rdb, cacheKeyAWS, []domain.PriceObservation{}, cache.DefaultTTL)
 	_ = cache.Warm(context.Background(), rdb, cacheKeyAzure, []domain.PriceObservation{}, cache.DefaultTTL)
 	_ = cache.Warm(context.Background(), rdb, cacheKeyGCP, []domain.PriceObservation{}, cache.DefaultTTL)
@@ -312,7 +312,7 @@ func TestComputeHandler_PartialProviderFailure_Returns200WithWarning(t *testing.
 			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsObs, cache.DefaultTTL)
 
 	failingQueries := store.New(&failingDBTX{})
 	pricingSvc := service.NewPricingService(failingQueries, rdb)
@@ -337,7 +337,7 @@ func TestComputeHandler_PartialProviderFailure_Returns200WithWarning(t *testing.
 	}
 }
 
-func TestComputeHandler_AllProvidersFail_Returns500(t *testing.T) {
+func TestComputeHandler_AllProvidersFail_Returns502(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -356,15 +356,15 @@ func TestComputeHandler_AllProvidersFail_Returns500(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 Internal Server Error", rec.Code)
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502 Bad Gateway", rec.Code)
 	}
 
 	var rfcErr middleware.RFC7807Error
 	if err := json.NewDecoder(rec.Body).Decode(&rfcErr); err != nil {
 		t.Fatalf("failed to decode RFC7807 JSON: %v", err)
 	}
-	if rfcErr.Status != 500 {
-		t.Errorf("Status = %d, want 500", rfcErr.Status)
+	if rfcErr.Status != 502 {
+		t.Errorf("Status = %d, want 502", rfcErr.Status)
 	}
 }

@@ -177,7 +177,7 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			ServiceCategory:   "storage",
 			SkuID:             "SKU-GCP-GCS-STD",
 			DisplayName:       "Standard Storage",
-			Region:            "us-east1",
+			Region:            "us-east4",
 			RegionGroup:       "us-east",
 			Unit:              "GB-Mo",
 			PriceAmount:       decimal.RequireFromString("0.020"),
@@ -188,9 +188,9 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 		},
 	}
 
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east"), awsObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "us-east"), azureObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east4"), gcpObs, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewStorageHandler(pricingSvc)
@@ -263,7 +263,7 @@ func TestStorageHandler_PartialProviderFailure_Returns200WithWarning(t *testing.
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsObs, cache.DefaultTTL)
 
 	failingQueries := store.New(&failingDBTX{})
 	pricingSvc := service.NewPricingService(failingQueries, rdb)
@@ -324,9 +324,9 @@ func TestStorageHandler_EmptyProviderResults_AddsWarning(t *testing.T) {
 			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east"), awsObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "eastus"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east4"), []domain.PriceObservation{}, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewStorageHandler(pricingSvc)
@@ -359,7 +359,7 @@ func TestStorageHandler_EmptyProviderResults_AddsWarning(t *testing.T) {
 	}
 }
 
-func TestStorageHandler_AllProvidersFail_Returns500(t *testing.T) {
+func TestStorageHandler_AllProvidersFail_Returns502(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -378,15 +378,15 @@ func TestStorageHandler_AllProvidersFail_Returns500(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 Internal Server Error", rec.Code)
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502 Bad Gateway", rec.Code)
 	}
 
 	var rfcErr middleware.RFC7807Error
 	if err := json.NewDecoder(rec.Body).Decode(&rfcErr); err != nil {
 		t.Fatalf("failed to decode RFC7807 JSON: %v", err)
 	}
-	if rfcErr.Status != 500 {
-		t.Errorf("Status = %d, want 500", rfcErr.Status)
+	if rfcErr.Status != 502 {
+		t.Errorf("Status = %d, want 502", rfcErr.Status)
 	}
 }

@@ -47,6 +47,7 @@ type awsProductMeta struct {
 }
 
 // Normalize parses an AWS Price List JSON stream and returns normalized domain observations.
+// Normalize parses an AWS Pricing Bulk JSON file stream and returns normalized domain observations.
 // It streams tokens using json.Decoder with depth-aware skipping to minimize memory overhead
 // on large provider files. It enforces that products precede terms, returning ErrPermanentFailure
 // if the payload order violates this streaming invariant.
@@ -80,163 +81,11 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 			offerCode = val
 
 		case "products":
-			// Consume opening '{' of products map
-			if err := consumeDelim(dec, '{'); err != nil {
-				return nil, fmt.Errorf("aws normalize: products open delim: %w", err)
+			prods, err := parseProductsMap(dec, offerCode)
+			if err != nil {
+				return nil, err
 			}
-
-			for dec.More() {
-				skuToken, err := dec.Token()
-				if err != nil {
-					return nil, fmt.Errorf("aws normalize: read sku key: %w", err)
-				}
-				sku := fmt.Sprintf("%v", skuToken)
-
-				var prod awsProduct
-				if err := dec.Decode(&prod); err != nil {
-					return nil, fmt.Errorf("aws normalize: decode product %s: %w", sku, err)
-				}
-
-				serviceCode := prod.Attributes["servicecode"]
-				if serviceCode == "" {
-					serviceCode = offerCode
-				}
-
-				if isComputeInstance(prod, prod.Attributes) {
-					category, err := catalogmap.MapAWSProduct(serviceCode)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-					}
-
-					location := prod.Attributes["location"]
-					if location == "" {
-						location = prod.Attributes["regionCode"]
-					}
-					regionGroup, err := regionmap.MapAWSRegion(location)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-					}
-
-					instanceType := prod.Attributes["instanceType"]
-					vcpu := parseVCPU(prod.Attributes["vcpu"])
-					ram := parseRAMGB(prod.Attributes["memory"])
-					family := parseFamily(instanceType)
-
-					region := prod.Attributes["regionCode"]
-					if region == "" {
-						region = prod.Attributes["location"]
-					}
-
-					meta := awsProductMeta{
-						sku:         sku,
-						category:    category,
-						regionGroup: regionGroup,
-						region:      region,
-						displayName: instanceType,
-						computeAttrs: domain.ComputeAttributes{
-							VCPU:   vcpu,
-							RAMGB:  ram,
-							Family: family,
-						},
-					}
-					filteredProducts[sku] = meta
-
-				} else if isStorageProduct(prod, prod.Attributes) {
-					category, err := catalogmap.MapAWSProduct(serviceCode)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-					}
-
-					location := prod.Attributes["location"]
-					if location == "" {
-						location = prod.Attributes["regionCode"]
-					}
-					regionGroup, err := regionmap.MapAWSRegion(location)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-					}
-
-					rawStorageClass := prod.Attributes["storageClass"]
-					if rawStorageClass == "" {
-						rawStorageClass = prod.Attributes["volumeType"]
-					}
-					storageClass, err := storageclassmap.MapAWSStorageClass(rawStorageClass)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-					}
-
-					region := prod.Attributes["regionCode"]
-					if region == "" {
-						region = prod.Attributes["location"]
-					}
-
-					displayName := prod.Attributes["description"]
-
-					meta := awsProductMeta{
-						sku:         sku,
-						category:    category,
-						regionGroup: regionGroup,
-						region:      region,
-						displayName: displayName,
-						storageAttrs: domain.StorageAttributes{
-							SizeGB:       1,
-							StorageClass: storageClass,
-						},
-					}
-					filteredProducts[sku] = meta
-
-				} else if isNetworkProduct(prod, prod.Attributes) {
-					category, err := catalogmap.MapAWSProduct(serviceCode)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-					}
-
-					location := prod.Attributes["fromLocation"]
-					if location == "" {
-						location = prod.Attributes["location"]
-					}
-					if location == "" {
-						location = prod.Attributes["regionCode"]
-					}
-					regionGroup, err := regionmap.MapAWSRegion(location)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-					}
-
-					region := prod.Attributes["regionCode"]
-					if region == "" {
-						region = location
-					}
-
-					displayName := prod.Attributes["description"]
-					if displayName == "" {
-						displayName = "AWS Data Transfer Out"
-					}
-
-					transferType, err := transfertypemap.MapAWSTransferType(displayName)
-					if err != nil {
-						return nil, fmt.Errorf("aws normalize sku %s transfer type: %w", sku, err)
-					}
-
-					meta := awsProductMeta{
-						sku:         sku,
-						category:    category,
-						regionGroup: regionGroup,
-						region:      region,
-						displayName: displayName,
-						networkAttrs: domain.NetworkAttributes{
-							EgressGB:     1,
-							TransferType: transferType,
-						},
-					}
-					filteredProducts[sku] = meta
-				}
-			}
-
-			// Consume closing '}' of products map
-			if err := consumeDelim(dec, '}'); err != nil {
-				return nil, fmt.Errorf("aws normalize: products close delim: %w", err)
-			}
+			filteredProducts = prods
 			productsParsed = true
 
 		case "terms":
@@ -244,90 +93,11 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 				return nil, fmt.Errorf("%w: aws normalize: terms encountered before products in payload", provider.ErrPermanentFailure)
 			}
 
-			// Consume opening '{' of terms map
-			if err := consumeDelim(dec, '{'); err != nil {
-				return nil, fmt.Errorf("aws normalize: terms open delim: %w", err)
+			obs, err := parseTermsMap(dec, filteredProducts, fetchedAt)
+			if err != nil {
+				return nil, err
 			}
-
-			var hasOnDemand bool
-			for dec.More() {
-				termTypeToken, err := dec.Token()
-				if err != nil {
-					return nil, fmt.Errorf("aws normalize: read term type: %w", err)
-				}
-				termType := fmt.Sprintf("%v", termTypeToken)
-
-				if termType == "OnDemand" {
-					hasOnDemand = true
-					if err := consumeDelim(dec, '{'); err != nil {
-						return nil, fmt.Errorf("aws normalize: OnDemand open delim: %w", err)
-					}
-
-					for dec.More() {
-						skuToken, err := dec.Token()
-						if err != nil {
-							return nil, fmt.Errorf("aws normalize: read OnDemand sku: %w", err)
-						}
-						sku := fmt.Sprintf("%v", skuToken)
-
-						meta, isFiltered := filteredProducts[sku]
-						if isFiltered {
-							var skuTerms map[string]awsOfferTerm
-							if err := dec.Decode(&skuTerms); err != nil {
-								return nil, fmt.Errorf("aws normalize: decode OnDemand sku %s: %w", sku, err)
-							}
-
-							for _, term := range skuTerms {
-								// Tiered Pricing Detection (PRD §16.1):
-								// If there are multiple price dimensions in a term or dimension starts above 0, skip the SKU entirely.
-								if len(term.PriceDimensions) > 1 {
-									slog.Info("skipping AWS SKU due to tiered pricing", "provider", "aws", "sku", sku, "dimensions", len(term.PriceDimensions), "reason", "tiered_pricing_not_supported_in_v1")
-									continue
-								}
-
-								for _, dim := range term.PriceDimensions {
-									if dim.BeginRange != "" && dim.BeginRange != "0" {
-										slog.Info("skipping AWS SKU dimension due to tiered pricing", "provider", "aws", "sku", sku, "begin_range", dim.BeginRange, "reason", "tiered_pricing_not_supported_in_v1")
-										continue
-									}
-
-									usdStr, hasUSD := dim.PricePerUnit["USD"]
-									if !hasUSD {
-										continue
-									}
-									priceAmount, err := decimal.NewFromString(usdStr)
-									if err != nil {
-										return nil, fmt.Errorf("aws normalize sku %s: invalid price %q: %w", sku, usdStr, err)
-									}
-									observations = append(observations, buildObservation(meta, dim.Unit, priceAmount, fetchedAt))
-								}
-							}
-						} else {
-							// Discard non-matching terms without memory allocation
-							if err := provider.SkipJSONValue(dec); err != nil {
-								return nil, fmt.Errorf("aws normalize: skip sku terms for %s: %w", sku, err)
-							}
-						}
-					}
-
-					if err := consumeDelim(dec, '}'); err != nil {
-						return nil, fmt.Errorf("aws normalize: OnDemand close delim: %w", err)
-					}
-				} else {
-					// Discard non-OnDemand terms (e.g. Reserved) without memory allocation
-					if err := provider.SkipJSONValue(dec); err != nil {
-						return nil, fmt.Errorf("aws normalize: skip term %s: %w", termType, err)
-					}
-				}
-			}
-
-			if err := consumeDelim(dec, '}'); err != nil {
-				return nil, fmt.Errorf("aws normalize: terms close delim: %w", err)
-			}
-
-			if !hasOnDemand {
-				return nil, fmt.Errorf("aws normalize: missing OnDemand terms")
-			}
+			observations = append(observations, obs...)
 
 		default:
 			// Discard unknown top-level section without memory allocation
@@ -337,6 +107,277 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 		}
 	}
 
+	return observations, nil
+}
+
+func parseProductsMap(dec *json.Decoder, offerCode string) (map[string]awsProductMeta, error) {
+	if err := consumeDelim(dec, '{'); err != nil {
+		return nil, fmt.Errorf("aws normalize: products open delim: %w", err)
+	}
+
+	filteredProducts := make(map[string]awsProductMeta)
+	for dec.More() {
+		skuToken, err := dec.Token()
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize: read sku key: %w", err)
+		}
+		sku := fmt.Sprintf("%v", skuToken)
+
+		var prod awsProduct
+		if err := dec.Decode(&prod); err != nil {
+			return nil, fmt.Errorf("aws normalize: decode product %s: %w", sku, err)
+		}
+
+		meta, err := parseSingleProduct(prod, sku, offerCode)
+		if err != nil {
+			return nil, err
+		}
+		if meta != nil {
+			filteredProducts[sku] = *meta
+		}
+	}
+
+	if err := consumeDelim(dec, '}'); err != nil {
+		return nil, fmt.Errorf("aws normalize: products close delim: %w", err)
+	}
+	return filteredProducts, nil
+}
+
+func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta, error) {
+	serviceCode := prod.Attributes["servicecode"]
+	if serviceCode == "" {
+		serviceCode = offerCode
+	}
+
+	if isComputeInstance(prod, prod.Attributes) {
+		category, err := catalogmap.MapAWSProduct(serviceCode)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		location := prod.Attributes["location"]
+		if location == "" {
+			location = prod.Attributes["regionCode"]
+		}
+		regionGroup, err := regionmap.MapAWSRegion(location)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		instanceType := prod.Attributes["instanceType"]
+		vcpu := parseVCPU(prod.Attributes["vcpu"])
+		ram := parseRAMGB(prod.Attributes["memory"])
+		family := parseFamily(instanceType)
+
+		region := prod.Attributes["regionCode"]
+		if region == "" {
+			region = prod.Attributes["location"]
+		}
+
+		return &awsProductMeta{
+			sku:         sku,
+			category:    category,
+			regionGroup: regionGroup,
+			region:      region,
+			displayName: instanceType,
+			computeAttrs: domain.ComputeAttributes{
+				VCPU:   vcpu,
+				RAMGB:  ram,
+				Family: family,
+			},
+		}, nil
+	}
+
+	if isStorageProduct(prod, prod.Attributes) {
+		category, err := catalogmap.MapAWSProduct(serviceCode)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		location := prod.Attributes["location"]
+		if location == "" {
+			location = prod.Attributes["regionCode"]
+		}
+		regionGroup, err := regionmap.MapAWSRegion(location)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		rawStorageClass := prod.Attributes["storageClass"]
+		if rawStorageClass == "" {
+			rawStorageClass = prod.Attributes["volumeType"]
+		}
+		storageClass, err := storageclassmap.MapAWSStorageClass(rawStorageClass)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		region := prod.Attributes["regionCode"]
+		if region == "" {
+			region = prod.Attributes["location"]
+		}
+
+		displayName := prod.Attributes["description"]
+
+		return &awsProductMeta{
+			sku:         sku,
+			category:    category,
+			regionGroup: regionGroup,
+			region:      region,
+			displayName: displayName,
+			storageAttrs: domain.StorageAttributes{
+				SizeGB:       1,
+				StorageClass: storageClass,
+			},
+		}, nil
+	}
+
+	if isNetworkProduct(prod, prod.Attributes) {
+		category, err := catalogmap.MapAWSProduct(serviceCode)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		location := prod.Attributes["fromLocation"]
+		if location == "" {
+			location = prod.Attributes["location"]
+		}
+		if location == "" {
+			location = prod.Attributes["regionCode"]
+		}
+		regionGroup, err := regionmap.MapAWSRegion(location)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		region := prod.Attributes["regionCode"]
+		if region == "" {
+			region = location
+		}
+
+		displayName := prod.Attributes["description"]
+		if displayName == "" {
+			displayName = "AWS Data Transfer Out"
+		}
+
+		transferType, err := transfertypemap.MapAWSTransferType(displayName)
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize sku %s transfer type: %w", sku, err)
+		}
+
+		return &awsProductMeta{
+			sku:         sku,
+			category:    category,
+			regionGroup: regionGroup,
+			region:      region,
+			displayName: displayName,
+			networkAttrs: domain.NetworkAttributes{
+				EgressGB:     1,
+				TransferType: transferType,
+			},
+		}, nil
+	}
+
+	return nil, nil
+}
+
+func parseTermsMap(dec *json.Decoder, filteredProducts map[string]awsProductMeta, fetchedAt time.Time) ([]domain.PriceObservation, error) {
+	if err := consumeDelim(dec, '{'); err != nil {
+		return nil, fmt.Errorf("aws normalize: terms open delim: %w", err)
+	}
+
+	var observations []domain.PriceObservation
+	var hasOnDemand bool
+
+	for dec.More() {
+		termTypeToken, err := dec.Token()
+		if err != nil {
+			return nil, fmt.Errorf("aws normalize: read term type: %w", err)
+		}
+		termType := fmt.Sprintf("%v", termTypeToken)
+
+		if termType == "OnDemand" {
+			hasOnDemand = true
+			if err := consumeDelim(dec, '{'); err != nil {
+				return nil, fmt.Errorf("aws normalize: OnDemand open delim: %w", err)
+			}
+
+			for dec.More() {
+				skuToken, err := dec.Token()
+				if err != nil {
+					return nil, fmt.Errorf("aws normalize: read OnDemand sku: %w", err)
+				}
+				sku := fmt.Sprintf("%v", skuToken)
+
+				meta, isFiltered := filteredProducts[sku]
+				if isFiltered {
+					var skuTerms map[string]awsOfferTerm
+					if err := dec.Decode(&skuTerms); err != nil {
+						return nil, fmt.Errorf("aws normalize: decode OnDemand sku %s: %w", sku, err)
+					}
+
+					obs, err := parseSKUTerms(skuTerms, sku, meta, fetchedAt)
+					if err != nil {
+						return nil, err
+					}
+					observations = append(observations, obs...)
+				} else {
+					// Discard non-matching terms without memory allocation
+					if err := provider.SkipJSONValue(dec); err != nil {
+						return nil, fmt.Errorf("aws normalize: skip sku terms for %s: %w", sku, err)
+					}
+				}
+			}
+
+			if err := consumeDelim(dec, '}'); err != nil {
+				return nil, fmt.Errorf("aws normalize: OnDemand close delim: %w", err)
+			}
+		} else {
+			// Discard non-OnDemand terms (e.g. Reserved) without memory allocation
+			if err := provider.SkipJSONValue(dec); err != nil {
+				return nil, fmt.Errorf("aws normalize: skip term %s: %w", termType, err)
+			}
+		}
+	}
+
+	if err := consumeDelim(dec, '}'); err != nil {
+		return nil, fmt.Errorf("aws normalize: terms close delim: %w", err)
+	}
+
+	if !hasOnDemand {
+		return nil, fmt.Errorf("aws normalize: missing OnDemand terms")
+	}
+
+	return observations, nil
+}
+
+func parseSKUTerms(skuTerms map[string]awsOfferTerm, sku string, meta awsProductMeta, fetchedAt time.Time) ([]domain.PriceObservation, error) {
+	var observations []domain.PriceObservation
+	for _, term := range skuTerms {
+		// Tiered Pricing Detection (PRD §16.1):
+		// If there are multiple price dimensions in a term or dimension starts above 0, skip the SKU entirely.
+		if len(term.PriceDimensions) > 1 {
+			slog.Info("skipping AWS SKU due to tiered pricing", "provider", "aws", "sku", sku, "dimensions", len(term.PriceDimensions), "reason", "tiered_pricing_not_supported_in_v1")
+			continue
+		}
+
+		for _, dim := range term.PriceDimensions {
+			if dim.BeginRange != "" && dim.BeginRange != "0" {
+				slog.Info("skipping AWS SKU dimension due to tiered pricing", "provider", "aws", "sku", sku, "begin_range", dim.BeginRange, "reason", "tiered_pricing_not_supported_in_v1")
+				continue
+			}
+
+			usdStr, hasUSD := dim.PricePerUnit["USD"]
+			if !hasUSD {
+				continue
+			}
+			priceAmount, err := decimal.NewFromString(usdStr)
+			if err != nil {
+				return nil, fmt.Errorf("aws normalize sku %s: invalid price %q: %w", sku, usdStr, err)
+			}
+			observations = append(observations, buildObservation(meta, dim.Unit, priceAmount, fetchedAt))
+		}
+	}
 	return observations, nil
 }
 

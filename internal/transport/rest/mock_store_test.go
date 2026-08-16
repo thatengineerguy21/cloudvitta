@@ -108,6 +108,14 @@ func (m *mockQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.GetLat
 	return store.PriceObservation{}, errors.New("GetLatestPriceForSKU not implemented")
 }
 
+func (m *mockQuerier) GetLatestPriceForSKUAndCategory(ctx context.Context, arg store.GetLatestPriceForSKUAndCategoryParams) (store.PriceObservation, error) {
+	return store.PriceObservation{}, errors.New("GetLatestPriceForSKUAndCategory not implemented")
+}
+
+func (m *mockQuerier) UpdatePriceObservationLastSeenAt(ctx context.Context, arg store.UpdatePriceObservationLastSeenAtParams) error {
+	return nil
+}
+
 func (m *mockQuerier) InsertPriceObservation(ctx context.Context, arg store.InsertPriceObservationParams) (int64, error) {
 	return 0, errors.New("InsertPriceObservation not implemented")
 }

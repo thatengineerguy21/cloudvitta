@@ -113,8 +113,8 @@ func TestCalculateHandler_HappyPath(t *testing.T) {
 		},
 	}
 
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east"), awsComputeObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east"), awsStorageObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsComputeObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsStorageObs, cache.DefaultTTL)
 
 	// Add only compute for Azure
 	azureComputeObs := []domain.PriceObservation{
@@ -128,12 +128,12 @@ func TestCalculateHandler_HappyPath(t *testing.T) {
 			FetchedAt:       time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "us-east"), azureComputeObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus"), azureComputeObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "eastus"), []domain.PriceObservation{}, cache.DefaultTTL)
 
 	// GCP gets nothing
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east4"), []domain.PriceObservation{}, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewCalculateHandler(pricingSvc)
@@ -205,7 +205,7 @@ func TestCalculateHandler_HappyPath(t *testing.T) {
 	}
 }
 
-func TestCalculateHandler_AllProvidersFail_Returns500(t *testing.T) {
+func TestCalculateHandler_AllProvidersFail_Returns502(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -225,15 +225,15 @@ func TestCalculateHandler_AllProvidersFail_Returns500(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 Internal Server Error", rec.Code)
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502 Bad Gateway", rec.Code)
 	}
 
 	var rfcErr middleware.RFC7807Error
 	if err := json.NewDecoder(rec.Body).Decode(&rfcErr); err != nil {
 		t.Fatalf("failed to decode RFC7807 JSON: %v", err)
 	}
-	if rfcErr.Status != 500 {
-		t.Errorf("Status = %d, want 500", rfcErr.Status)
+	if rfcErr.Status != 502 {
+		t.Errorf("Status = %d, want 502", rfcErr.Status)
 	}
 }

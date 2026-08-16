@@ -95,7 +95,7 @@ func (h *StatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			middleware.WriteJSONError(w, r, http.StatusNotFound, "https://cloudvitta.dev/errors/provider-not-found", "Provider Not Found", "provider '"+provider+"' is not recognized")
 			return
 		}
-		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-server-error", "Internal Server Error", err.Error())
+		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-server-error", "Internal Server Error", "An internal server error occurred while retrieving provider status")
 		return
 	}
 

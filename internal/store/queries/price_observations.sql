@@ -68,3 +68,34 @@ WHERE provider = $1
   AND region = $3
 ORDER BY fetched_at DESC
 LIMIT 1;
+
+-- name: GetLatestPriceForSKUAndCategory :one
+SELECT
+    id,
+    provider,
+    service_category,
+    sku_id,
+    display_name,
+    region,
+    region_group,
+    unit,
+    price_amount,
+    price_currency,
+    pricing_model,
+    attributes,
+    raw_response_ref,
+    fetched_at,
+    last_seen_at,
+    anomaly_status
+FROM price_observations
+WHERE provider = $1
+  AND service_category = $2
+  AND sku_id = $3
+  AND region = $4
+ORDER BY fetched_at DESC
+LIMIT 1;
+
+-- name: UpdatePriceObservationLastSeenAt :exec
+UPDATE price_observations
+SET last_seen_at = $2
+WHERE id = $1;

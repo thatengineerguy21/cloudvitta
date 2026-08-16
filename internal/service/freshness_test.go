@@ -75,6 +75,14 @@ func (m *mockStatusQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.
 	return store.PriceObservation{}, nil
 }
 
+func (m *mockStatusQuerier) GetLatestPriceForSKUAndCategory(ctx context.Context, arg store.GetLatestPriceForSKUAndCategoryParams) (store.PriceObservation, error) {
+	return store.PriceObservation{}, nil
+}
+
+func (m *mockStatusQuerier) UpdatePriceObservationLastSeenAt(ctx context.Context, arg store.UpdatePriceObservationLastSeenAtParams) error {
+	return nil
+}
+
 func (m *mockStatusQuerier) InsertPriceObservation(ctx context.Context, arg store.InsertPriceObservationParams) (int64, error) {
 	return 0, nil
 }

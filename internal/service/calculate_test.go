@@ -43,13 +43,14 @@ func TestPricingService_Calculate_CompleteAllCategories(t *testing.T) {
 			FetchedAt: time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", regionGroup), awsCompute, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsCompute, cache.DefaultTTL)
 
 	awsStorage := []domain.PriceObservation{
 		{
 			Provider:        "aws",
 			ServiceCategory: "storage",
 			SkuID:           "s3-standard",
+			Region:          "us-east-1",
 			RegionGroup:     regionGroup,
 			PriceAmount:     decimal.RequireFromString("0.023"), // $0.023 / GB-month
 			PriceCurrency:   "USD",
@@ -60,13 +61,14 @@ func TestPricingService_Calculate_CompleteAllCategories(t *testing.T) {
 			FetchedAt: time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", regionGroup), awsStorage, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsStorage, cache.DefaultTTL)
 
 	awsNetwork := []domain.PriceObservation{
 		{
 			Provider:        "aws",
 			ServiceCategory: "network",
 			SkuID:           "data-transfer-out",
+			Region:          "us-east-1",
 			RegionGroup:     regionGroup,
 			PriceAmount:     decimal.RequireFromString("0.090"), // $0.090 / GB
 			PriceCurrency:   "USD",
@@ -77,7 +79,7 @@ func TestPricingService_Calculate_CompleteAllCategories(t *testing.T) {
 			FetchedAt: time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", regionGroup), awsNetwork, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsNetwork, cache.DefaultTTL)
 
 	svc := service.NewPricingService(nil, rdb)
 
@@ -176,13 +178,14 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 			},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", regionGroup), awsCompute, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsCompute, cache.DefaultTTL)
 
 	awsStorage := []domain.PriceObservation{
 		{
 			Provider:        "aws",
 			ServiceCategory: "storage",
 			SkuID:           "s3-standard",
+			Region:          "us-east-1",
 			RegionGroup:     regionGroup,
 			PriceAmount:     decimal.RequireFromString("0.023"),
 			StorageAttributes: domain.StorageAttributes{
@@ -191,7 +194,7 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 			},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", regionGroup), awsStorage, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsStorage, cache.DefaultTTL)
 
 	// AWS network is empty []
 
@@ -201,6 +204,7 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 			Provider:        "azure",
 			ServiceCategory: "compute",
 			SkuID:           "Standard_D4s_v5",
+			Region:          "eastus",
 			RegionGroup:     regionGroup,
 			PriceAmount:     decimal.RequireFromString("0.192"),
 			Attributes: domain.ComputeAttributes{
@@ -210,13 +214,14 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 			},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", regionGroup), azureCompute, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus"), azureCompute, cache.DefaultTTL)
 
 	azureStorage := []domain.PriceObservation{
 		{
 			Provider:        "azure",
 			ServiceCategory: "storage",
 			SkuID:           "blob-hot",
+			Region:          "eastus",
 			RegionGroup:     regionGroup,
 			PriceAmount:     decimal.RequireFromString("0.0184"),
 			StorageAttributes: domain.StorageAttributes{
@@ -225,13 +230,14 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 			},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", regionGroup), azureStorage, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "eastus"), azureStorage, cache.DefaultTTL)
 
 	azureNetwork := []domain.PriceObservation{
 		{
 			Provider:        "azure",
 			ServiceCategory: "network",
 			SkuID:           "azure-egress",
+			Region:          "eastus",
 			RegionGroup:     regionGroup,
 			PriceAmount:     decimal.RequireFromString("0.087"),
 			NetworkAttributes: domain.NetworkAttributes{
@@ -240,7 +246,7 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 			},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", regionGroup), azureNetwork, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "eastus"), azureNetwork, cache.DefaultTTL)
 
 	svc := service.NewPricingService(nil, rdb)
 
@@ -372,7 +378,7 @@ func TestPricingService_Calculate_CurrencyWarning(t *testing.T) {
 			},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", regionGroup), awsCompute, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsCompute, cache.DefaultTTL)
 
 	svc := service.NewPricingService(nil, rdb)
 

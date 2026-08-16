@@ -289,7 +289,7 @@ func TestCrossEndpoint_StalenessAgreement(t *testing.T) {
 		},
 	}
 
-	staleKey := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east")
+	staleKey := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1")
 	if err := cache.Warm(ctx, rdb, staleKey, staleObs, cache.DefaultTTL); err != nil {
 		t.Fatalf("cache.Warm failed: %v", err)
 	}

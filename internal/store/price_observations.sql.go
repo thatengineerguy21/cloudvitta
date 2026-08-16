@@ -67,6 +67,69 @@ func (q *Queries) GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceFo
 	return i, err
 }
 
+const getLatestPriceForSKUAndCategory = `-- name: GetLatestPriceForSKUAndCategory :one
+SELECT
+    id,
+    provider,
+    service_category,
+    sku_id,
+    display_name,
+    region,
+    region_group,
+    unit,
+    price_amount,
+    price_currency,
+    pricing_model,
+    attributes,
+    raw_response_ref,
+    fetched_at,
+    last_seen_at,
+    anomaly_status
+FROM price_observations
+WHERE provider = $1
+  AND service_category = $2
+  AND sku_id = $3
+  AND region = $4
+ORDER BY fetched_at DESC
+LIMIT 1
+`
+
+type GetLatestPriceForSKUAndCategoryParams struct {
+	Provider        string `json:"provider"`
+	ServiceCategory string `json:"service_category"`
+	SkuID           string `json:"sku_id"`
+	Region          string `json:"region"`
+}
+
+func (q *Queries) GetLatestPriceForSKUAndCategory(ctx context.Context, arg GetLatestPriceForSKUAndCategoryParams) (PriceObservation, error) {
+	row := q.db.QueryRow(ctx, getLatestPriceForSKUAndCategory,
+		arg.Provider,
+		arg.ServiceCategory,
+		arg.SkuID,
+		arg.Region,
+	)
+	var i PriceObservation
+	err := row.Scan(
+		&i.ID,
+		&i.Provider,
+		&i.ServiceCategory,
+		&i.SkuID,
+		&i.DisplayName,
+		&i.Region,
+		&i.RegionGroup,
+		&i.Unit,
+		&i.PriceAmount,
+		&i.PriceCurrency,
+		&i.PricingModel,
+		&i.Attributes,
+		&i.RawResponseRef,
+		&i.FetchedAt,
+		&i.LastSeenAt,
+		&i.AnomalyStatus,
+	)
+	return i, err
+}
+
 const getPriceObservations = `-- name: GetPriceObservations :many
 SELECT
     id,
@@ -197,4 +260,20 @@ func (q *Queries) InsertPriceObservation(ctx context.Context, arg InsertPriceObs
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const updatePriceObservationLastSeenAt = `-- name: UpdatePriceObservationLastSeenAt :exec
+UPDATE price_observations
+SET last_seen_at = $2
+WHERE id = $1
+`
+
+type UpdatePriceObservationLastSeenAtParams struct {
+	ID         int64              `json:"id"`
+	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+}
+
+func (q *Queries) UpdatePriceObservationLastSeenAt(ctx context.Context, arg UpdatePriceObservationLastSeenAtParams) error {
+	_, err := q.db.Exec(ctx, updatePriceObservationLastSeenAt, arg.ID, arg.LastSeenAt)
+	return err
 }

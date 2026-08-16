@@ -167,7 +167,7 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 			ServiceCategory:   "network",
 			SkuID:             "SKU-GCP-NET-FLAT",
 			DisplayName:       "Network Internet Egress",
-			Region:            "us-east1",
+			Region:            "us-east4",
 			RegionGroup:       "us-east",
 			Unit:              "GB",
 			PriceAmount:       decimal.RequireFromString("0.085"),
@@ -178,9 +178,9 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 		},
 	}
 
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east"), awsObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "us-east"), azureObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east4"), gcpObs, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewNetworkHandler(pricingSvc)
@@ -252,7 +252,7 @@ func TestNetworkHandler_PartialProviderFailure_Returns200WithWarning(t *testing.
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
 
 	failingQueries := store.New(&failingDBTX{})
 	pricingSvc := service.NewPricingService(failingQueries, rdb)
@@ -310,9 +310,9 @@ func TestNetworkHandler_EmptyProviderResults_AddsWarning(t *testing.T) {
 			NetworkAttributes: domain.NetworkAttributes{EgressGB: 100},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east"), awsObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "eastus"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east4"), []domain.PriceObservation{}, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewNetworkHandler(pricingSvc)
@@ -345,7 +345,7 @@ func TestNetworkHandler_EmptyProviderResults_AddsWarning(t *testing.T) {
 	}
 }
 
-func TestNetworkHandler_AllProvidersFail_Returns500(t *testing.T) {
+func TestNetworkHandler_AllProvidersFail_Returns502(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis.Run() failed: %v", err)
@@ -364,15 +364,15 @@ func TestNetworkHandler_AllProvidersFail_Returns500(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 Internal Server Error", rec.Code)
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502 Bad Gateway", rec.Code)
 	}
 
 	var rfcErr middleware.RFC7807Error
 	if err := json.NewDecoder(rec.Body).Decode(&rfcErr); err != nil {
 		t.Fatalf("failed to decode RFC7807 JSON: %v", err)
 	}
-	if rfcErr.Status != 500 {
-		t.Errorf("Status = %d, want 500", rfcErr.Status)
+	if rfcErr.Status != 502 {
+		t.Errorf("Status = %d, want 502", rfcErr.Status)
 	}
 }

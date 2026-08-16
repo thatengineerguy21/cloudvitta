@@ -7,11 +7,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
-	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"go.opentelemetry.io/otel/trace"
@@ -73,7 +72,12 @@ func (s *PricingService) GetPrices(ctx context.Context, provider, category, regi
 		return nil, fmt.Errorf("%w: provider %q does not support category %q", ErrCategoryNotSupported, provider, category)
 	}
 
-	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, regionGroup)
+	nativeRegion, err := regionmap.ResolveNativeRegion(provider, regionGroup)
+	if err != nil {
+		nativeRegion = regionGroup
+	}
+
+	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, nativeRegion)
 
 	// 1. Try Cache-Aside Read from Redis
 	if s.redisClient != nil {
@@ -170,7 +174,7 @@ func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, erro
 		return domain.PriceObservation{}, err
 	}
 
-	priceDec, err := numericToDecimal(row.PriceAmount)
+	priceDec, err := store.NumericToDecimal(row.PriceAmount)
 	if err != nil {
 		return domain.PriceObservation{}, fmt.Errorf("convert numeric price: %w", err)
 	}
@@ -196,19 +200,4 @@ func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, erro
 		NetworkAttributes: networkAttrs,
 		FetchedAt:         fetchedAtTime,
 	}, nil
-}
-
-func numericToDecimal(n pgtype.Numeric) (decimal.Decimal, error) {
-	if !n.Valid {
-		return decimal.Zero, nil
-	}
-	val, err := n.Value()
-	if err != nil || val == nil {
-		return decimal.Zero, nil
-	}
-	str, ok := val.(string)
-	if !ok {
-		str = fmt.Sprintf("%v", val)
-	}
-	return decimal.NewFromString(str)
 }

@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceForSKUParams) (PriceObservation, error)
+	GetLatestPriceForSKUAndCategory(ctx context.Context, arg GetLatestPriceForSKUAndCategoryParams) (PriceObservation, error)
 	GetPriceObservations(ctx context.Context, arg GetPriceObservationsParams) ([]PriceObservation, error)
 	GetProviderCategoryStatus(ctx context.Context, provider string) ([]GetProviderCategoryStatusRow, error)
 	GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (RefreshToken, error)
@@ -26,6 +27,7 @@ type Querier interface {
 	RevokeRefreshTokenByHash(ctx context.Context, arg RevokeRefreshTokenByHashParams) error
 	RevokeRefreshTokenFamily(ctx context.Context, arg RevokeRefreshTokenFamilyParams) error
 	RevokeRefreshTokenWithReplacement(ctx context.Context, arg RevokeRefreshTokenWithReplacementParams) error
+	UpdatePriceObservationLastSeenAt(ctx context.Context, arg UpdatePriceObservationLastSeenAtParams) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -116,7 +116,7 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	storageClass := q.Get("storage_class")
 
-	providers := []string{"aws", "azure", "gcp"}
+	providers := service.SupportedProviders()
 	var results []StorageResultEntry
 	var providerErrors int
 
@@ -184,9 +184,9 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// If all providers errored and produced zero results, return a 500 error
+	// If all providers errored and produced zero results, return a 502 Bad Gateway error
 	if len(results) == 0 && providerErrors == len(providers) {
-		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-error", "Storage pricing unavailable", "All providers failed to retrieve pricing data")
+		middleware.WriteJSONError(w, r, http.StatusBadGateway, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable", "All providers failed to retrieve pricing data")
 		return
 	}
 

@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 	"go.opentelemetry.io/otel/attribute"
@@ -117,6 +115,7 @@ type JobResult struct {
 	Provider      string
 	Category      string
 	InsertedCount int
+	UpdatedCount  int
 	AnomalyCount  int
 	Err           error
 	Skipped       bool // true if lock was already held
@@ -221,11 +220,72 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		return result
 	}
 
-	// Step 3: Insert observations with anomaly detection
+	// Step 3: Upsert-with-history observations with anomaly detection
 	for _, obs := range fetchResult.Observations {
-		anomalyStatus := o.checkAnomaly(ctx, obs)
+		prev, prevErr := o.queries.GetLatestPriceForSKUAndCategory(ctx, store.GetLatestPriceForSKUAndCategoryParams{
+			Provider:        obs.Provider,
+			ServiceCategory: obs.ServiceCategory,
+			SkuID:           obs.SkuID,
+			Region:          obs.Region,
+		})
 
-		params, marshalErr := toInsertParams(obs, fetchResult.RawGCSPath)
+		var oldPrice decimal.Decimal
+		hasPrior := false
+		if prevErr == nil {
+			hasPrior = true
+			if dec, decErr := store.NumericToDecimal(prev.PriceAmount); decErr == nil {
+				oldPrice = dec
+			}
+		} else if !store.IsNotFound(prevErr) {
+			slog.WarnContext(ctx, "failed to query previous price observation",
+				"provider", obs.Provider,
+				"sku", obs.SkuID,
+				"region", obs.Region,
+				"error", prevErr,
+			)
+		}
+
+		// Check if price and billing dimensions are identical
+		if hasPrior && !oldPrice.IsZero() && oldPrice.Equal(obs.PriceAmount) &&
+			prev.Unit == obs.Unit && prev.PricingModel == obs.PricingModel && prev.PriceCurrency == obs.PriceCurrency {
+			// Unchanged observation: bump last_seen_at timestamp on existing row
+			if err := o.queries.UpdatePriceObservationLastSeenAt(ctx, store.UpdatePriceObservationLastSeenAtParams{
+				ID:         prev.ID,
+				LastSeenAt: store.TimestamptzFromTime(obs.FetchedAt),
+			}); err != nil {
+				slog.ErrorContext(ctx, "failed to update last_seen_at",
+					"provider", job.Provider,
+					"sku", obs.SkuID,
+					"error", err,
+				)
+				continue
+			}
+			result.UpdatedCount++
+			continue
+		}
+
+		// New SKU or price change: check for anomaly against prior price
+		anomalyStatus := ""
+		if hasPrior && !oldPrice.IsZero() && !obs.PriceAmount.IsZero() {
+			ratio := obs.PriceAmount.Div(oldPrice)
+			if ratio.LessThan(decimal.NewFromInt(1)) {
+				ratio = oldPrice.Div(obs.PriceAmount)
+			}
+			threshold := decimal.NewFromInt(AnomalyThreshold)
+			if ratio.GreaterThanOrEqual(threshold) {
+				slog.WarnContext(ctx, "price anomaly detected",
+					"provider", obs.Provider,
+					"sku", obs.SkuID,
+					"region", obs.Region,
+					"ratio", ratio.StringFixed(2),
+				)
+				anomalyStatus = "pending_review"
+				result.AnomalyCount++
+				o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID)
+			}
+		}
+
+		params, marshalErr := store.ToInsertPriceObservationParams(obs, fetchResult.RawGCSPath, anomalyStatus)
 		if marshalErr != nil {
 			slog.ErrorContext(ctx, "failed to build insert params",
 				"provider", job.Provider,
@@ -233,13 +293,6 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 				"error", marshalErr,
 			)
 			continue
-		}
-
-		// Override anomaly status
-		if anomalyStatus != "" {
-			params.AnomalyStatus = pgtype.Text{String: anomalyStatus, Valid: true}
-			result.AnomalyCount++
-			o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID)
 		}
 
 		if _, insertErr := o.queries.InsertPriceObservation(ctx, params); insertErr != nil {
@@ -273,6 +326,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 	span.SetAttributes(
 		attribute.String("status", "success"),
 		attribute.Int("inserted_count", result.InsertedCount),
+		attribute.Int("updated_count", result.UpdatedCount),
 		attribute.Int("anomalies_count", result.AnomalyCount),
 	)
 	o.recordJobMetric(ctx, job.Provider, job.Category, "success")
@@ -281,6 +335,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		"provider", job.Provider,
 		"category", job.Category,
 		"inserted", result.InsertedCount,
+		"updated", result.UpdatedCount,
 		"anomalies", result.AnomalyCount,
 		"total_observations", len(fetchResult.Observations),
 	)
@@ -305,59 +360,6 @@ func (o *Orchestrator) recordAnomalyMetric(ctx context.Context, provider, catego
 			attribute.String("sku", sku),
 		))
 	}
-}
-
-// checkAnomaly compares the incoming price against the latest recorded price
-// for the same SKU/region. Returns "pending_review" if the price differs by
-// more than AnomalyThreshold, otherwise returns empty string.
-func (o *Orchestrator) checkAnomaly(ctx context.Context, obs domain.PriceObservation) string {
-
-	prev, err := o.queries.GetLatestPriceForSKU(ctx, store.GetLatestPriceForSKUParams{
-		Provider: obs.Provider,
-		SkuID:    obs.SkuID,
-		Region:   obs.Region,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// No prior observation: first time seeing this SKU, no anomaly
-			return ""
-		}
-		slog.WarnContext(ctx, "anomaly check: failed to query previous price",
-			"provider", obs.Provider,
-			"sku", obs.SkuID,
-			"region", obs.Region,
-			"error", err,
-		)
-		return ""
-	}
-
-	oldPrice, err := numericToDecimal(prev.PriceAmount)
-	if err != nil || oldPrice.IsZero() {
-		return ""
-	}
-
-	newPrice := obs.PriceAmount
-	if newPrice.IsZero() {
-		return ""
-	}
-
-	// Calculate ratio = max(new/old, old/new)
-	ratio := newPrice.Div(oldPrice)
-	if ratio.LessThan(decimal.NewFromInt(1)) {
-		ratio = oldPrice.Div(newPrice)
-	}
-
-	threshold := decimal.NewFromInt(AnomalyThreshold)
-	if ratio.GreaterThanOrEqual(threshold) {
-		slog.WarnContext(ctx, "price anomaly detected",
-			"provider", obs.Provider,
-			"sku", obs.SkuID,
-			"region", obs.Region,
-			"ratio", ratio.StringFixed(2),
-		)
-		return "pending_review"
-	}
-	return ""
 }
 
 // warmCache writes observation data to Redis grouped by region.

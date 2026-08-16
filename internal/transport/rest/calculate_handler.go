@@ -84,15 +84,47 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reqBody CalculateRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-payload", "Invalid Payload", "Request body must be valid JSON.")
+	if err := DecodeJSONBody(w, r, &reqBody); err != nil {
+		middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "Malformed JSON request body")
 		return
 	}
-	defer func() { _ = r.Body.Close() }()
 
 	if reqBody.Compute == nil && reqBody.Storage == nil && reqBody.Network == nil {
 		middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/missing-categories", "Missing Categories", "At least one of 'compute', 'storage', or 'network' must be specified.")
 		return
+	}
+
+	if reqBody.Compute != nil {
+		if reqBody.Compute.VCPU <= 0 {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "compute.vcpu must be a positive number")
+			return
+		}
+		if reqBody.Compute.RAMGB <= 0 {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "compute.ram_gb must be a positive number")
+			return
+		}
+	}
+
+	if reqBody.Storage != nil {
+		if reqBody.Storage.SizeGB <= 0 {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "storage.size_gb must be a positive number")
+			return
+		}
+		if reqBody.Storage.SizeGB > 1000000 {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "storage.size_gb exceeds maximum limit of 1,000,000 GB (1 PB)")
+			return
+		}
+	}
+
+	if reqBody.Network != nil {
+		if reqBody.Network.EgressGB < 0 {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "network.egress_gb cannot be negative")
+			return
+		}
+		if reqBody.Network.EgressGB > 10000000 {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "network.egress_gb exceeds maximum limit of 10,000,000 GB (10 PB)")
+			return
+		}
 	}
 
 	strictFamily := true
@@ -128,11 +160,12 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	svcRes, err := h.pricingSvc.Calculate(r.Context(), svcReq)
 	if err != nil {
-		if err == service.ErrProviderUnavailable {
-			middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-error", "Pricing unavailable", "All providers failed to retrieve pricing data")
-			return
+		status, errType, title := middleware.MapServiceError(err)
+		detail := err.Error()
+		if status == http.StatusInternalServerError {
+			detail = "An internal server error occurred while calculating pricing"
 		}
-		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-error", "Internal Error", err.Error())
+		middleware.WriteJSONError(w, r, status, errType, title, detail)
 		return
 	}
 
