@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,54 +18,36 @@ import (
 
 var testJWTSecret = []byte("super-secret-jwt-key-with-at-least-32-bytes-length!")
 
-// mockAuthStore implements store.Querier for testing AuthService in isolation.
-type mockAuthStore struct {
-	createUserFunc         func(ctx context.Context, arg store.CreateUserParams) (store.User, error)
-	getUserByEmailFunc     func(ctx context.Context, email string) (store.User, error)
-	insertRefreshTokenFunc func(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error)
+// testRow implements pgx.Row for mocked query responses.
+type testRow struct {
+	scanFn func(dest ...interface{}) error
 }
 
-func (m *mockAuthStore) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-	if m.createUserFunc != nil {
-		return m.createUserFunc(ctx, arg)
+func (r *testRow) Scan(dest ...interface{}) error {
+	if r.scanFn != nil {
+		return r.scanFn(dest...)
 	}
-	return store.User{}, errors.New("CreateUser not implemented")
+	return pgx.ErrNoRows
 }
 
-func (m *mockAuthStore) GetUserByEmail(ctx context.Context, email string) (store.User, error) {
-	if m.getUserByEmailFunc != nil {
-		return m.getUserByEmailFunc(ctx, email)
+// testDBTX implements store.DBTX to verify Queries calls directly.
+type testDBTX struct {
+	queryRowFn func(ctx context.Context, sql string, args ...interface{}) pgx.Row
+}
+
+func (t *testDBTX) Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, nil
+}
+
+func (t *testDBTX) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
+	return nil, nil
+}
+
+func (t *testDBTX) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+	if t.queryRowFn != nil {
+		return t.queryRowFn(ctx, sql, args...)
 	}
-	return store.User{}, pgx.ErrNoRows
-}
-
-func (m *mockAuthStore) InsertRefreshToken(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {
-	if m.insertRefreshTokenFunc != nil {
-		return m.insertRefreshTokenFunc(ctx, arg)
-	}
-	return store.RefreshToken{
-		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		UserID:    arg.UserID,
-		FamilyID:  arg.FamilyID,
-		TokenHash: arg.TokenHash,
-		ExpiresAt: arg.ExpiresAt,
-	}, nil
-}
-
-func (m *mockAuthStore) GetUserByID(ctx context.Context, id pgtype.UUID) (store.User, error) {
-	return store.User{}, errors.New("GetUserByID not implemented")
-}
-
-func (m *mockAuthStore) GetPriceObservations(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error) {
-	return nil, errors.New("GetPriceObservations not implemented")
-}
-
-func (m *mockAuthStore) GetLatestPriceForSKU(ctx context.Context, arg store.GetLatestPriceForSKUParams) (store.PriceObservation, error) {
-	return store.PriceObservation{}, errors.New("GetLatestPriceForSKU not implemented")
-}
-
-func (m *mockAuthStore) InsertPriceObservation(ctx context.Context, arg store.InsertPriceObservationParams) (int64, error) {
-	return 0, errors.New("InsertPriceObservation not implemented")
+	return &testRow{}
 }
 
 func TestSignup_Success(t *testing.T) {
@@ -73,24 +56,41 @@ func TestSignup_Success(t *testing.T) {
 	email := "newuser@example.com"
 	password := "securePassword123"
 
-	mock := &mockAuthStore{
-		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-			if arg.Email != email {
-				t.Errorf("arg.Email = %q, want %q", arg.Email, email)
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			if len(args) < 2 {
+				t.Fatalf("expected at least 2 args, got %d", len(args))
 			}
-			if err := auth.CheckPassword(password, arg.PasswordHash); err != nil {
+			argEmail, _ := args[0].(string)
+			argHash, _ := args[1].(string)
+			if argEmail != email {
+				t.Errorf("argEmail = %q, want %q", argEmail, email)
+			}
+			if err := auth.CheckPassword(password, argHash); err != nil {
 				t.Errorf("stored password hash does not match password: %v", err)
 			}
-			return store.User{
-				ID:           pgtype.UUID{Bytes: userUUID, Valid: true},
-				Email:        arg.Email,
-				PasswordHash: arg.PasswordHash,
-				CreatedAt:    pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			}, nil
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+						*idPtr = store.UUIDToPg(userUUID)
+					}
+					if emailPtr, ok := dest[1].(*string); ok {
+						*emailPtr = argEmail
+					}
+					if hashPtr, ok := dest[2].(*string); ok {
+						*hashPtr = argHash
+					}
+					if createdPtr, ok := dest[3].(*pgtype.Timestamptz); ok {
+						*createdPtr = store.TimestamptzFromTime(time.Now().UTC())
+					}
+					return nil
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	user, err := authSvc.Signup(ctx, email, password)
 	if err != nil {
 		t.Fatalf("Signup failed: %v", err)
@@ -108,22 +108,36 @@ func TestSignup_CaseInsensitiveEmail(t *testing.T) {
 	ctx := context.Background()
 	emailInput := "  User.Name@Example.COM  "
 	expectedEmail := "user.name@example.com"
+	userUUID := uuid.New()
 
-	mock := &mockAuthStore{
-		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-			if arg.Email != expectedEmail {
-				t.Errorf("CreateUser called with %q, want normalized %q", arg.Email, expectedEmail)
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			argEmail, _ := args[0].(string)
+			if argEmail != expectedEmail {
+				t.Errorf("CreateUser called with %q, want normalized %q", argEmail, expectedEmail)
 			}
-			return store.User{
-				ID:           pgtype.UUID{Bytes: uuid.New(), Valid: true},
-				Email:        arg.Email,
-				PasswordHash: arg.PasswordHash,
-				CreatedAt:    pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			}, nil
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+						*idPtr = store.UUIDToPg(userUUID)
+					}
+					if emailPtr, ok := dest[1].(*string); ok {
+						*emailPtr = argEmail
+					}
+					if hashPtr, ok := dest[2].(*string); ok {
+						*hashPtr = "hashedPassword"
+					}
+					if createdPtr, ok := dest[3].(*pgtype.Timestamptz); ok {
+						*createdPtr = store.TimestamptzFromTime(time.Now().UTC())
+					}
+					return nil
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	user, err := authSvc.Signup(ctx, emailInput, "securePassword123")
 	if err != nil {
 		t.Fatalf("Signup failed: %v", err)
@@ -135,16 +149,21 @@ func TestSignup_CaseInsensitiveEmail(t *testing.T) {
 
 func TestSignup_DuplicateEmail(t *testing.T) {
 	ctx := context.Background()
-	mock := &mockAuthStore{
-		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-			return store.User{}, &pgconn.PgError{
-				Code:           "23505",
-				ConstraintName: "users_email_key",
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					return &pgconn.PgError{
+						Code:           "23505",
+						ConstraintName: "users_email_key",
+					}
+				},
 			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	_, err := authSvc.Signup(ctx, "existing@example.com", "securePassword123")
 	if !errors.Is(err, service.ErrUserAlreadyExists) {
 		t.Errorf("expected ErrUserAlreadyExists, got: %v", err)
@@ -153,8 +172,9 @@ func TestSignup_DuplicateEmail(t *testing.T) {
 
 func TestSignup_ValidationErrors(t *testing.T) {
 	ctx := context.Background()
-	mock := &mockAuthStore{}
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	dbtx := &testDBTX{}
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 
 	// Invalid email
 	_, err := authSvc.Signup(ctx, "notanemail", "securePassword123")
@@ -181,32 +201,49 @@ func TestLogin_Success(t *testing.T) {
 	}
 
 	var insertedTokenHash string
-	mock := &mockAuthStore{
-		getUserByEmailFunc: func(ctx context.Context, e string) (store.User, error) {
-			if e != email {
-				return store.User{}, pgx.ErrNoRows
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			if strings.Contains(sql, "FROM users") {
+				return &testRow{
+					scanFn: func(dest ...interface{}) error {
+						if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+							*idPtr = store.UUIDToPg(userUUID)
+						}
+						if emailPtr, ok := dest[1].(*string); ok {
+							*emailPtr = email
+						}
+						if hashPtr, ok := dest[2].(*string); ok {
+							*hashPtr = passwordHash
+						}
+						if createdPtr, ok := dest[3].(*pgtype.Timestamptz); ok {
+							*createdPtr = store.TimestamptzFromTime(time.Now().UTC())
+						}
+						return nil
+					},
+				}
 			}
-			return store.User{
-				ID:           pgtype.UUID{Bytes: userUUID, Valid: true},
-				Email:        email,
-				PasswordHash: passwordHash,
-				CreatedAt:    pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			}, nil
-		},
-		insertRefreshTokenFunc: func(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {
-			insertedTokenHash = arg.TokenHash
-			return store.RefreshToken{
-				ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-				UserID:    arg.UserID,
-				FamilyID:  arg.FamilyID,
-				TokenHash: arg.TokenHash,
-				ExpiresAt: arg.ExpiresAt,
-			}, nil
+			if strings.Contains(sql, "INSERT INTO refresh_tokens") {
+				if len(args) >= 3 {
+					if th, ok := args[2].(string); ok {
+						insertedTokenHash = th
+					}
+				}
+				return &testRow{
+					scanFn: func(dest ...interface{}) error {
+						if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+							*idPtr = store.UUIDToPg(uuid.New())
+						}
+						return nil
+					},
+				}
+			}
+			return &testRow{}
 		},
 	}
 
 	fixedNow := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
-	authSvc := service.NewAuthService(mock, testJWTSecret, service.WithClock(func() time.Time { return fixedNow }))
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret, service.WithClock(func() time.Time { return fixedNow }))
 
 	tokens, err := authSvc.Login(ctx, email, password)
 	if err != nil {
@@ -246,17 +283,27 @@ func TestLogin_WrongPassword(t *testing.T) {
 	ctx := context.Background()
 	passwordHash, _ := auth.HashPassword("realPassword123")
 
-	mock := &mockAuthStore{
-		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
-			return store.User{
-				ID:           pgtype.UUID{Bytes: uuid.New(), Valid: true},
-				Email:        email,
-				PasswordHash: passwordHash,
-			}, nil
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+						*idPtr = store.UUIDToPg(uuid.New())
+					}
+					if emailPtr, ok := dest[1].(*string); ok {
+						*emailPtr = "user@example.com"
+					}
+					if hashPtr, ok := dest[2].(*string); ok {
+						*hashPtr = passwordHash
+					}
+					return nil
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	_, err := authSvc.Login(ctx, "user@example.com", "wrongPassword")
 	if !errors.Is(err, service.ErrInvalidCredentials) {
 		t.Errorf("expected ErrInvalidCredentials for wrong password, got: %v", err)
@@ -265,13 +312,18 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 func TestLogin_UserNotFound(t *testing.T) {
 	ctx := context.Background()
-	mock := &mockAuthStore{
-		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
-			return store.User{}, pgx.ErrNoRows
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					return pgx.ErrNoRows
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	_, err := authSvc.Login(ctx, "nonexistent@example.com", "somePassword123")
 	if !errors.Is(err, service.ErrInvalidCredentials) {
 		t.Errorf("expected ErrInvalidCredentials for nonexistent user, got: %v", err)
@@ -281,13 +333,18 @@ func TestLogin_UserNotFound(t *testing.T) {
 func TestLogin_DatabaseError(t *testing.T) {
 	ctx := context.Background()
 	dbErr := errors.New("connection reset by peer")
-	mock := &mockAuthStore{
-		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
-			return store.User{}, dbErr
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					return dbErr
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	_, err := authSvc.Login(ctx, "user@example.com", "somePassword123")
 	// Database failure must NOT be masked as ErrInvalidCredentials
 	if errors.Is(err, service.ErrInvalidCredentials) {

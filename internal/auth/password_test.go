@@ -27,7 +27,7 @@ func TestHashAndCheckPassword(t *testing.T) {
 }
 
 func TestDummyHash_MatchesCost(t *testing.T) {
-	cost, err := bcrypt.Cost([]byte(auth.DummyBcryptHash))
+	cost, err := bcrypt.Cost([]byte(auth.DummyBcryptHashForTest))
 	if err != nil {
 		t.Fatalf("failed to extract cost from DummyBcryptHash: %v", err)
 	}

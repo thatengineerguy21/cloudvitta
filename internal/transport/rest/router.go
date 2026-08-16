@@ -43,6 +43,7 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	mux.Handle("GET /api/v1/prices/network", limiter.Handler(networkHandler))
 	mux.Handle("POST /api/v1/calculate", limiter.Handler(calculateHandler))
 	mux.Handle("POST /api/v1/auth/signup", limiter.Handler(signupHandler))
+	// Rate limit: login gets a stricter 10 req/min/IP profile ahead of 1.10 as credential-guessing mitigation.
 	mux.Handle("POST /api/v1/auth/login", limiter.WithProfile("login", 10)(loginHandler))
 
 	// Wrap with recovery middleware and OpenTelemetry HTTP instrumentation

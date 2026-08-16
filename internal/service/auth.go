@@ -4,13 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thatengineerguy21/CloudVitta/internal/auth"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
@@ -28,13 +24,13 @@ func WithClock(clock func() time.Time) AuthOption {
 
 // AuthService orchestrates user registration, authentication, and token management.
 type AuthService struct {
-	queries   store.Querier
+	queries   *store.Queries
 	jwtSecret []byte
 	clock     func() time.Time
 }
 
 // NewAuthService creates a new AuthService instance.
-func NewAuthService(queries store.Querier, jwtSecret []byte, opts ...AuthOption) *AuthService {
+func NewAuthService(queries *store.Queries, jwtSecret []byte, opts ...AuthOption) *AuthService {
 	s := &AuthService{
 		queries:   queries,
 		jwtSecret: jwtSecret,
@@ -68,28 +64,23 @@ func (s *AuthService) Signup(ctx context.Context, email, password string) (*doma
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	if s.queries == nil {
+		return nil, fmt.Errorf("auth service: database queries unavailable")
+	}
+
 	user, err := s.queries.CreateUser(ctx, store.CreateUserParams{
 		Email:        normalizedEmail,
 		PasswordHash: passwordHash,
 	})
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, ErrUserAlreadyExists
-		}
-		if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(strings.ToLower(err.Error()), "users_email_key") {
+		if store.IsUniqueViolation(err) {
 			return nil, ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	var userID uuid.UUID
-	if user.ID.Valid {
-		userID = uuid.UUID(user.ID.Bytes)
-	}
-
 	return &domain.User{
-		ID:           userID,
+		ID:           store.PgToUUID(user.ID),
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt.Time,
@@ -104,9 +95,14 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*domai
 		return nil, ErrInvalidCredentials
 	}
 
+	if s.queries == nil {
+		_ = auth.CheckPasswordTimingSafe(false, "", password)
+		return nil, fmt.Errorf("auth service: database queries unavailable")
+	}
+
 	user, err := s.queries.GetUserByEmail(ctx, normalizedEmail)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if store.IsNotFound(err) {
 			_ = auth.CheckPasswordTimingSafe(false, "", password)
 			return nil, ErrInvalidCredentials
 		}
@@ -128,18 +124,15 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*domai
 	expiresAt := now.Add(30 * 24 * time.Hour)
 	_, err = s.queries.InsertRefreshToken(ctx, store.InsertRefreshTokenParams{
 		UserID:    user.ID,
-		FamilyID:  pgtype.UUID{Bytes: familyID, Valid: true},
+		FamilyID:  store.UUIDToPg(familyID),
 		TokenHash: tokenHash,
-		ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
+		ExpiresAt: store.TimestamptzFromTime(expiresAt),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to record refresh token: %w", err)
 	}
 
-	var userUUID uuid.UUID
-	if user.ID.Valid {
-		userUUID = uuid.UUID(user.ID.Bytes)
-	}
+	userUUID := store.PgToUUID(user.ID)
 
 	accessToken, err := auth.GenerateAccessToken(userUUID, "standard", s.jwtSecret, now, 15*time.Minute)
 	if err != nil {

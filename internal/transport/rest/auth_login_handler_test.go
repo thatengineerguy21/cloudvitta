@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,30 +26,43 @@ func TestLoginHandler_Success(t *testing.T) {
 	password := "correctPassword123"
 	passwordHash, _ := auth.HashPassword(password)
 
-	mock := &mockQuerier{
-		getUserByEmailFunc: func(ctx context.Context, e string) (store.User, error) {
-			if e != email {
-				return store.User{}, pgx.ErrNoRows
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			if strings.Contains(sql, "FROM users") {
+				return &testRow{
+					scanFn: func(dest ...interface{}) error {
+						if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+							*idPtr = store.UUIDToPg(userUUID)
+						}
+						if emailPtr, ok := dest[1].(*string); ok {
+							*emailPtr = email
+						}
+						if hashPtr, ok := dest[2].(*string); ok {
+							*hashPtr = passwordHash
+						}
+						if createdPtr, ok := dest[3].(*pgtype.Timestamptz); ok {
+							*createdPtr = store.TimestamptzFromTime(time.Now().UTC())
+						}
+						return nil
+					},
+				}
 			}
-			return store.User{
-				ID:           pgtype.UUID{Bytes: userUUID, Valid: true},
-				Email:        email,
-				PasswordHash: passwordHash,
-				CreatedAt:    pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			}, nil
-		},
-		insertRefreshTokenFunc: func(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {
-			return store.RefreshToken{
-				ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-				UserID:    arg.UserID,
-				FamilyID:  arg.FamilyID,
-				TokenHash: arg.TokenHash,
-				ExpiresAt: arg.ExpiresAt,
-			}, nil
+			if strings.Contains(sql, "INSERT INTO refresh_tokens") {
+				return &testRow{
+					scanFn: func(dest ...interface{}) error {
+						if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+							*idPtr = store.UUIDToPg(uuid.New())
+						}
+						return nil
+					},
+				}
+			}
+			return &testRow{}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewLoginHandler(authSvc)
 
 	body := `{"email": "loginuser@example.com", "password": "correctPassword123"}`
@@ -80,17 +94,27 @@ func TestLoginHandler_Success(t *testing.T) {
 func TestLoginHandler_InvalidPassword(t *testing.T) {
 	passwordHash, _ := auth.HashPassword("realPassword123")
 
-	mock := &mockQuerier{
-		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
-			return store.User{
-				ID:           pgtype.UUID{Bytes: uuid.New(), Valid: true},
-				Email:        email,
-				PasswordHash: passwordHash,
-			}, nil
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+						*idPtr = store.UUIDToPg(uuid.New())
+					}
+					if emailPtr, ok := dest[1].(*string); ok {
+						*emailPtr = "user@example.com"
+					}
+					if hashPtr, ok := dest[2].(*string); ok {
+						*hashPtr = passwordHash
+					}
+					return nil
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewLoginHandler(authSvc)
 
 	body := `{"email": "user@example.com", "password": "wrongPassword123"}`
@@ -113,13 +137,18 @@ func TestLoginHandler_InvalidPassword(t *testing.T) {
 }
 
 func TestLoginHandler_NonexistentEmail_IdenticalResponse(t *testing.T) {
-	mock := &mockQuerier{
-		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
-			return store.User{}, pgx.ErrNoRows
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					return pgx.ErrNoRows
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewLoginHandler(authSvc)
 
 	body := `{"email": "unknown@example.com", "password": "anyPassword123"}`
@@ -145,7 +174,8 @@ func TestLoginHandler_NonexistentEmail_IdenticalResponse(t *testing.T) {
 }
 
 func TestLoginHandler_MethodNotAllowed(t *testing.T) {
-	authSvc := service.NewAuthService(&mockQuerier{}, testJWTSecret)
+	queries := store.New(&testDBTX{})
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewLoginHandler(authSvc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/login", nil)

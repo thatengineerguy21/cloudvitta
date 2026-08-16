@@ -1,6 +1,10 @@
 package service
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/auth"
+)
 
 var (
 	// ErrInvalidParameters is returned when input parameters are invalid.
@@ -15,12 +19,10 @@ var (
 	ErrNoCategoriesRequested = errors.New("no categories requested")
 	// ErrUserAlreadyExists is returned when attempting to signup with an existing email.
 	ErrUserAlreadyExists = errors.New("user with this email already exists")
-	// ErrInvalidCredentials is returned when email/password verification fails.
-	ErrInvalidCredentials = errors.New("invalid email or password")
-	// ErrInvalidEmail is returned when email format is invalid.
-	ErrInvalidEmail = errors.New("invalid email format")
-	// ErrPasswordTooShort is returned when password is shorter than 8 characters.
-	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
-	// ErrPasswordTooLong is returned when password exceeds 72 characters.
-	ErrPasswordTooLong = errors.New("password exceeds maximum allowed length of 72 characters")
+
+	// Consolidated auth error sentinels
+	ErrInvalidCredentials = auth.ErrInvalidCredentials
+	ErrInvalidEmail       = auth.ErrInvalidEmail
+	ErrPasswordTooShort   = auth.ErrPasswordTooShort
+	ErrPasswordTooLong    = auth.ErrPasswordTooLong
 )

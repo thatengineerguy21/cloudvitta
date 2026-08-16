@@ -242,4 +242,16 @@ func TestUserAndRefreshTokenIntegration(t *testing.T) {
 	if refreshToken.TokenHash == rawToken {
 		t.Errorf("stored token hash matches plaintext token")
 	}
+
+	// 4. Duplicate email insertion triggers unique violation
+	_, err = queries.CreateUser(ctx, store.CreateUserParams{
+		Email:        testEmail,
+		PasswordHash: pwHash,
+	})
+	if err == nil {
+		t.Fatalf("expected error on duplicate email insertion, got nil")
+	}
+	if !store.IsUniqueViolation(err) {
+		t.Errorf("expected store.IsUniqueViolation(err) = true, got false for error: %v", err)
+	}
 }

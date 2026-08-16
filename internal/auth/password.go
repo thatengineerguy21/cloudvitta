@@ -7,15 +7,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// DummyBcryptHash is a fixed bcrypt hash computed at bcrypt.DefaultCost
+// dummyBcryptHash is a fixed bcrypt hash computed at bcrypt.DefaultCost
 // to provide constant execution time when verifying nonexistent users (ADR 0020).
-var DummyBcryptHash = "$2a$10$e8wNu2eK.fPjY2sN7t1qfeO4r0L4VqX6yJ4FzT3L8W7z5yB.z1L0W"
+var dummyBcryptHash = "$2a$10$e8wNu2eK.fPjY2sN7t1qfeO4r0L4VqX6yJ4FzT3L8W7z5yB.z1L0W"
 
 func init() {
-	if cost, err := bcrypt.Cost([]byte(DummyBcryptHash)); err != nil || cost != bcrypt.DefaultCost {
+	if cost, err := bcrypt.Cost([]byte(dummyBcryptHash)); err != nil || cost != bcrypt.DefaultCost {
 		h, err := bcrypt.GenerateFromPassword([]byte("cloudvitta-dummy-password"), bcrypt.DefaultCost)
 		if err == nil {
-			DummyBcryptHash = string(h)
+			dummyBcryptHash = string(h)
 		}
 	}
 }
@@ -76,6 +76,6 @@ func CheckPasswordTimingSafe(userFound bool, realHash, password string) error {
 		return nil
 	}
 
-	_ = CheckPassword(password, DummyBcryptHash)
+	_ = CheckPassword(password, dummyBcryptHash)
 	return ErrInvalidCredentials
 }

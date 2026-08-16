@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
@@ -21,64 +21,66 @@ import (
 
 var testJWTSecret = []byte("super-secret-jwt-key-with-at-least-32-bytes-length!")
 
-// mockQuerier implements store.Querier for REST handler testing.
-type mockQuerier struct {
-	createUserFunc         func(ctx context.Context, arg store.CreateUserParams) (store.User, error)
-	getUserByEmailFunc     func(ctx context.Context, email string) (store.User, error)
-	insertRefreshTokenFunc func(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error)
+// testRow implements pgx.Row for mocked query responses.
+type testRow struct {
+	scanFn func(dest ...interface{}) error
 }
 
-func (m *mockQuerier) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-	if m.createUserFunc != nil {
-		return m.createUserFunc(ctx, arg)
+func (r *testRow) Scan(dest ...interface{}) error {
+	if r.scanFn != nil {
+		return r.scanFn(dest...)
 	}
-	return store.User{}, errors.New("CreateUser not implemented")
+	return pgx.ErrNoRows
 }
 
-func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (store.User, error) {
-	if m.getUserByEmailFunc != nil {
-		return m.getUserByEmailFunc(ctx, email)
+// testDBTX implements store.DBTX for testing handlers with *store.Queries.
+type testDBTX struct {
+	queryRowFn func(ctx context.Context, sql string, args ...interface{}) pgx.Row
+}
+
+func (t *testDBTX) Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, nil
+}
+
+func (t *testDBTX) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
+	return nil, nil
+}
+
+func (t *testDBTX) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+	if t.queryRowFn != nil {
+		return t.queryRowFn(ctx, sql, args...)
 	}
-	return store.User{}, errors.New("GetUserByEmail not implemented")
-}
-
-func (m *mockQuerier) InsertRefreshToken(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {
-	if m.insertRefreshTokenFunc != nil {
-		return m.insertRefreshTokenFunc(ctx, arg)
-	}
-	return store.RefreshToken{}, errors.New("InsertRefreshToken not implemented")
-}
-
-func (m *mockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (store.User, error) {
-	return store.User{}, errors.New("GetUserByID not implemented")
-}
-
-func (m *mockQuerier) GetPriceObservations(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error) {
-	return nil, errors.New("GetPriceObservations not implemented")
-}
-
-func (m *mockQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.GetLatestPriceForSKUParams) (store.PriceObservation, error) {
-	return store.PriceObservation{}, errors.New("GetLatestPriceForSKU not implemented")
-}
-
-func (m *mockQuerier) InsertPriceObservation(ctx context.Context, arg store.InsertPriceObservationParams) (int64, error) {
-	return 0, errors.New("InsertPriceObservation not implemented")
+	return &testRow{}
 }
 
 func TestSignupHandler_Success(t *testing.T) {
 	userUUID := uuid.New()
-	mock := &mockQuerier{
-		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-			return store.User{
-				ID:           pgtype.UUID{Bytes: userUUID, Valid: true},
-				Email:        arg.Email,
-				PasswordHash: arg.PasswordHash,
-				CreatedAt:    pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			}, nil
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			argEmail, _ := args[0].(string)
+			argHash, _ := args[1].(string)
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					if idPtr, ok := dest[0].(*pgtype.UUID); ok {
+						*idPtr = store.UUIDToPg(userUUID)
+					}
+					if emailPtr, ok := dest[1].(*string); ok {
+						*emailPtr = argEmail
+					}
+					if hashPtr, ok := dest[2].(*string); ok {
+						*hashPtr = argHash
+					}
+					if createdPtr, ok := dest[3].(*pgtype.Timestamptz); ok {
+						*createdPtr = store.TimestamptzFromTime(time.Now().UTC())
+					}
+					return nil
+				},
+			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	body := `{"email": "user@example.com", "password": "securePassword123"}`
@@ -106,7 +108,8 @@ func TestSignupHandler_Success(t *testing.T) {
 }
 
 func TestSignupHandler_MethodNotAllowed(t *testing.T) {
-	authSvc := service.NewAuthService(&mockQuerier{}, testJWTSecret)
+	queries := store.New(&testDBTX{})
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/signup", nil)
@@ -120,7 +123,8 @@ func TestSignupHandler_MethodNotAllowed(t *testing.T) {
 }
 
 func TestSignupHandler_MalformedJSON(t *testing.T) {
-	authSvc := service.NewAuthService(&mockQuerier{}, testJWTSecret)
+	queries := store.New(&testDBTX{})
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/signup", bytes.NewBufferString(`{invalid-json`))
@@ -134,7 +138,8 @@ func TestSignupHandler_MalformedJSON(t *testing.T) {
 }
 
 func TestSignupHandler_ShortPassword(t *testing.T) {
-	authSvc := service.NewAuthService(&mockQuerier{}, testJWTSecret)
+	queries := store.New(&testDBTX{})
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	body := `{"email": "user@example.com", "password": "123"}`
@@ -155,16 +160,21 @@ func TestSignupHandler_ShortPassword(t *testing.T) {
 }
 
 func TestSignupHandler_DuplicateEmail(t *testing.T) {
-	mock := &mockQuerier{
-		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-			return store.User{}, &pgconn.PgError{
-				Code:           "23505",
-				ConstraintName: "users_email_key",
+	dbtx := &testDBTX{
+		queryRowFn: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+			return &testRow{
+				scanFn: func(dest ...interface{}) error {
+					return &pgconn.PgError{
+						Code:           "23505",
+						ConstraintName: "users_email_key",
+					}
+				},
 			}
 		},
 	}
 
-	authSvc := service.NewAuthService(mock, testJWTSecret)
+	queries := store.New(dbtx)
+	authSvc := service.NewAuthService(queries, testJWTSecret)
 	handler := rest.NewSignupHandler(authSvc)
 
 	body := `{"email": "existing@example.com", "password": "securePassword123"}`
