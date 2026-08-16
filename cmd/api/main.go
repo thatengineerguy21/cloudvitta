@@ -102,7 +102,7 @@ func main() {
 		service.WithTransactor(transactor),
 		service.WithAuthTracer(otelProviders.Tracer),
 	)
-	router := rest.NewRouter(pricingSvc, authSvc, dbPool, redisClient)
+	router := rest.NewRouter(pricingSvc, authSvc, dbPool, redisClient, cfg)
 
 	// --- HTTP Server ---
 	server := &http.Server{

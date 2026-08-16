@@ -173,3 +173,85 @@ func TestLoad_MalformedVar(t *testing.T) {
 		t.Fatal("expected error for malformed PORT, got nil")
 	}
 }
+
+func TestLoad_RateLimitAndCORSDefaults(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	// RateLimit defaults
+	if cfg.RateLimit.StandardTierRate != 120 {
+		t.Errorf("expected default StandardTierRate 120, got %d", cfg.RateLimit.StandardTierRate)
+	}
+	if cfg.RateLimit.FreeTierRate != 20 {
+		t.Errorf("expected default FreeTierRate 20, got %d", cfg.RateLimit.FreeTierRate)
+	}
+	if cfg.RateLimit.IPCeilingRate != 60 {
+		t.Errorf("expected default IPCeilingRate 60, got %d", cfg.RateLimit.IPCeilingRate)
+	}
+	if cfg.RateLimit.LoginRate != 10 {
+		t.Errorf("expected default LoginRate 10, got %d", cfg.RateLimit.LoginRate)
+	}
+
+	// Auth AnonCookieSecret fallback to JWTSecret
+	if cfg.Auth.AnonCookieSecret != testJWTSecret {
+		t.Errorf("expected default AnonCookieSecret fallback %s, got %s", testJWTSecret, cfg.Auth.AnonCookieSecret)
+	}
+
+	// CORS defaults
+	if len(cfg.CORS.AllowedOrigins) != 1 || cfg.CORS.AllowedOrigins[0] != "*" {
+		t.Errorf("expected default AllowedOrigins [*], got %v", cfg.CORS.AllowedOrigins)
+	}
+	if !cfg.CORS.AllowCredentials {
+		t.Errorf("expected default AllowCredentials true, got %v", cfg.CORS.AllowCredentials)
+	}
+}
+
+func TestLoad_RateLimitAndCORSOverrides(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("CLOUDVITTA_AUTH_ANON_COOKIE_SECRET", "custom-anon-cookie-secret-32-chars-long!")
+	t.Setenv("CLOUDVITTA_RATELIMIT_STANDARD_TIER_RATE", "300")
+	t.Setenv("CLOUDVITTA_RATELIMIT_FREE_TIER_RATE", "50")
+	t.Setenv("CLOUDVITTA_RATELIMIT_IP_CEILING_RATE", "100")
+	t.Setenv("CLOUDVITTA_RATELIMIT_LOGIN_RATE", "5")
+	t.Setenv("CLOUDVITTA_CORS_ALLOWED_ORIGINS", "https://cloudvitta.dev,https://app.cloudvitta.dev")
+	t.Setenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS", "false")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	if cfg.RateLimit.StandardTierRate != 300 {
+		t.Errorf("expected StandardTierRate 300, got %d", cfg.RateLimit.StandardTierRate)
+	}
+	if cfg.RateLimit.FreeTierRate != 50 {
+		t.Errorf("expected FreeTierRate 50, got %d", cfg.RateLimit.FreeTierRate)
+	}
+	if cfg.RateLimit.IPCeilingRate != 100 {
+		t.Errorf("expected IPCeilingRate 100, got %d", cfg.RateLimit.IPCeilingRate)
+	}
+	if cfg.RateLimit.LoginRate != 5 {
+		t.Errorf("expected LoginRate 5, got %d", cfg.RateLimit.LoginRate)
+	}
+	if cfg.Auth.AnonCookieSecret != "custom-anon-cookie-secret-32-chars-long!" {
+		t.Errorf("expected custom AnonCookieSecret, got %s", cfg.Auth.AnonCookieSecret)
+	}
+	if len(cfg.CORS.AllowedOrigins) != 2 || cfg.CORS.AllowedOrigins[0] != "https://cloudvitta.dev" || cfg.CORS.AllowedOrigins[1] != "https://app.cloudvitta.dev" {
+		t.Errorf("expected custom AllowedOrigins, got %v", cfg.CORS.AllowedOrigins)
+	}
+	if cfg.CORS.AllowCredentials {
+		t.Errorf("expected AllowCredentials false, got %v", cfg.CORS.AllowCredentials)
+	}
+}

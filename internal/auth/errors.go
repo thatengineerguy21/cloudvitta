@@ -21,4 +21,8 @@ var (
 	ErrTokenFamilyRevoked = errors.New("token family revoked due to theft detection")
 	// ErrMissingIdempotencyKey is returned when a refresh request is missing the required idempotency key.
 	ErrMissingIdempotencyKey = errors.New("idempotency_key is required for refresh token rotation")
+	// ErrInvalidCookie is returned when an anonymous tracking cookie is malformed or signature verification fails.
+	ErrInvalidCookie = errors.New("invalid or tampered anonymous cookie")
+	// ErrExpiredCookie is returned when an anonymous tracking cookie has expired.
+	ErrExpiredCookie = errors.New("anonymous cookie has expired")
 )

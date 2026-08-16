@@ -20,6 +20,8 @@ type Config struct {
 	Redis         RedisConfig         `koanf:"redis" validate:"required"`
 	Storage       StorageConfig       `koanf:"storage" validate:"required"`
 	Auth          AuthConfig          `koanf:"auth" validate:"required"`
+	RateLimit     RateLimitConfig     `koanf:"ratelimit"`
+	CORS          CORSConfig          `koanf:"cors"`
 	Observability ObservabilityConfig `koanf:"observability"`
 	GCP           GCPConfig           `koanf:"gcp"`
 }
@@ -88,7 +90,20 @@ type StorageConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret string `koanf:"jwt_secret" validate:"required,min=32"`
+	JWTSecret        string `koanf:"jwt_secret" validate:"required,min=32"`
+	AnonCookieSecret string `koanf:"anon_cookie_secret"`
+}
+
+type RateLimitConfig struct {
+	StandardTierRate int64 `koanf:"standard_tier_rate"` // default: 120 req/min
+	FreeTierRate     int64 `koanf:"free_tier_rate"`     // default: 20 req/min
+	IPCeilingRate    int64 `koanf:"ip_ceiling_rate"`    // default: 60 req/min
+	LoginRate        int64 `koanf:"login_rate"`         // default: 10 req/min
+}
+
+type CORSConfig struct {
+	AllowedOrigins   []string `koanf:"allowed_origins"`
+	AllowCredentials bool     `koanf:"allow_credentials"`
 }
 
 type ObservabilityConfig struct {
@@ -209,6 +224,127 @@ func resolveEnvFallbacks(cfg *Config) error {
 		} else {
 			cfg.Auth.JWTSecret = os.Getenv("JWT_SECRET")
 		}
+	}
+
+	// 9. Resolve Auth Anon Cookie Secret fallback
+	if cfg.Auth.AnonCookieSecret == "" {
+		if val := os.Getenv("CLOUDVITTA_AUTH_ANON_COOKIE_SECRET"); val != "" {
+			cfg.Auth.AnonCookieSecret = val
+		} else if val := os.Getenv("ANON_COOKIE_SECRET"); val != "" {
+			cfg.Auth.AnonCookieSecret = val
+		} else {
+			cfg.Auth.AnonCookieSecret = cfg.Auth.JWTSecret
+		}
+	}
+
+	// 10. Resolve RateLimit fallbacks & defaults
+	if cfg.RateLimit.StandardTierRate == 0 {
+		if val := os.Getenv("CLOUDVITTA_RATELIMIT_STANDARD_TIER_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.StandardTierRate = parsed
+			}
+		} else if val := os.Getenv("RATELIMIT_STANDARD_TIER_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.StandardTierRate = parsed
+			}
+		}
+	}
+	if cfg.RateLimit.StandardTierRate == 0 {
+		cfg.RateLimit.StandardTierRate = 120
+	}
+
+	if cfg.RateLimit.FreeTierRate == 0 {
+		if val := os.Getenv("CLOUDVITTA_RATELIMIT_FREE_TIER_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.FreeTierRate = parsed
+			}
+		} else if val := os.Getenv("RATELIMIT_FREE_TIER_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.FreeTierRate = parsed
+			}
+		}
+	}
+	if cfg.RateLimit.FreeTierRate == 0 {
+		cfg.RateLimit.FreeTierRate = 20
+	}
+
+	if cfg.RateLimit.IPCeilingRate == 0 {
+		if val := os.Getenv("CLOUDVITTA_RATELIMIT_IP_CEILING_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.IPCeilingRate = parsed
+			}
+		} else if val := os.Getenv("RATELIMIT_IP_CEILING_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.IPCeilingRate = parsed
+			}
+		}
+	}
+	if cfg.RateLimit.IPCeilingRate == 0 {
+		cfg.RateLimit.IPCeilingRate = 60
+	}
+
+	if cfg.RateLimit.LoginRate == 0 {
+		if val := os.Getenv("CLOUDVITTA_RATELIMIT_LOGIN_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.LoginRate = parsed
+			}
+		} else if val := os.Getenv("RATELIMIT_LOGIN_RATE"); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				cfg.RateLimit.LoginRate = parsed
+			}
+		}
+	}
+	if cfg.RateLimit.LoginRate == 0 {
+		cfg.RateLimit.LoginRate = 10
+	}
+
+	// 11. Resolve CORS fallbacks & defaults
+	corsOriginsVal := os.Getenv("CLOUDVITTA_CORS_ALLOWED_ORIGINS")
+	if corsOriginsVal == "" {
+		corsOriginsVal = os.Getenv("CORS_ALLOWED_ORIGINS")
+	}
+
+	if corsOriginsVal != "" {
+		parts := strings.Split(corsOriginsVal, ",")
+		var origins []string
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
+		if len(origins) > 0 {
+			cfg.CORS.AllowedOrigins = origins
+		}
+	} else if len(cfg.CORS.AllowedOrigins) == 1 && strings.Contains(cfg.CORS.AllowedOrigins[0], ",") {
+		parts := strings.Split(cfg.CORS.AllowedOrigins[0], ",")
+		var origins []string
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
+		if len(origins) > 0 {
+			cfg.CORS.AllowedOrigins = origins
+		}
+	}
+
+	if len(cfg.CORS.AllowedOrigins) == 0 {
+		cfg.CORS.AllowedOrigins = []string{"*"}
+	}
+
+	corsCredsVal := os.Getenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS")
+	if corsCredsVal == "" {
+		corsCredsVal = os.Getenv("CORS_ALLOW_CREDENTIALS")
+	}
+	if corsCredsVal != "" {
+		if parsed, err := strconv.ParseBool(corsCredsVal); err == nil {
+			cfg.CORS.AllowCredentials = parsed
+		}
+	} else {
+		// Default to true if not explicitly specified
+		cfg.CORS.AllowCredentials = true
 	}
 
 	return nil
