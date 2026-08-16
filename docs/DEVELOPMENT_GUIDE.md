@@ -162,6 +162,7 @@ The orchestrator concurrently fetches pricing data from all registered provider/
 | `/api/v1/prices/compute` | `GET` | Compute pricing lookup & SKU comparison endpoint |
 | `/api/v1/prices/storage` | `GET` | Storage pricing lookup & cost comparison endpoint |
 | `/api/v1/prices/network` | `GET` | Network pricing lookup & egress cost comparison endpoint |
+| `/api/v1/calculate` | `POST` | Composite multi-category workload total, server-computed |
 
 ### Local Verification Commands
 
@@ -178,10 +179,17 @@ The orchestrator concurrently fetches pricing data from all registered provider/
    curl "http://localhost:8080/api/v1/prices/network?egress_gb=1000&region=us-east"
    ```
 
-3. **Verify Rate Limiter (60 req/min)**:
+3. **Query Composite Calculation Endpoint**:
+   ```bash
+   curl -X POST "http://localhost:8080/api/v1/calculate" \
+     -H "Content-Type: application/json" \
+     -d '{"region":"us-east","compute":{"vcpu":4,"ram_gb":16},"storage":{"size_gb":500},"network":{"egress_gb":100}}'
+   ```
+
+4. **Verify Rate Limiter (60 req/min)**:
    Execute >60 requests within 1 minute to receive `429 Too Many Requests` with a `Retry-After` header.
 
-4. **Inspect Local Prometheus Metrics**:
+5. **Inspect Local Prometheus Metrics**:
    ```bash
    curl http://localhost:8080/metrics | grep cache_requests_total
    ```

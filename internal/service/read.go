@@ -109,6 +109,10 @@ func (s *PricingService) GetPrices(ctx context.Context, provider, category, regi
 			defer dbSpan.End()
 		}
 
+		if s.queries == nil {
+			return nil, fmt.Errorf("pricing service: database query unavailable")
+		}
+
 		dbRows, dbErr := s.queries.GetPriceObservations(dbCtx, store.GetPriceObservationsParams{
 			Provider:        provider,
 			ServiceCategory: category,

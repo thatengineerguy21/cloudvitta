@@ -11,4 +11,6 @@ var (
 	ErrNoMatchFound = errors.New("no match found")
 	// ErrCategoryNotSupported is returned when a provider does not support the requested category.
 	ErrCategoryNotSupported = errors.New("category not supported by provider")
+	// ErrNoCategoriesRequested is returned when a composite calculate request specifies no categories.
+	ErrNoCategoriesRequested = errors.New("no categories requested")
 )

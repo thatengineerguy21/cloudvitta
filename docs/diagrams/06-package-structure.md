@@ -50,6 +50,13 @@ classDiagram
     class matching {
         catalogmap
         regionmap
+        storageclassmap
+        transfertypemap
+    }
+
+    class fx {
+        FXService Interface
+        NoOpFXService
     }
 
     cmd --> transport : Wires dependencies
@@ -61,6 +68,7 @@ classDiagram
     service --> cache : Orchestrates reads + locks
     service --> dlq : Records failed jobs
     service --> matching : Uses matching strategies
+    service --> fx : Uses currency conversion
     service --> domain : Returns domain types
     service --> adapter : Builds and runs jobs
     
