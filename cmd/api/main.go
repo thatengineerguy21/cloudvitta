@@ -95,7 +95,8 @@ func main() {
 		service.WithTracer(otelProviders.Tracer),
 		service.WithCacheMetrics(cacheMetrics),
 	)
-	router := rest.NewRouter(pricingSvc, dbPool, redisClient)
+	authSvc := service.NewAuthService(queries, []byte(cfg.Auth.JWTSecret))
+	router := rest.NewRouter(pricingSvc, authSvc, dbPool, redisClient)
 
 	// --- HTTP Server ---
 	server := &http.Server{

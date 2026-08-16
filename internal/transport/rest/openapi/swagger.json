@@ -4,9 +4,133 @@
         "contact": {}
     },
     "paths": {
+        "/api/v1/auth/login": {
+            "post": {
+                "description": "Validates credentials with timing-safe comparison and issues JWT access token and opaque refresh token pair",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Authenticate user and issue tokens",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Authentication successful",
+                        "schema": {
+                            "$ref": "#/definitions/rest.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed JSON request",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid email or password",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/signup": {
+            "post": {
+                "description": "Creates a new user account with email and password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "Signup parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.SignupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "User registered successfully",
+                        "schema": {
+                            "$ref": "#/definitions/rest.SignupResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid email or password format",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "409": {
+                        "description": "User with this email already exists",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/calculate": {
             "post": {
-                "description": "Calculates server-side composite normalized hourly pricing across cloud providers (AWS, Azure, GCP) for multi-category workloads (compute, storage, network).",
+                "description": "Calculates composite pricing across cloud providers for requested compute, storage, and network specs.",
                 "consumes": [
                     "application/json"
                 ],
@@ -14,13 +138,13 @@
                     "application/json"
                 ],
                 "tags": [
-                    "prices"
+                    "calculator"
                 ],
-                "summary": "Calculate composite workload pricing",
+                "summary": "Get composite pricing calculation",
                 "parameters": [
                     {
-                        "description": "Workload calculation request",
-                        "name": "request",
+                        "description": "Composite workload request payload",
+                        "name": "payload",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -32,17 +156,11 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/rest.CalculateComparisonResponse"
+                            "$ref": "#/definitions/rest.CalculateResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/middleware.RFC7807Error"
-                        }
-                    },
-                    "405": {
-                        "description": "Method Not Allowed",
                         "schema": {
                             "$ref": "#/definitions/middleware.RFC7807Error"
                         }
@@ -328,7 +446,33 @@
                 }
             }
         },
-        "rest.CalculateComparisonMeta": {
+        "rest.CalculateCategoryResult": {
+            "type": "object",
+            "properties": {
+                "match_delta_pct": {
+                    "type": "number"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "rest.CalculateMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -336,54 +480,32 @@
                 },
                 "generated_at": {
                     "type": "string"
+                },
+                "request": {
+                    "$ref": "#/definitions/rest.CalculateRequestBody"
                 }
             }
         },
-        "rest.CalculateComparisonResponse": {
+        "rest.CalculateProviderResult": {
             "type": "object",
             "properties": {
-                "meta": {
-                    "$ref": "#/definitions/rest.CalculateComparisonMeta"
-                },
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/service.CalculateProviderResult"
+                "categories": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/rest.CalculateCategoryResult"
                     }
                 },
-                "warnings": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/rest.ProviderWarning"
-                    }
-                }
-            }
-        },
-        "rest.CalculateComputeRequest": {
-            "type": "object",
-            "properties": {
-                "family": {
-                    "type": "string"
-                },
-                "ram_gb": {
-                    "type": "number"
-                },
-                "strict_family": {
+                "partial": {
                     "type": "boolean"
                 },
-                "vcpu": {
-                    "type": "number"
-                }
-            }
-        },
-        "rest.CalculateNetworkRequest": {
-            "type": "object",
-            "properties": {
-                "egress_gb": {
+                "partial_total_normalized_hourly_usd": {
                     "type": "number"
                 },
-                "transfer_type": {
+                "provider": {
                     "type": "string"
+                },
+                "total_normalized_hourly_usd": {
+                    "type": "number"
                 }
             }
         },
@@ -391,30 +513,42 @@
             "type": "object",
             "properties": {
                 "compute": {
-                    "$ref": "#/definitions/rest.CalculateComputeRequest"
+                    "$ref": "#/definitions/domain.ComputeAttributes"
                 },
                 "currency": {
                     "type": "string"
                 },
                 "network": {
-                    "$ref": "#/definitions/rest.CalculateNetworkRequest"
+                    "$ref": "#/definitions/domain.NetworkAttributes"
                 },
                 "region": {
                     "type": "string"
                 },
                 "storage": {
-                    "$ref": "#/definitions/rest.CalculateStorageRequest"
+                    "$ref": "#/definitions/domain.StorageAttributes"
+                },
+                "strict_family": {
+                    "type": "boolean"
                 }
             }
         },
-        "rest.CalculateStorageRequest": {
+        "rest.CalculateResponse": {
             "type": "object",
             "properties": {
-                "size_gb": {
-                    "type": "number"
+                "meta": {
+                    "$ref": "#/definitions/rest.CalculateMeta"
                 },
-                "storage_class": {
-                    "type": "string"
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.CalculateProviderResult"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.ProviderWarning"
+                    }
                 }
             }
         },
@@ -488,6 +622,34 @@
                 },
                 "stale": {
                     "type": "boolean"
+                }
+            }
+        },
+        "rest.LoginRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
                 }
             }
         },
@@ -592,6 +754,31 @@
                 }
             }
         },
+        "rest.SignupRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.SignupResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "rest.StorageComparisonMeta": {
             "type": "object",
             "properties": {
@@ -662,43 +849,6 @@
                 },
                 "stale": {
                     "type": "boolean"
-                }
-            }
-        },
-        "service.CalculateCategoryResult": {
-            "type": "object",
-            "properties": {
-                "match_quality": {
-                    "type": "string"
-                },
-                "normalized_hourly_usd": {
-                    "type": "number"
-                },
-                "sku_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "service.CalculateProviderResult": {
-            "type": "object",
-            "properties": {
-                "categories": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/service.CalculateCategoryResult"
-                    }
-                },
-                "partial": {
-                    "type": "boolean"
-                },
-                "partial_total_normalized_hourly_usd": {
-                    "type": "number"
-                },
-                "provider": {
-                    "type": "string"
-                },
-                "total_normalized_hourly_usd": {
-                    "type": "number"
                 }
             }
         }

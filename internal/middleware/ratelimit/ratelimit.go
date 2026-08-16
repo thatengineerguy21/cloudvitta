@@ -57,50 +57,64 @@ func ExtractClientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// Handler returns HTTP middleware enforcing per-IP rate limiting.
+// Handler returns HTTP middleware enforcing per-IP rate limiting using default limits.
 func (rl *RateLimiter) Handler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if rl.redisClient == nil {
-			next.ServeHTTP(w, r)
-			return
-		}
+	return rl.WithProfile("default", rl.rateLimit)(next)
+}
 
-		clientIP := ExtractClientIP(r)
-		now := time.Now().UTC()
-		minuteWindow := now.Unix() / 60
-		key := fmt.Sprintf("ratelimit:ip:%s:%d", clientIP, minuteWindow)
+// WithProfile returns an HTTP middleware enforcing custom per-IP rate limits for a named profile (e.g., "login", limit: 10).
+func (rl *RateLimiter) WithProfile(profile string, limit int64) func(http.Handler) http.Handler {
+	if limit <= 0 {
+		limit = rl.rateLimit
+	}
+	if profile == "" {
+		profile = "default"
+	}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-
-		count, err := rl.redisClient.Incr(ctx, key).Result()
-		if err != nil {
-			slog.Warn("rate limiter redis error, failing open", "ip", clientIP, "error", err)
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if count == 1 {
-			_ = rl.redisClient.Expire(ctx, key, 70*time.Second).Err()
-		}
-
-		if count > rl.rateLimit {
-			secondsRemaining := 60 - (now.Unix() % 60)
-			if secondsRemaining <= 0 {
-				secondsRemaining = 1
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if rl.redisClient == nil {
+				next.ServeHTTP(w, r)
+				return
 			}
 
-			w.Header().Set("Retry-After", strconv.FormatInt(secondsRemaining, 10))
-			middleware.WriteJSONError(
-				w, r,
-				http.StatusTooManyRequests,
-				"https://cloudvitta.dev/errors/rate-limit-exceeded",
-				"Rate limit exceeded",
-				fmt.Sprintf("Rate limit of %d requests per minute exceeded. Please try again in %d seconds.", rl.rateLimit, secondsRemaining),
-			)
-			return
-		}
+			clientIP := ExtractClientIP(r)
+			now := time.Now().UTC()
+			minuteWindow := now.Unix() / 60
+			key := fmt.Sprintf("ratelimit:ip:%s:%s:%d", profile, clientIP, minuteWindow)
 
-		next.ServeHTTP(w, r)
-	})
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+
+			count, err := rl.redisClient.Incr(ctx, key).Result()
+			if err != nil {
+				slog.Warn("rate limiter redis error, failing open", "profile", profile, "ip", clientIP, "error", err)
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if count == 1 {
+				_ = rl.redisClient.Expire(ctx, key, 70*time.Second).Err()
+			}
+
+			if count > limit {
+				secondsRemaining := 60 - (now.Unix() % 60)
+				if secondsRemaining <= 0 {
+					secondsRemaining = 1
+				}
+
+				w.Header().Set("Retry-After", strconv.FormatInt(secondsRemaining, 10))
+				middleware.WriteJSONError(
+					w, r,
+					http.StatusTooManyRequests,
+					"https://cloudvitta.dev/errors/rate-limit-exceeded",
+					"Rate limit exceeded",
+					fmt.Sprintf("Rate limit of %d requests per minute exceeded. Please try again in %d seconds.", limit, secondsRemaining),
+				)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

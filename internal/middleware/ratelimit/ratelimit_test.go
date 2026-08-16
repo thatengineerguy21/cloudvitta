@@ -99,3 +99,53 @@ func TestRateLimiter(t *testing.T) {
 		t.Errorf("expected Retry-After header on 429 response")
 	}
 }
+
+func TestRateLimiter_WithProfile(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	rl := ratelimit.NewRateLimiter(rdb, 60) // generic limit = 60
+
+	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Login profile limit = 1
+	loginHandler := rl.WithProfile("login", 1)(dummyHandler)
+
+	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	req1.Header.Set("X-Forwarded-For", "198.51.100.42")
+	rec1 := httptest.NewRecorder()
+	loginHandler.ServeHTTP(rec1, req1)
+
+	if rec1.Code != http.StatusOK {
+		t.Fatalf("login request 1 status = %d, want 200 OK", rec1.Code)
+	}
+
+	// 2nd login request should be 429
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	req2.Header.Set("X-Forwarded-For", "198.51.100.42")
+	rec2 := httptest.NewRecorder()
+	loginHandler.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf("login request 2 status = %d, want 429 Too Many Requests", rec2.Code)
+	}
+
+	// Generic handler for same IP should still pass because profiles are partitioned
+	genericHandler := rl.Handler(dummyHandler)
+	reqGeneric := httptest.NewRequest(http.MethodGet, "/api/v1/calculate", nil)
+	reqGeneric.Header.Set("X-Forwarded-For", "198.51.100.42")
+	recGeneric := httptest.NewRecorder()
+	genericHandler.ServeHTTP(recGeneric, reqGeneric)
+
+	if recGeneric.Code != http.StatusOK {
+		t.Errorf("generic request status = %d, want 200 OK (profile isolation)", recGeneric.Code)
+	}
+}

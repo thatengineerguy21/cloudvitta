@@ -163,6 +163,8 @@ The orchestrator concurrently fetches pricing data from all registered provider/
 | `/api/v1/prices/storage` | `GET` | Storage pricing lookup & cost comparison endpoint |
 | `/api/v1/prices/network` | `GET` | Network pricing lookup & egress cost comparison endpoint |
 | `/api/v1/calculate` | `POST` | Composite multi-category workload total, server-computed |
+| `/api/v1/auth/signup` | `POST` | User registration endpoint (returns user details) |
+| `/api/v1/auth/login` | `POST` | User authentication endpoint (returns JWT access and refresh tokens) |
 
 ### Local Verification Commands
 
@@ -186,10 +188,23 @@ The orchestrator concurrently fetches pricing data from all registered provider/
      -d '{"region":"us-east","compute":{"vcpu":4,"ram_gb":16},"storage":{"size_gb":500},"network":{"egress_gb":100}}'
    ```
 
-4. **Verify Rate Limiter (60 req/min)**:
-   Execute >60 requests within 1 minute to receive `429 Too Many Requests` with a `Retry-After` header.
+4. **Register and Authenticate User**:
+   ```bash
+   # Register new user
+   curl -X POST "http://localhost:8080/api/v1/auth/signup" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"user@example.com","password":"securePassword123"}'
 
-5. **Inspect Local Prometheus Metrics**:
+   # Authenticate and receive tokens
+   curl -X POST "http://localhost:8080/api/v1/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"user@example.com","password":"securePassword123"}'
+   ```
+
+5. **Verify Rate Limiter (60 req/min generic, 10 req/min login)**:
+   Execute >10 requests to `/api/v1/auth/login` or >60 requests to generic endpoints within 1 minute to receive `429 Too Many Requests` with a `Retry-After` header.
+
+6. **Inspect Local Prometheus Metrics**:
    ```bash
    curl http://localhost:8080/metrics | grep cache_requests_total
    ```

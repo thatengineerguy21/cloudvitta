@@ -40,63 +40,74 @@ definitions:
       type:
         type: string
     type: object
-  rest.CalculateComparisonMeta:
+  rest.CalculateCategoryResult:
+    properties:
+      match_delta_pct:
+        type: number
+      match_quality:
+        type: string
+      missing_attributes:
+        items:
+          type: string
+        type: array
+      normalized_hourly_usd:
+        type: number
+      sku_id:
+        type: string
+      stale:
+        type: boolean
+    type: object
+  rest.CalculateMeta:
     properties:
       api_version:
         type: string
       generated_at:
         type: string
+      request:
+        $ref: '#/definitions/rest.CalculateRequestBody'
     type: object
-  rest.CalculateComparisonResponse:
+  rest.CalculateProviderResult:
+    properties:
+      categories:
+        additionalProperties:
+          $ref: '#/definitions/rest.CalculateCategoryResult'
+        type: object
+      partial:
+        type: boolean
+      partial_total_normalized_hourly_usd:
+        type: number
+      provider:
+        type: string
+      total_normalized_hourly_usd:
+        type: number
+    type: object
+  rest.CalculateRequestBody:
+    properties:
+      compute:
+        $ref: '#/definitions/domain.ComputeAttributes'
+      currency:
+        type: string
+      network:
+        $ref: '#/definitions/domain.NetworkAttributes'
+      region:
+        type: string
+      storage:
+        $ref: '#/definitions/domain.StorageAttributes'
+      strict_family:
+        type: boolean
+    type: object
+  rest.CalculateResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.CalculateComparisonMeta'
+        $ref: '#/definitions/rest.CalculateMeta'
       results:
         items:
-          $ref: '#/definitions/service.CalculateProviderResult'
+          $ref: '#/definitions/rest.CalculateProviderResult'
         type: array
       warnings:
         items:
           $ref: '#/definitions/rest.ProviderWarning'
         type: array
-    type: object
-  rest.CalculateComputeRequest:
-    properties:
-      family:
-        type: string
-      ram_gb:
-        type: number
-      strict_family:
-        type: boolean
-      vcpu:
-        type: number
-    type: object
-  rest.CalculateNetworkRequest:
-    properties:
-      egress_gb:
-        type: number
-      transfer_type:
-        type: string
-    type: object
-  rest.CalculateRequestBody:
-    properties:
-      compute:
-        $ref: '#/definitions/rest.CalculateComputeRequest'
-      currency:
-        type: string
-      network:
-        $ref: '#/definitions/rest.CalculateNetworkRequest'
-      region:
-        type: string
-      storage:
-        $ref: '#/definitions/rest.CalculateStorageRequest'
-    type: object
-  rest.CalculateStorageRequest:
-    properties:
-      size_gb:
-        type: number
-      storage_class:
-        type: string
     type: object
   rest.ComputeComparisonMeta:
     properties:
@@ -145,6 +156,24 @@ definitions:
         type: string
       stale:
         type: boolean
+    type: object
+  rest.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  rest.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        type: string
     type: object
   rest.NetworkComparisonMeta:
     properties:
@@ -212,6 +241,22 @@ definitions:
       provider:
         type: string
     type: object
+  rest.SignupRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  rest.SignupResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+    type: object
   rest.StorageComparisonMeta:
     properties:
       api_version:
@@ -260,44 +305,102 @@ definitions:
       stale:
         type: boolean
     type: object
-  service.CalculateCategoryResult:
-    properties:
-      match_quality:
-        type: string
-      normalized_hourly_usd:
-        type: number
-      sku_id:
-        type: string
-    type: object
-  service.CalculateProviderResult:
-    properties:
-      categories:
-        additionalProperties:
-          $ref: '#/definitions/service.CalculateCategoryResult'
-        type: object
-      partial:
-        type: boolean
-      partial_total_normalized_hourly_usd:
-        type: number
-      provider:
-        type: string
-      total_normalized_hourly_usd:
-        type: number
-    type: object
 info:
   contact: {}
 paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Validates credentials with timing-safe comparison and issues JWT
+        access token and opaque refresh token pair
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.LoginRequest'
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "200":
+          description: Authentication successful
+          schema:
+            $ref: '#/definitions/rest.LoginResponse'
+        "400":
+          description: Malformed JSON request
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "401":
+          description: Invalid email or password
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Authenticate user and issue tokens
+      tags:
+      - Auth
+  /api/v1/auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account with email and password
+      parameters:
+      - description: Signup parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.SignupRequest'
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "201":
+          description: User registered successfully
+          schema:
+            $ref: '#/definitions/rest.SignupResponse'
+        "400":
+          description: Invalid email or password format
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "409":
+          description: User with this email already exists
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Register a new user
+      tags:
+      - Auth
   /api/v1/calculate:
     post:
       consumes:
       - application/json
-      description: Calculates server-side composite normalized hourly pricing across
-        cloud providers (AWS, Azure, GCP) for multi-category workloads (compute, storage,
-        network).
+      description: Calculates composite pricing across cloud providers for requested
+        compute, storage, and network specs.
       parameters:
-      - description: Workload calculation request
+      - description: Composite workload request payload
         in: body
-        name: request
+        name: payload
         required: true
         schema:
           $ref: '#/definitions/rest.CalculateRequestBody'
@@ -307,13 +410,9 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.CalculateComparisonResponse'
+            $ref: '#/definitions/rest.CalculateResponse'
         "400":
           description: Bad Request
-          schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
-        "405":
-          description: Method Not Allowed
           schema:
             $ref: '#/definitions/middleware.RFC7807Error'
         "429":
@@ -324,9 +423,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/middleware.RFC7807Error'
-      summary: Calculate composite workload pricing
+      summary: Get composite pricing calculation
       tags:
-      - prices
+      - calculator
   /api/v1/prices/compute:
     get:
       description: Returns normalized compute pricing across cloud providers for requested

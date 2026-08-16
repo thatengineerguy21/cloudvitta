@@ -19,6 +19,7 @@ type Config struct {
 	Database      DatabaseConfig      `koanf:"database" validate:"required"`
 	Redis         RedisConfig         `koanf:"redis" validate:"required"`
 	Storage       StorageConfig       `koanf:"storage" validate:"required"`
+	Auth          AuthConfig          `koanf:"auth" validate:"required"`
 	Observability ObservabilityConfig `koanf:"observability"`
 	GCP           GCPConfig           `koanf:"gcp"`
 }
@@ -84,6 +85,10 @@ type RedisConfig struct {
 
 type StorageConfig struct {
 	GCSBucketName string `koanf:"gcs_bucket_name" validate:"required"`
+}
+
+type AuthConfig struct {
+	JWTSecret string `koanf:"jwt_secret" validate:"required,min=32"`
 }
 
 type ObservabilityConfig struct {
@@ -192,6 +197,17 @@ func resolveEnvFallbacks(cfg *Config) error {
 			cfg.GCP.APIKey = val
 		} else {
 			cfg.GCP.APIKey = os.Getenv("GCP_API_KEY")
+		}
+	}
+
+	// 8. Resolve Auth JWT Secret fallback
+	if cfg.Auth.JWTSecret == "" {
+		if val := os.Getenv("CLOUDVITTA_AUTH_JWT_SECRET"); val != "" {
+			cfg.Auth.JWTSecret = val
+		} else if val := os.Getenv("CLOUDVITTA_JWT_SECRET"); val != "" {
+			cfg.Auth.JWTSecret = val
+		} else {
+			cfg.Auth.JWTSecret = os.Getenv("JWT_SECRET")
 		}
 	}
 

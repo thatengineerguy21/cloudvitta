@@ -59,6 +59,12 @@ classDiagram
         NoOpFXService
     }
 
+    class auth {
+        Bcrypt Password Hashing
+        JWT Token Issuance
+        Refresh Token Generation
+    }
+
     cmd --> transport : Wires dependencies
     cmd --> adapter : Instantiates factories
     
@@ -69,6 +75,7 @@ classDiagram
     service --> dlq : Records failed jobs
     service --> matching : Uses matching strategies
     service --> fx : Uses currency conversion
+    service --> auth : Uses authentication primitives
     service --> domain : Returns domain types
     service --> adapter : Builds and runs jobs
     
@@ -76,3 +83,4 @@ classDiagram
     
     store --> domain : Returns domain types
 ```
+
