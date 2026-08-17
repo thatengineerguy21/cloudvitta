@@ -73,6 +73,12 @@ func TestMapAzureRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid edge region attdetroit1",
+			region:    "attdetroit1",
+			wantGroup: "us-east",
+			wantErr:   nil,
+		},
+		{
 			name:      "unmapped region fails loudly",
 			region:    "unknown-azure-region-99",
 			wantGroup: "",

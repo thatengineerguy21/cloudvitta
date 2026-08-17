@@ -165,6 +165,9 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 			observations = append(observations, obs)
 
 		} else if category == "storage" {
+			if !isAzureStorageProduct(item) {
+				continue
+			}
 			storageClass, err := parseAzureStorageClass(item.SkuName, item.MeterName, item.ProductName)
 			if err != nil {
 				return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
@@ -265,6 +268,19 @@ func isComputeInstance(item azureItem) bool {
 		return false
 	}
 
+	return true
+}
+
+func isAzureStorageProduct(item azureItem) bool {
+	// Exclude auxiliary operational/management services
+	desc := item.ProductName + " " + item.MeterName + " " + item.SkuName
+	if strings.Contains(desc, "Storage Tasks") || strings.Contains(desc, "Operations") || strings.Contains(desc, "Transactions") || strings.Contains(desc, "Storage Mover") {
+		return false
+	}
+	unit := strings.ToLower(item.UnitOfMeasure)
+	if !strings.Contains(unit, "month") && !strings.Contains(unit, "mo") {
+		return false
+	}
 	return true
 }
 

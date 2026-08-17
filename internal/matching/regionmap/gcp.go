@@ -64,16 +64,31 @@ var gcpRegionMap = map[string]string{
 	// Africa
 	"africa-south1": "af-south",
 
-	// Global / Multi-region
-	"global":      "global",
-	"us":          "us-east",
-	"eu":          "eu-west",
-	"asia":        "ap-east",
-	"asia1":       "ap-east",
-	"nam4":        "us-east",
-	"eur4":        "eu-central",
-	"us-central2": "us-central",
-	"us-east7":    "us-east",
+	// Global / Multi-region / Dual-region
+	"global":       "global",
+	"us":           "us-east",
+	"eu":           "eu-west",
+	"asia":         "ap-east",
+	"asia1":        "ap-east",
+	"asia2":        "ap-southeast",
+	"nam4":         "us-east",
+	"nam5":         "us-east",
+	"nam6":         "us-west",
+	"nam7":         "us-west",
+	"nam8":         "us-west",
+	"nam9":         "us-west",
+	"nam10":        "us-central",
+	"nam11":        "us-east",
+	"nam12":        "us-east",
+	"nam13":        "us-east",
+	"nam-eur-asia1": "global",
+	"eur4":         "eu-central",
+	"eur5":         "eu-west",
+	"eur6":         "eu-west",
+	"eur7":         "eu-central",
+	"eur8":         "eu-central",
+	"us-central2":  "us-central",
+	"us-east7":     "us-east",
 }
 
 var gcpGroupToNativeMap = map[string]string{
