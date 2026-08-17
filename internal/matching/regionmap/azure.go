@@ -96,6 +96,8 @@ var azureRegionMap = map[string]string{
 	// Middle East
 	"uaenorth":       "me-central",
 	"UAE North":      "me-central",
+	"uaecentral":     "me-central",
+	"UAE Central":    "me-central",
 	"israelcentral":  "il-central",
 	"Israel Central": "il-central",
 

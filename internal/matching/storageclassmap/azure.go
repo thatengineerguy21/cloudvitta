@@ -5,11 +5,14 @@ import (
 )
 
 var azureStorageClassMap = map[string]string{
-	"Hot":      "standard",
-	"Standard": "standard",
-	"Cool":     "infrequent_access",
-	"Cold":     "infrequent_access",
-	"Archive":  "archive",
+	"Hot":         "standard",
+	"Standard":    "standard",
+	"Premium":     "standard",
+	"Premium LRS": "standard",
+	"Premium ZRS": "standard",
+	"Cool":        "infrequent_access",
+	"Cold":        "infrequent_access",
+	"Archive":     "archive",
 }
 
 // MapAzureStorageClass resolves an Azure storage class to a canonical class.

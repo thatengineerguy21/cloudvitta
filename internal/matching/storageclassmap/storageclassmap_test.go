@@ -40,6 +40,9 @@ func TestMapAzureStorageClass(t *testing.T) {
 	}{
 		{"Hot", "standard", nil},
 		{"Standard", "standard", nil},
+		{"Premium", "standard", nil},
+		{"Premium LRS", "standard", nil},
+		{"Premium ZRS", "standard", nil},
 		{"Cool", "infrequent_access", nil},
 		{"Archive", "archive", nil},
 		{"UnknownClass", "", ErrUnmappedStorageClass},
@@ -69,6 +72,8 @@ func TestMapGCPStorageClass(t *testing.T) {
 		{"Nearline", "infrequent_access", nil},
 		{"Coldline", "archive", nil},
 		{"Archive", "archive", nil},
+		{"DRAStorage", "infrequent_access", nil},
+		{"DRA", "infrequent_access", nil},
 		{"UnknownClass", "", ErrUnmappedStorageClass},
 	}
 

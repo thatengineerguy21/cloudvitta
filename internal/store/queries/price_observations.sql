@@ -18,6 +18,16 @@ INSERT INTO price_observations (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 )
+ON CONFLICT (provider, sku_id, region, fetched_at)
+DO UPDATE SET
+    price_amount = EXCLUDED.price_amount,
+    unit = EXCLUDED.unit,
+    price_currency = EXCLUDED.price_currency,
+    pricing_model = EXCLUDED.pricing_model,
+    attributes = EXCLUDED.attributes,
+    raw_response_ref = EXCLUDED.raw_response_ref,
+    last_seen_at = EXCLUDED.last_seen_at,
+    anomaly_status = EXCLUDED.anomaly_status
 RETURNING id;
 
 -- name: GetPriceObservations :many

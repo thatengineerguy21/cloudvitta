@@ -270,7 +270,7 @@ func isComputeInstance(item azureItem) bool {
 
 func parseAzureStorageClass(skuName, meterName, productName string) (string, error) {
 	for _, text := range []string{skuName, meterName, productName} {
-		for _, candidate := range []string{"Hot", "Standard", "Cool", "Cold", "Archive"} {
+		for _, candidate := range []string{"Hot", "Standard", "Premium", "Cool", "Cold", "Archive"} {
 			if strings.Contains(text, candidate) {
 				return storageclassmap.MapAzureStorageClass(candidate)
 			}

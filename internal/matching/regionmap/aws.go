@@ -84,13 +84,21 @@ var awsRegionMap = map[string]string{
 	"Israel (Tel Aviv)":     "il-central",
 
 	// Africa
-	"af-south-1":         "af-south",
+	"af-south-1":        "af-south",
 	"Africa (Cape Town)": "af-south",
+	"Nigeria (Lagos)":    "af-south",
+
+	// GovCloud
+	"us-gov-west-1":           "us-west",
+	"AWS GovCloud (US-West)":  "us-west",
+	"us-gov-east-1":           "us-east",
+	"AWS GovCloud (US-East)":  "us-east",
 
 	// Global / Any
-	"Global": "global",
-	"global": "global",
-	"Any":    "global",
+	"Global":   "global",
+	"global":   "global",
+	"Any":      "global",
+	"External": "global",
 }
 
 var awsGroupToNativeMap = map[string]string{

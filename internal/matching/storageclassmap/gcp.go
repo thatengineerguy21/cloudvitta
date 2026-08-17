@@ -5,10 +5,12 @@ import (
 )
 
 var gcpStorageClassMap = map[string]string{
-	"Standard": "standard",
-	"Nearline": "infrequent_access",
-	"Coldline": "archive",
-	"Archive":  "archive",
+	"Standard":   "standard",
+	"Nearline":   "infrequent_access",
+	"Coldline":   "archive",
+	"Archive":    "archive",
+	"DRAStorage": "infrequent_access",
+	"DRA":        "infrequent_access",
 }
 
 // MapGCPStorageClass resolves a GCP storage class to a canonical class.

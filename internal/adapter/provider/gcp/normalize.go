@@ -465,7 +465,7 @@ func isStorageProduct(sku gcpSKU) bool {
 
 func parseGCPStorageClass(resourceGroup, description, name string) (string, error) {
 	for _, text := range []string{resourceGroup, description, name} {
-		for _, candidate := range []string{"Standard", "Nearline", "Coldline", "Archive"} {
+		for _, candidate := range []string{"DRAStorage", "DRA", "Standard", "Nearline", "Coldline", "Archive"} {
 			if strings.Contains(text, candidate) {
 				return storageclassmap.MapGCPStorageClass(candidate)
 			}

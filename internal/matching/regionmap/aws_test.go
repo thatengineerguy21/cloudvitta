@@ -31,6 +31,24 @@ func TestMapAWSRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid location Nigeria (Lagos)",
+			region:    "Nigeria (Lagos)",
+			wantGroup: "af-south",
+			wantErr:   nil,
+		},
+		{
+			name:      "valid location External",
+			region:    "External",
+			wantGroup: "global",
+			wantErr:   nil,
+		},
+		{
+			name:      "valid location AWS GovCloud (US-West)",
+			region:    "AWS GovCloud (US-West)",
+			wantGroup: "us-west",
+			wantErr:   nil,
+		},
+		{
 			name:      "unmapped region code fails loudly",
 			region:    "unknown-aws-region-99",
 			wantGroup: "",
