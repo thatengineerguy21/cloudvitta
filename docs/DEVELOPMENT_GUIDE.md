@@ -163,8 +163,11 @@ The orchestrator concurrently fetches pricing data from all registered provider/
 | `/api/v1/prices/storage` | `GET` | Storage pricing lookup & cost comparison endpoint |
 | `/api/v1/prices/network` | `GET` | Network pricing lookup & egress cost comparison endpoint |
 | `/api/v1/calculate` | `POST` | Composite multi-category workload total, server-computed |
+| `/api/v1/providers/{provider}/status` | `GET` | Provider operational status, category data age, and DLQ state |
 | `/api/v1/auth/signup` | `POST` | User registration endpoint (returns user details) |
 | `/api/v1/auth/login` | `POST` | User authentication endpoint (returns JWT access and refresh tokens) |
+| `/api/v1/auth/refresh` | `POST` | Token rotation endpoint (requires `idempotency_key`, returns new token pair) |
+| `/api/v1/auth/logout` | `POST` | Session revocation endpoint (revokes refresh token and clears cache) |
 
 ### Local Verification Commands
 
