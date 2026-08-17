@@ -39,6 +39,7 @@ var gcpRegionMap = map[string]string{
 	"europe-west10":     "eu-central",
 	"europe-west12":     "eu-south",
 	"europe-north1":     "eu-north",
+	"europe-north2":     "eu-north",
 	"europe-central2":   "eu-central",
 	"europe-southwest1": "eu-south",
 

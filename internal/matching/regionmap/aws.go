@@ -10,16 +10,32 @@ var ErrUnmappedRegion = errors.New("regionmap: unmapped region")
 
 var awsRegionMap = map[string]string{
 	// US East
-	"us-east-1":             "us-east",
-	"US East (N. Virginia)": "us-east",
-	"us-east-2":             "us-east",
-	"US East (Ohio)":        "us-east",
+	"us-east-1":                 "us-east",
+	"US East (N. Virginia)":     "us-east",
+	"US East (New York City)":   "us-east",
+	"US East (New York)":        "us-east",
+	"US East (Boston)":          "us-east",
+	"US East (Philadelphia)":    "us-east",
+	"US East (Atlanta)":         "us-east",
+	"US East (Miami)":           "us-east",
+	"US East (Chicago)":         "us-east",
+	"US East (Dallas)":          "us-central",
+	"US East (Houston)":         "us-central",
+	"us-east-2":                 "us-east",
+	"US East (Ohio)":            "us-east",
 
 	// US West
-	"us-west-1":               "us-west",
-	"US West (N. California)": "us-west",
-	"us-west-2":               "us-west",
-	"US West (Oregon)":        "us-west",
+	"us-west-1":                 "us-west",
+	"US West (N. California)":   "us-west",
+	"US West (Los Angeles)":     "us-west",
+	"US West (San Francisco)":   "us-west",
+	"US West (Seattle)":         "us-west",
+	"US West (Denver)":          "us-west",
+	"US West (Phoenix)":         "us-west",
+	"US West (Las Vegas)":       "us-west",
+	"US West (Portland)":        "us-west",
+	"us-west-2":                 "us-west",
+	"US West (Oregon)":          "us-west",
 
 	// Canada
 	"ca-central-1":          "ca-central",

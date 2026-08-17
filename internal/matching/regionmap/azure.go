@@ -101,6 +101,32 @@ var azureRegionMap = map[string]string{
 	"israelcentral":  "il-central",
 	"Israel Central": "il-central",
 
+	// US Government & Security
+	"usgovarizona":   "us-west",
+	"USGov Arizona":  "us-west",
+	"usgovtexas":     "us-central",
+	"USGov Texas":    "us-central",
+	"usgovvirginia":  "us-east",
+	"USGov Virginia": "us-east",
+	"usgoviowa":      "us-central",
+	"USGov Iowa":     "us-central",
+	"usdodeast":      "us-east",
+	"USDoD East":     "us-east",
+	"usdodcentral":   "us-central",
+	"USDoD Central":  "us-central",
+	"ussecwest":      "us-west",
+	"USSec West":     "us-west",
+	"usseceast":      "us-east",
+	"USSec East":     "us-east",
+
+	// Other International
+	"qatarcentral":     "me-central",
+	"Qatar Central":    "me-central",
+	"mexicocentral":    "us-central",
+	"Mexico Central":   "us-central",
+	"newzealandnorth":  "ap-southeast",
+	"New Zealand North": "ap-southeast",
+
 	// Global
 	"global": "global",
 	"Global": "global",

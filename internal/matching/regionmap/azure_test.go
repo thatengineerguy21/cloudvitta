@@ -49,6 +49,18 @@ func TestMapAzureRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid region usgovarizona",
+			region:    "usgovarizona",
+			wantGroup: "us-west",
+			wantErr:   nil,
+		},
+		{
+			name:      "valid location USGov Arizona",
+			region:    "USGov Arizona",
+			wantGroup: "us-west",
+			wantErr:   nil,
+		},
+		{
 			name:      "unmapped region fails loudly",
 			region:    "unknown-azure-region-99",
 			wantGroup: "",

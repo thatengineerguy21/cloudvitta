@@ -280,7 +280,9 @@ func parseAzureStorageClass(skuName, meterName, productName string) (string, err
 		for _, candidate := range []string{
 			"Hot", "Standard", "Premium", "Cool", "Cold", "Archive",
 			"SSD ZRS", "SSD LRS", "SSD", "HDD", "Premium LRS", "Premium ZRS",
-			"Standard LRS", "Standard ZRS", "Standard GRS",
+			"Standard LRS", "Standard ZRS", "Standard GRS", "Standard GZRS",
+			"Account Encrypted GZRS", "Account Encrypted GRS", "Account Encrypted ZRS", "Account Encrypted LRS", "Account Encrypted",
+			"GZRS", "GRS", "ZRS", "LRS", "RA-GRS", "RA-GZRS",
 		} {
 			if strings.Contains(text, candidate) {
 				return storageclassmap.MapAzureStorageClass(candidate)

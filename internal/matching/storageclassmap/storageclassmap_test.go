@@ -45,6 +45,7 @@ func TestMapAzureStorageClass(t *testing.T) {
 		{"Premium ZRS", "standard", nil},
 		{"SSD ZRS", "standard", nil},
 		{"SSD LRS", "standard", nil},
+		{"Account Encrypted GZRS", "standard", nil},
 		{"Cool", "infrequent_access", nil},
 		{"Archive", "archive", nil},
 		{"UnknownClass", "", ErrUnmappedStorageClass},
