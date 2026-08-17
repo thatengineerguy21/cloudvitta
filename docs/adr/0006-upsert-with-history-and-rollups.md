@@ -8,26 +8,33 @@ Accepted
 
 ## Context
 
-CloudVitta ingests pricing data for millions of SKUs across 7 cloud providers. The initial data model proposed an "Append-only" architecture for the `price_observations` table in Postgres (Neon), where every successful ingestion run would insert a brand new row even if the price hadn't changed. 
+CloudVitta ingests pricing data for millions of SKUs across cloud providers. An append-only architecture for the `price_observations` table in Postgres (Neon) inserts a new row on every ingestion run, even when prices do not change.
 
-The original justification was a "perfect historical audit trail." However, upon review, this use case doesn't practically exist: customers consume aggregates (trend charts, min/max/avg), not raw ticks. Furthermore, On-Demand and Reserved prices rarely change, meaning the vast majority of append-only inserts would be entirely redundant. Spot pricing is the only volatile category, and we do not need hourly-plus granularity for Spot instances extending beyond two weeks.
+Most On-Demand and Reserved prices change infrequently. An append-only model generates redundant rows, causes rapid table and index bloat, and increases serverless storage costs. Users consume aggregated trends and current prices, not high-frequency unchanged ticks.
 
 ## Decision
 
-We will use an **Upsert-with-History and Rollups** pattern for the `price_observations` table instead of an Append-only pattern.
-
-1. **Upsert-with-History**: We will only insert a *new* row into Postgres when an actual price change is detected. 
-2. **Bump Timestamps**: On unchanged fetches, we will simply perform a cheap update to bump the `last_seen_at` timestamp on the existing active row, avoiding index bloat.
-3. **Capped Raw Retention & Rollups**: We will cap the retention of raw `price_observations` rows at ~2 weeks. Older data will be rolled up into daily OHLC (Open-High-Low-Close) aggregates, and the raw rows will be dropped.
+We use an **Upsert-with-History and Rollups** pattern for the `price_observations` table:
+1. **Upsert-with-History**: The ingestion worker only inserts a new row when it detects an actual price change for a SKU.
+2. **Timestamp Bumping**: When an ingestion run fetches an unchanged price, the database query updates the `last_seen_at` timestamp on the existing active row without inserting new rows or bloating indexes.
+3. **Capped Retention and Rollups**: Raw `price_observations` rows are retained for approximately two weeks. Older rows are summarized into daily aggregates (Open-High-Low-Close), and expired raw rows are purged.
 
 ## Consequences
 
 ### Positive
-- Massive reduction in redundant data, directly lowering serverless Postgres (Neon) storage costs.
-- Postgres indexes stay lean and cache-miss queries remain highly performant.
-- Provides a sustainable, steady-state database size rather than unbounded exponential growth.
-- Perfectly supports the actual customer-facing feature (aggregate trend analysis) without over-engineering raw data retention.
+- Substantially reduces redundant database rows and keeps serverless PostgreSQL (Neon) storage costs low.
+- Keeps database indexes small and maintains fast query times on cache misses.
+- Provides a stable, steady-state database size instead of unbounded growth.
+- Directly supports user requirements for current prices and historical trend charts.
 
 ### Negative
-- Requires a slightly more complex ingestion query (`INSERT ... ON CONFLICT DO UPDATE` or checking existing state) compared to a blind `INSERT`.
-- Requires a background cron task or database lifecycle rule to perform the daily OHLC rollups and purge raw data older than 2 weeks.
+- Requires ingestion queries to use `INSERT ... ON CONFLICT DO UPDATE` rather than simple append inserts.
+- Requires automated background jobs to compute daily rollups and purge raw records older than two weeks.
+
+## Alternatives Considered
+
+### Alternative 1: Strict Append-Only Event Log Table
+Rejected. Inserting a new row on every ingestion run creates millions of identical rows for stable On-Demand SKUs, rapidly exhausts database storage limits, and slows down read queries.
+
+### Alternative 2: In-Place Overwrite Without Price History
+Rejected. Overwriting existing rows without tracking changes destroys price history, prevents anomaly detection for unexpected price jumps, and disables historical trend visualization.

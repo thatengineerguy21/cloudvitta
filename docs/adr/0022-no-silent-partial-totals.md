@@ -29,3 +29,11 @@ If a requested category is missing for a provider, the API must:
 
 ### Negative
 - Requires slightly more complex JSON unmarshaling on the client side if they *do* want to render both complete and partial totals in the same UI column.
+
+## Alternatives Considered
+
+### Alternative 1: Overload `total_normalized_hourly_usd` with a Boolean `"partial": true` Flag
+Rejected. Naive client sorting logic prioritizes low numerical totals. A two-category sum is almost always cheaper than a three-category sum, causing incomplete provider calculations to be incorrectly ranked as the cheapest option.
+
+### Alternative 2: Fail the Request Entirely When Any Category is Missing
+Rejected. Rejecting comparison requests because one provider lacks a specific category eliminates valid cost visibility for users who want to inspect available categories (such as compute and storage) despite missing network data.

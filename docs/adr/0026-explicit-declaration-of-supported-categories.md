@@ -25,3 +25,11 @@ We mandate the **Explicit Declaration of Supported Categories** (`supported_cate
 
 ### Negative
 - Requires frontend/client developers to handle `warnings` gracefully in the UI, rather than assuming the `results` array is always perfectly uniform.
+
+## Alternatives Considered
+
+### Alternative 1: Dynamic Discovery of Supported Categories from Database Rows
+Rejected. Inferring supported categories solely from database row presence confuses un-ingested or failing categories with permanently unsupported categories, preventing clear operational degradation alerts.
+
+### Alternative 2: Fabricated Placeholder Pricing for Unsupported Categories
+Rejected. Returning hardcoded placeholder prices to make comparison matrices look complete during demos corrupts data credibility and leads users to make decisions based on false figures.

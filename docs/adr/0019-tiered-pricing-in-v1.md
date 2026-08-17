@@ -33,3 +33,11 @@ We will treat **Tier-Aware Calculation as a first-class feature in v1**, fully r
 - Significantly increases the engineering scope of v1.
 - Requires building a more complex calculation engine capable of walking tier breakpoints.
 - Modifies the API contract to support usage-volume inputs.
+
+## Alternatives Considered
+
+### Alternative 1: Exclude Storage and Network Categories in Initial Release
+Rejected. Omitting tiered storage and network categories forces users to make compute-only decisions and distorts actual multi-cloud infrastructure cost totals.
+
+### Alternative 2: Approximate Flattened Pricing (Fixed Average Price per GB)
+Rejected. Flattening tiered schedules into arbitrary single-number averages generates inaccurate cost calculations and violates our core honesty rule that "a wrong number is worse than an honestly missing one."

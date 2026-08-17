@@ -27,3 +27,11 @@ We will use `github.com/knadh/koanf/v2` combined with `github.com/go-playground/
 
 ### Negative
 - **Additional Dependencies**: Adds third-party dependencies (`koanf`, `validator`, `godotenv`) to the project for configuration management, slightly increasing the binary size and dependency graph complexity.
+
+## Alternatives Considered
+
+### Alternative 1: Manual `os.Getenv` Calls and Repetitive Validation Checks
+Rejected. Hand-writing environment variable lookups, type parsing, and non-empty string checks produces hundreds of lines of boilerplate that is error-prone to maintain across dozens of configuration fields.
+
+### Alternative 2: Heavy Configuration Frameworks (Viper)
+Rejected. Viper relies heavily on global state, possesses a large transitive dependency graph, and introduces complex key casing behaviors compared to the lightweight, modular architecture of `koanf`.

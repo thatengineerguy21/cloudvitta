@@ -59,3 +59,14 @@ The engine executes the following evaluation steps in sequence:
 
 ### Negative
 - Middleware must calculate HMAC signatures and manage Redis keys on every request.
+
+## Alternatives Considered
+
+### Alternative 1: Single IP-Only Rate Limiting
+Rejected. Enforcing rate limits solely by IP address groups all users behind a shared Network Address Translation (NAT), corporate proxy, or mobile gateway, unfairly throttling legitimate concurrent users.
+
+### Alternative 2: Mandatory User Authentication for All Endpoints
+Rejected. Requiring mandatory signup/login for simple pricing lookups creates high friction for evaluation, interactive documentation exploration, and lightweight developer tools.
+
+### Alternative 3: Server-Side Stateful Session Store for Anonymous Users
+Rejected. Storing anonymous visitor session tokens in PostgreSQL or Redis incurs database write amplification and consumes database memory for transient single-request visitors. Stateless HMAC-signed cookies avoid server-side storage overhead.

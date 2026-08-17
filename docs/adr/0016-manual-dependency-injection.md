@@ -26,3 +26,11 @@ We will strictly use **Manual, Constructor-based Dependency Injection**, explici
 ### Negative
 - `main.go` could become noisy with boilerplate.
 - **Mitigation**: We explicitly mitigate this by grouping constructors into small, logical helper functions (e.g., `newProviderAdapters()`, `newCacheLayer()`), keeping the top-level `main.go` clean while remaining 100% compiler-checked and manually traceable.
+
+## Alternatives Considered
+
+### Alternative 1: Runtime Reflection DI Frameworks (Uber `fx`, `dig`)
+Rejected. Runtime reflection frameworks hide the initialization order, defer missing dependency failures to runtime execution rather than compilation, and make stack traces difficult to debug during system startup.
+
+### Alternative 2: Compile-Time Code-Generation DI Tools (Google `wire`)
+Rejected. Google Wire adds build step complexity and code-generation artifacts for a dependency graph that is shallow and straightforward to construct manually in standard Go.

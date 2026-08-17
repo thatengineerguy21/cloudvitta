@@ -50,3 +50,11 @@ We narrow the CORS policy on all REST endpoints through `internal/transport/rest
 
 ### Negative
 - Frontend applications and test environments must configure their origin in `CLOUDVITTA_CORS_ALLOWED_ORIGINS` to perform cross-origin requests with credentials.
+
+## Alternatives Considered
+
+### Alternative 1: Permissive Wildcard CORS (`Access-Control-Allow-Origin: *`)
+Rejected. W3C CORS and modern browser specifications forbid combining `Access-Control-Allow-Credentials: true` with wildcard origins. Maintaining a wildcard policy prevents browsers from transmitting or persisting authentication and anonymous tracking cookies.
+
+### Alternative 2: Reverse Proxy Origin Rewriting Without CORS Middleware
+Rejected. Requiring an external proxy (such as Nginx or Cloudflare) to manage CORS headers complicates local developer setups and couples application security behavior to external routing infrastructure.

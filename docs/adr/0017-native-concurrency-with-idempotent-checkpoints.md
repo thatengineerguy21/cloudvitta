@@ -32,3 +32,11 @@ We will strictly use **Native Go Concurrency** combined with an **External Idemp
 
 ### Negative
 - Requires building a small amount of custom checkpoint/resume logic rather than getting it out-of-the-box from a framework like RabbitMQ.
+
+## Alternatives Considered
+
+### Alternative 1: Distributed Job Queue and Message Brokers (RabbitMQ / Celery / Machinery)
+Rejected. Distributed message brokers require continuously running broker and worker instances, conflicting with scale-to-zero serverless constraints. Ingestion bottlenecks stem from upstream provider rate limits rather than local worker concurrency.
+
+### Alternative 2: Single-Threaded Sequential Ingestion
+Rejected. Sequential ingestion across all cloud providers, categories, and regions takes hours to complete, exceeding Cloud Run execution timeout ceilings and delaying pricing data availability.

@@ -14,9 +14,18 @@ classDiagram
         a2a
     }
 
+    class middleware {
+        authmw
+        ratelimit
+        cors
+    }
+
     class service {
         Calculator Engine
+        Pricing Service
+        Freshness Service
         Ingestion Orchestrator
+        Auth Service
         FX Service Abstraction
         SKU Matching Orchestration
     }
@@ -63,15 +72,20 @@ classDiagram
         Bcrypt Password Hashing
         JWT Token Issuance
         Refresh Token Generation
+        Anonymous Cookie Verification
     }
 
     cmd --> transport : Wires dependencies
     cmd --> adapter : Instantiates factories
     
-    transport --> service : Thin adapters call engine
+    transport --> middleware : Routes through middlewares
+    middleware --> auth : Verifies JWT and cookies
+    middleware --> cache : Tracks rate limit keys
+    
+    transport --> service : Thin adapters call services
     
     service --> store : Calls DB layer
-    service --> cache : Orchestrates reads + locks
+    service --> cache : Orchestrates reads and locks
     service --> dlq : Records failed jobs
     service --> matching : Uses matching strategies
     service --> fx : Uses currency conversion

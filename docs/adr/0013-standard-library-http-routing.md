@@ -25,3 +25,11 @@ We will use the **Go Standard Library (`net/http`)** and the 1.22+ `ServeMux`, e
 
 ### Negative
 - Requires a slightly deeper understanding of the standard `func(http.Handler) http.Handler` middleware pattern rather than relying on framework abstractions.
+
+## Alternatives Considered
+
+### Alternative 1: Third-Party HTTP Frameworks (Gin, Echo, Fiber)
+Rejected. Framework-specific middlewares (such as Gin rate limiters or auth handlers) cannot be reused across gRPC, MCP, or A2A transports. They introduce third-party API churn and dependency bloat without offering benefits over the standard library `http.ServeMux` (Go 1.22+).
+
+### Alternative 2: Full-Stack Web Application Frameworks
+Rejected. Heavy full-stack frameworks introduce opinionated ORM and transport abstractions that contradict our modular monolith architecture and explicit constructor-based dependency injection.
