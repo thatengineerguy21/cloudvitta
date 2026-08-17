@@ -274,7 +274,7 @@ func isComputeInstance(item azureItem) bool {
 func isAzureStorageProduct(item azureItem) bool {
 	// Exclude auxiliary operational/management services
 	desc := item.ProductName + " " + item.MeterName + " " + item.SkuName
-	if strings.Contains(desc, "Storage Tasks") || strings.Contains(desc, "Operations") || strings.Contains(desc, "Transactions") || strings.Contains(desc, "Storage Mover") {
+	if strings.Contains(desc, "Storage Tasks") || strings.Contains(desc, "Operations") || strings.Contains(desc, "Transactions") || strings.Contains(desc, "Storage Mover") || strings.Contains(desc, "Data Box") {
 		return false
 	}
 	unit := strings.ToLower(item.UnitOfMeasure)
@@ -300,6 +300,7 @@ func parseAzureStorageClass(skuName, meterName, productName string) (string, err
 			"Account Encrypted GZRS", "Account Encrypted GRS", "Account Encrypted ZRS", "Account Encrypted LRS", "Account Encrypted",
 			"GZRS", "GRS", "ZRS", "LRS", "RA-GRS", "RA-GZRS",
 			"Blob", "Block Blob", "Page Blob", "Append Blob", "Files", "Disks", "Managed Disks",
+			"Premium Files", "Ultra Disks", "Premium SSD v2",
 		} {
 			if strings.Contains(text, candidate) {
 				return storageclassmap.MapAzureStorageClass(candidate)
@@ -321,6 +322,7 @@ func parseAzureTransferType(displayName, meterName, skuName string) (string, err
 		for _, candidate := range []string{
 			"Inter-Region", "Intra-Region", "Internet", "Data Transfer Out", "Bandwidth",
 			"Rtn Preference: MGN", "Rtn Preference: Transit", "Routing Preference",
+			"ExpressRoute", "Global",
 		} {
 			if strings.Contains(text, candidate) {
 				if tt, err := transfertypemap.MapAzureTransferType(candidate); err == nil {
@@ -332,7 +334,7 @@ func parseAzureTransferType(displayName, meterName, skuName string) (string, err
 	return transfertypemap.MapAzureTransferType(displayName)
 }
 
-var vmSizeRegex = regexp.MustCompile(`(?i)(?:Standard_)?([A-Za-z]+)(\d+)(?:[A-Za-z]*)?(?:_v(\d+))?`)
+var vmSizeRegex = regexp.MustCompile(`(?i)(?:(?:Standard|Basic|Promo)_)?([A-Za-z]+)(\d+)(?:[A-Za-z]*)?(?:_v(\d+))?`)
 
 func parseAzureAttributes(armSkuName, skuName, _ string) (float64, float64, string) {
 	// Check known specs first

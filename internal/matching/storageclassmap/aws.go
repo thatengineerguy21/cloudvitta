@@ -9,12 +9,35 @@ import (
 var ErrUnmappedStorageClass = errors.New("storageclassmap: unmapped storage class")
 
 var awsStorageClassMap = map[string]string{
+	// S3 Storage Classes
 	"Standard":                     "standard",
 	"General Purpose":              "standard",
+	"Intelligent-Tiering":          "standard",
 	"Standard - Infrequent Access": "infrequent_access",
+	"Standard-IA":                  "infrequent_access",
 	"One Zone - Infrequent Access": "infrequent_access",
+	"OneZone-IA":                   "infrequent_access",
+	"Glacier Instant Retrieval":    "archive",
 	"Glacier Flexible Retrieval":   "archive",
+	"Glacier":                      "archive",
 	"Glacier Deep Archive":         "archive",
+	"Express One Zone":             "standard",
+	"Reduced Redundancy":           "standard",
+	"S3 Outposts":                  "standard",
+
+	// EBS Volume Types (volumeType)
+	"gp2":                       "standard",
+	"gp3":                       "standard",
+	"io1":                       "standard",
+	"io2":                       "standard",
+	"st1":                       "standard",
+	"sc1":                       "archive",
+	"Magnetic":                  "standard",
+	"Throughput Optimized HDD":  "standard",
+	"Cold HDD":                  "archive",
+	"Provisioned IOPS":          "standard",
+	"Provisioned IOPS SSD(io1)": "standard",
+	"Provisioned IOPS SSD(io2)": "standard",
 }
 
 // MapAWSStorageClass resolves an AWS storage class to a canonical class.

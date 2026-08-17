@@ -24,6 +24,9 @@ var gcpRegionMap = map[string]string{
 	"northamerica-northeast1": "ca-central",
 	"northamerica-northeast2": "ca-central",
 
+	// Mexico
+	"northamerica-south1": "us-central",
+
 	// South America
 	"southamerica-east1": "sa-east",
 	"southamerica-west1": "sa-east",
@@ -60,6 +63,7 @@ var gcpRegionMap = map[string]string{
 	"me-west1":    "il-central",
 	"me-central1": "me-central",
 	"me-central2": "me-central",
+	"me-south1":   "me-central",
 
 	// Africa
 	"africa-south1": "af-south",

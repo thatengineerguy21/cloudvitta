@@ -461,9 +461,12 @@ func isStorageProduct(sku gcpSKU) bool {
 		return false
 	}
 
-	// Exclude metadata, tag bindings, and auxiliary operations
+	// Exclude metadata, tag bindings, operations, and auxiliary services
 	desc := sku.Description + " " + sku.Category.ResourceGroup + " " + sku.Name
-	if strings.Contains(desc, "TagBinding") || strings.Contains(desc, "Tag Binding") || strings.Contains(desc, "Autoclass") || strings.Contains(desc, "Early Delete") {
+	if strings.Contains(desc, "TagBinding") || strings.Contains(desc, "Tag Binding") ||
+		strings.Contains(desc, "Autoclass") || strings.Contains(desc, "Early Delete") ||
+		strings.Contains(desc, "Retrieval") || strings.Contains(desc, "Operations Class") ||
+		strings.Contains(desc, "Replication") || strings.Contains(desc, "Data Box") {
 		return false
 	}
 

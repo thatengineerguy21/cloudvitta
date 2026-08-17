@@ -20,6 +20,11 @@ var azureTransferTypeMap = map[string]string{
 	"Microsoft Global Network":                     "internet_egress",
 	"Standard Internet Egress":                     "internet_egress",
 	"Routing Preference Internet Egress":           "internet_egress",
+	"Routing Preference: Transit / ISP":            "internet_egress",
+	"Routing Preference: Transit":                  "internet_egress",
+	"Routing Preference: ISP":                      "internet_egress",
+	"ExpressRoute":                                 "internet_egress",
+	"Global":                                       "internet_egress",
 }
 
 // MapAzureTransferType resolves an Azure transfer type to a canonical transfer type.

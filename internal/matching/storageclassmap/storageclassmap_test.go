@@ -15,6 +15,9 @@ func TestMapAWSStorageClass(t *testing.T) {
 		{"General Purpose", "standard", nil},
 		{"Standard - Infrequent Access", "infrequent_access", nil},
 		{"Glacier Deep Archive", "archive", nil},
+		{"gp3", "standard", nil},
+		{"io1", "standard", nil},
+		{"Express One Zone", "standard", nil},
 		{"UnknownClass", "", ErrUnmappedStorageClass},
 	}
 

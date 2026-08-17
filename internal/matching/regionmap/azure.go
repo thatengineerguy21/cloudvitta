@@ -10,6 +10,8 @@ var azureRegionMap = map[string]string{
 	"US East":   "us-east",
 	"eastus2":   "us-east",
 	"US East 2": "us-east",
+	"eastus3":   "us-east",
+	"US East 3": "us-east",
 
 	// US West
 	"westus":    "us-west",
@@ -52,6 +54,10 @@ var azureRegionMap = map[string]string{
 	"Germany West Central": "eu-central",
 	"germanynorth":         "eu-central",
 	"Germany North":        "eu-central",
+	"germanycentral":       "eu-central",
+	"Germany Central":      "eu-central",
+	"germanynortheast":     "eu-central",
+	"Germany Northeast":    "eu-central",
 	"switzerlandnorth":     "eu-central",
 	"Switzerland North":    "eu-central",
 	"switzerlandwest":      "eu-central",
@@ -110,6 +116,20 @@ var azureRegionMap = map[string]string{
 	"Indonesia Central":   "ap-southeast",
 	"malaysiawest":        "ap-southeast",
 	"Malaysia West":       "ap-southeast",
+
+	// China Sovereign
+	"chinaeast":     "ap-east",
+	"China East":    "ap-east",
+	"chinaeast2":    "ap-east",
+	"China East 2":  "ap-east",
+	"chinaeast3":    "ap-east",
+	"China East 3":  "ap-east",
+	"chinanorth":    "ap-east",
+	"China North":   "ap-east",
+	"chinanorth2":   "ap-east",
+	"China North 2": "ap-east",
+	"chinanorth3":   "ap-east",
+	"China North 3": "ap-east",
 
 	// South America
 	"brazilsouth":      "sa-east",
@@ -185,9 +205,31 @@ var azureRegionMap = map[string]string{
 	"attseattle1":     "us-west",
 	"attorlando1":     "us-east",
 
-	// Global
-	"global": "global",
-	"Global": "global",
+	// Macro Regions (Network Transfer / Egress)
+	"Oceania":       "ap-southeast",
+	"oceania":       "ap-southeast",
+	"Asia":          "ap-east",
+	"asia":          "ap-east",
+	"Asia Pacific":  "ap-east",
+	"Asia-Pacific":  "ap-east",
+	"Europe":        "eu-west",
+	"europe":        "eu-west",
+	"North America": "us-east",
+	"South America": "sa-east",
+	"Middle East":   "me-central",
+	"Africa":        "af-south",
+	"US":            "us-east",
+	"United States": "us-east",
+	"Canada":        "ca-central",
+	"Latin America": "sa-east",
+	"LATAM":         "sa-east",
+
+	// Global & Transfer
+	"global":       "global",
+	"Global":       "global",
+	"Any":          "global",
+	"Inter-Region": "global",
+	"Intra-Region": "global",
 }
 
 var azureGroupToNativeMap = map[string]string{

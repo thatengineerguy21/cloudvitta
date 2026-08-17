@@ -13,8 +13,11 @@ func TestMapAWSTransferType(t *testing.T) {
 	}{
 		{"AWS Data Transfer Out", "internet_egress", nil},
 		{"Data Transfer Out (Internet)", "internet_egress", nil},
+		{"Data Transfer Internet (Out)", "internet_egress", nil},
 		{"Data Transfer Out (Inter-Region)", "inter_region", nil},
 		{"Data Transfer Out (Intra-Region)", "intra_region", nil},
+		{"Direct Connect Data Transfer Out", "internet_egress", nil},
+		{"CloudFront Data Transfer Out", "internet_egress", nil},
 		{"UnknownTransferType", "", ErrUnmappedTransferType},
 	}
 
@@ -42,6 +45,9 @@ func TestMapAzureTransferType(t *testing.T) {
 		{"Data Transfer Out", "internet_egress", nil},
 		{"Rtn Preference: MGN", "internet_egress", nil},
 		{"Routing Preference: Microsoft Global Network", "internet_egress", nil},
+		{"Routing Preference: Transit / ISP", "internet_egress", nil},
+		{"ExpressRoute", "internet_egress", nil},
+		{"Global", "internet_egress", nil},
 		{"Inter-Region", "inter_region", nil},
 		{"Intra-Region", "intra_region", nil},
 		{"UnknownTransferType", "", ErrUnmappedTransferType},
@@ -68,6 +74,8 @@ func TestMapGCPTransferType(t *testing.T) {
 		wantErr  error
 	}{
 		{"Network Internet Egress", "internet_egress", nil},
+		{"Premium Tier Internet Egress", "internet_egress", nil},
+		{"Cloud Interconnect Egress", "internet_egress", nil},
 		{"Network Inter Region Egress", "inter_region", nil},
 		{"Network Intra Region Egress", "intra_region", nil},
 		{"UnknownTransferType", "", ErrUnmappedTransferType},
