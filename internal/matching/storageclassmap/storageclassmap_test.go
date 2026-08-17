@@ -14,10 +14,18 @@ func TestMapAWSStorageClass(t *testing.T) {
 		{"Standard", "standard", nil},
 		{"General Purpose", "standard", nil},
 		{"Standard - Infrequent Access", "infrequent_access", nil},
+		{"Infrequent Access", "infrequent_access", nil},
+		{"Archive Instant Retrieval", "archive", nil},
 		{"Glacier Deep Archive", "archive", nil},
 		{"gp3", "standard", nil},
 		{"io1", "standard", nil},
 		{"Express One Zone", "standard", nil},
+		{"High Performance", "standard", nil},
+		{"Non-Critical Data", "standard", nil},
+		{"Tags", "standard", nil},
+		{"Analytics", "standard", nil},
+		{"Files", "standard", nil},
+		{"Vectors", "standard", nil},
 		{"UnknownClass", "", ErrUnmappedStorageClass},
 	}
 
