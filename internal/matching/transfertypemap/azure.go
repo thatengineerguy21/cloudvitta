@@ -5,13 +5,21 @@ import (
 )
 
 var azureTransferTypeMap = map[string]string{
-	"Bandwidth - Data Transfer Out": "internet_egress",
-	"Bandwidth Data Transfer Out":   "internet_egress",
-	"Data Transfer Out":             "internet_egress",
-	"Inter-Region":                  "inter_region",
-	"Intra-Region":                  "intra_region",
-	"Internet Egress":               "internet_egress",
-	"Internet":                      "internet_egress",
+	"Bandwidth - Data Transfer Out":                "internet_egress",
+	"Bandwidth Data Transfer Out":                  "internet_egress",
+	"Data Transfer Out":                            "internet_egress",
+	"Inter-Region":                                 "inter_region",
+	"Intra-Region":                                 "intra_region",
+	"Internet Egress":                              "internet_egress",
+	"Internet":                                     "internet_egress",
+	"Rtn Preference: MGN":                          "internet_egress",
+	"Rtn Preference: Transit":                      "internet_egress",
+	"Routing Preference: Microsoft Global Network": "internet_egress",
+	"Routing Preference: Transit Provider":         "internet_egress",
+	"Routing Preference":                           "internet_egress",
+	"Microsoft Global Network":                     "internet_egress",
+	"Standard Internet Egress":                     "internet_egress",
+	"Routing Preference Internet Egress":           "internet_egress",
 }
 
 // MapAzureTransferType resolves an Azure transfer type to a canonical transfer type.

@@ -40,6 +40,8 @@ func TestMapAzureTransferType(t *testing.T) {
 	}{
 		{"Bandwidth Data Transfer Out", "internet_egress", nil},
 		{"Data Transfer Out", "internet_egress", nil},
+		{"Rtn Preference: MGN", "internet_egress", nil},
+		{"Routing Preference: Microsoft Global Network", "internet_egress", nil},
 		{"Inter-Region", "inter_region", nil},
 		{"Intra-Region", "intra_region", nil},
 		{"UnknownTransferType", "", ErrUnmappedTransferType},

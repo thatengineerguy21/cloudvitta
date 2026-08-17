@@ -64,10 +64,15 @@ var gcpRegionMap = map[string]string{
 	"africa-south1": "af-south",
 
 	// Global / Multi-region
-	"global": "global",
-	"us":     "us-east",
-	"eu":     "eu-west",
-	"asia":   "ap-east",
+	"global":      "global",
+	"us":          "us-east",
+	"eu":          "eu-west",
+	"asia":        "ap-east",
+	"asia1":       "ap-east",
+	"nam4":        "us-east",
+	"eur4":        "eu-central",
+	"us-central2": "us-central",
+	"us-east7":    "us-east",
 }
 
 var gcpGroupToNativeMap = map[string]string{

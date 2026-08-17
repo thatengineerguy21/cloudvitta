@@ -269,8 +269,19 @@ func isComputeInstance(item azureItem) bool {
 }
 
 func parseAzureStorageClass(skuName, meterName, productName string) (string, error) {
+	for _, candidate := range []string{skuName, meterName, productName} {
+		if candidate != "" {
+			if sc, err := storageclassmap.MapAzureStorageClass(candidate); err == nil {
+				return sc, nil
+			}
+		}
+	}
 	for _, text := range []string{skuName, meterName, productName} {
-		for _, candidate := range []string{"Hot", "Standard", "Premium", "Cool", "Cold", "Archive"} {
+		for _, candidate := range []string{
+			"Hot", "Standard", "Premium", "Cool", "Cold", "Archive",
+			"SSD ZRS", "SSD LRS", "SSD", "HDD", "Premium LRS", "Premium ZRS",
+			"Standard LRS", "Standard ZRS", "Standard GRS",
+		} {
 			if strings.Contains(text, candidate) {
 				return storageclassmap.MapAzureStorageClass(candidate)
 			}
@@ -284,6 +295,18 @@ func parseAzureTransferType(displayName, meterName, skuName string) (string, err
 		if candidate != "" {
 			if tt, err := transfertypemap.MapAzureTransferType(candidate); err == nil {
 				return tt, nil
+			}
+		}
+	}
+	for _, text := range []string{displayName, meterName, skuName} {
+		for _, candidate := range []string{
+			"Inter-Region", "Intra-Region", "Internet", "Data Transfer Out", "Bandwidth",
+			"Rtn Preference: MGN", "Rtn Preference: Transit", "Routing Preference",
+		} {
+			if strings.Contains(text, candidate) {
+				if tt, err := transfertypemap.MapAzureTransferType(candidate); err == nil {
+					return tt, nil
+				}
 			}
 		}
 	}

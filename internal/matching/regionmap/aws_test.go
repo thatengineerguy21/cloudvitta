@@ -49,6 +49,18 @@ func TestMapAWSRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid location Asia Pacific (New Zealand)",
+			region:    "Asia Pacific (New Zealand)",
+			wantGroup: "ap-southeast",
+			wantErr:   nil,
+		},
+		{
+			name:      "valid location EU (Ireland)",
+			region:    "EU (Ireland)",
+			wantGroup: "eu-west",
+			wantErr:   nil,
+		},
+		{
 			name:      "unmapped region code fails loudly",
 			region:    "unknown-aws-region-99",
 			wantGroup: "",
