@@ -179,7 +179,7 @@ var azureRegionMap = map[string]string{
 	"mexicocentral":  "us-central",
 	"Mexico Central": "us-central",
 
-	// Edge Zones (AT&T)
+	// Edge Zones (AT&T / Singtel)
 	"attdetroit1":     "us-east",
 	"ATT Detroit 1":   "us-east",
 	"attdetroit":      "us-east",
@@ -204,6 +204,9 @@ var azureRegionMap = map[string]string{
 	"attphoenix1":     "us-west",
 	"attseattle1":     "us-west",
 	"attorlando1":     "us-east",
+	"sgxsingapore1":   "ap-southeast",
+	"SGX Singapore 1": "ap-southeast",
+	"sgxsingapore":    "ap-southeast",
 
 	// Macro Regions (Network Transfer / Egress)
 	"Oceania":       "ap-southeast",

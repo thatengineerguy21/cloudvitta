@@ -79,6 +79,12 @@ func TestMapAzureRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid edge region sgxsingapore1",
+			region:    "sgxsingapore1",
+			wantGroup: "ap-southeast",
+			wantErr:   nil,
+		},
+		{
 			name:      "valid macro region Oceania",
 			region:    "Oceania",
 			wantGroup: "ap-southeast",

@@ -85,6 +85,12 @@ func TestMapAWSRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid location Denmark (Copenhagen)",
+			region:    "Denmark (Copenhagen)",
+			wantGroup: "eu-north",
+			wantErr:   nil,
+		},
+		{
 			name:      "unmapped region code fails loudly",
 			region:    "unknown-aws-region-99",
 			wantGroup: "",

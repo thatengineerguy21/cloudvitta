@@ -96,6 +96,7 @@ var awsRegionMap = map[string]string{
 	"Europe (Stockholm)":   "eu-north",
 	"EU (Stockholm)":       "eu-north",
 	"Europe (Copenhagen)":  "eu-north",
+	"Denmark (Copenhagen)": "eu-north",
 	"Europe (Helsinki)":    "eu-north",
 	"eu-south-1":           "eu-south",
 	"Europe (Milan)":       "eu-south",

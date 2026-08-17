@@ -72,6 +72,7 @@ var gcpRegionMap = map[string]string{
 	"global":       "global",
 	"us":           "us-east",
 	"eu":           "eu-west",
+	"europe":       "eu-west",
 	"asia":         "ap-east",
 	"asia1":        "ap-east",
 	"asia2":        "ap-southeast",

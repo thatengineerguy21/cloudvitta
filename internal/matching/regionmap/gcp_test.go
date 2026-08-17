@@ -61,6 +61,12 @@ func TestMapGCPRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid multi-region europe",
+			region:    "europe",
+			wantGroup: "eu-west",
+			wantErr:   nil,
+		},
+		{
 			name:      "valid region northamerica-south1",
 			region:    "northamerica-south1",
 			wantGroup: "us-central",
