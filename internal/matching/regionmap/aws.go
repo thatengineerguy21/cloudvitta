@@ -107,6 +107,7 @@ var awsRegionMap = map[string]string{
 
 	// Asia Pacific
 	"ap-east-1":                  "ap-east",
+	"ap-east-2":                  "ap-east",
 	"Asia Pacific (Hong Kong)":   "ap-east",
 	"Asia Pacific (Taipei)":      "ap-east",
 	"Taiwan (Taipei)":            "ap-east",
@@ -183,12 +184,25 @@ var awsRegionMap = map[string]string{
 	"Africa (Cape Town)": "af-south",
 	"Nigeria (Lagos)":    "af-south",
 
-	// GovCloud
+	// GovCloud & Secret Regions
 	"us-gov-west-1":          "us-west",
 	"AWS GovCloud (US-West)": "us-west",
 	"AWS GovCloud (US)":      "us-west",
 	"us-gov-east-1":          "us-east",
 	"AWS GovCloud (US-East)": "us-east",
+	"us-iso-east-1":          "us-east",
+	"us-isob-east-1":         "us-east",
+	"us-iso-west-1":          "us-west",
+	"eu-isoe-west-1":         "eu-west",
+
+	// Location Aliases
+	"Spain (Madrid)":        "eu-south",
+	"Switzerland (Zurich)":  "eu-central",
+	"India (Hyderabad)":     "ap-south",
+	"Australia (Melbourne)": "ap-southeast",
+	"UAE (Dubai)":           "me-central",
+	"United Arab Emirates":  "me-central",
+	"Tel Aviv":              "il-central",
 
 	// Global / Any
 	"Global":   "global",
@@ -201,6 +215,23 @@ var awsGroupToNativeMap = map[string]string{
 	"us-east":               "us-east-1",
 	"us-east-1":             "us-east-1",
 	"US East (N. Virginia)": "us-east-1",
+	"us-central":            "us-east-2",
+	"us-west":               "us-west-2",
+	"ca-central":            "ca-central-1",
+	"eu-west":               "eu-west-1",
+	"eu-central":            "eu-central-1",
+	"eu-north":              "eu-north-1",
+	"eu-south":              "eu-south-1",
+	"ap-east":               "ap-east-1",
+	"ap-south":              "ap-south-1",
+	"ap-southeast":          "ap-southeast-1",
+	"ap-northeast":          "ap-northeast-1",
+	"sa-east":               "sa-east-1",
+	"me-central":            "me-central-1",
+	"me-south":              "me-south-1",
+	"il-central":            "il-central-1",
+	"af-south":              "af-south-1",
+	"global":                "global",
 }
 
 // MapAWSRegion resolves an AWS region code or location name to a normalized region group.

@@ -85,6 +85,18 @@ func TestMapAzureRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid region denmarkeast",
+			region:    "denmarkeast",
+			wantGroup: "eu-north",
+			wantErr:   nil,
+		},
+		{
+			name:      "valid location Mexico East",
+			region:    "Mexico East",
+			wantGroup: "us-central",
+			wantErr:   nil,
+		},
+		{
 			name:      "valid macro region Oceania",
 			region:    "Oceania",
 			wantGroup: "ap-southeast",
