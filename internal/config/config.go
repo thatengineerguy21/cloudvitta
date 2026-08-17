@@ -19,7 +19,12 @@ type Config struct {
 	Database      DatabaseConfig      `koanf:"database" validate:"required"`
 	Redis         RedisConfig         `koanf:"redis" validate:"required"`
 	Storage       StorageConfig       `koanf:"storage" validate:"required"`
+	Auth          AuthConfig          `koanf:"auth" validate:"required"`
+	RateLimit     RateLimitConfig     `koanf:"ratelimit"`
+	CORS          CORSConfig          `koanf:"cors"`
 	Observability ObservabilityConfig `koanf:"observability"`
+	GCP           GCPConfig           `koanf:"gcp"`
+	Freshness     FreshnessConfig     `koanf:"freshness"`
 }
 
 type PrimaryConfig struct {
@@ -85,9 +90,34 @@ type StorageConfig struct {
 	GCSBucketName string `koanf:"gcs_bucket_name" validate:"required"`
 }
 
+type AuthConfig struct {
+	JWTSecret        string `koanf:"jwt_secret" validate:"required,min=32"`
+	AnonCookieSecret string `koanf:"anon_cookie_secret"`
+}
+
+type RateLimitConfig struct {
+	StandardTierRate int64 `koanf:"standard_tier_rate"` // default: 120 req/min
+	FreeTierRate     int64 `koanf:"free_tier_rate"`     // default: 20 req/min
+	IPCeilingRate    int64 `koanf:"ip_ceiling_rate"`    // default: 60 req/min
+	LoginRate        int64 `koanf:"login_rate"`         // default: 10 req/min
+}
+
+type CORSConfig struct {
+	AllowedOrigins   []string `koanf:"allowed_origins"`
+	AllowCredentials bool     `koanf:"allow_credentials"`
+}
+
 type ObservabilityConfig struct {
 	OTLPEndpoint string `koanf:"otlp_endpoint"`
 	OTLPHeaders  string `koanf:"otlp_headers"`
+}
+
+type GCPConfig struct {
+	APIKey string `koanf:"api_key"`
+}
+
+type FreshnessConfig struct {
+	StalenessThresholdHours int64 `koanf:"staleness_threshold_hours"`
 }
 
 func Load() (*Config, error) {
@@ -124,7 +154,31 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	if mainConfig.CORS.AllowCredentials {
+		for _, origin := range mainConfig.CORS.AllowedOrigins {
+			if origin == "*" {
+				return nil, fmt.Errorf("config: CORS AllowCredentials cannot be true when AllowedOrigins contains wildcard '*'")
+			}
+		}
+	}
+
 	return mainConfig, nil
+}
+
+func resolveEnvInt64(primaryEnv, secondaryEnv string, fallback int64) int64 {
+	if val := os.Getenv(primaryEnv); val != "" {
+		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	if secondaryEnv != "" {
+		if val := os.Getenv(secondaryEnv); val != "" {
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+				return parsed
+			}
+		}
+	}
+	return fallback
 }
 
 // resolveEnvFallbacks populates configuration fields with standard environment variables
@@ -179,6 +233,112 @@ func resolveEnvFallbacks(cfg *Config) error {
 	}
 	if cfg.Observability.OTLPHeaders == "" {
 		cfg.Observability.OTLPHeaders = os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+	}
+
+	// 7. Resolve GCP fallbacks
+	if cfg.GCP.APIKey == "" {
+		if val := os.Getenv("CLOUDVITTA_GCP_API_KEY"); val != "" {
+			cfg.GCP.APIKey = val
+		} else {
+			cfg.GCP.APIKey = os.Getenv("GCP_API_KEY")
+		}
+	}
+
+	// 8. Resolve Auth JWT Secret fallback
+	if cfg.Auth.JWTSecret == "" {
+		if val := os.Getenv("CLOUDVITTA_AUTH_JWT_SECRET"); val != "" {
+			cfg.Auth.JWTSecret = val
+		} else if val := os.Getenv("CLOUDVITTA_JWT_SECRET"); val != "" {
+			cfg.Auth.JWTSecret = val
+		} else {
+			cfg.Auth.JWTSecret = os.Getenv("JWT_SECRET")
+		}
+	}
+
+	// 9. Resolve Auth Anon Cookie Secret fallback
+	if cfg.Auth.AnonCookieSecret == "" {
+		if val := os.Getenv("CLOUDVITTA_AUTH_ANON_COOKIE_SECRET"); val != "" {
+			cfg.Auth.AnonCookieSecret = val
+		} else if val := os.Getenv("ANON_COOKIE_SECRET"); val != "" {
+			cfg.Auth.AnonCookieSecret = val
+		} else {
+			cfg.Auth.AnonCookieSecret = cfg.Auth.JWTSecret
+		}
+	}
+
+	// 10. Resolve RateLimit fallbacks & defaults
+	if cfg.RateLimit.StandardTierRate == 0 {
+		cfg.RateLimit.StandardTierRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_STANDARD_TIER_RATE", "RATELIMIT_STANDARD_TIER_RATE", 120)
+	}
+	if cfg.RateLimit.FreeTierRate == 0 {
+		cfg.RateLimit.FreeTierRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_FREE_TIER_RATE", "RATELIMIT_FREE_TIER_RATE", 20)
+	}
+	if cfg.RateLimit.IPCeilingRate == 0 {
+		cfg.RateLimit.IPCeilingRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_IP_CEILING_RATE", "RATELIMIT_IP_CEILING_RATE", 60)
+	}
+	if cfg.RateLimit.LoginRate == 0 {
+		cfg.RateLimit.LoginRate = resolveEnvInt64("CLOUDVITTA_RATELIMIT_LOGIN_RATE", "RATELIMIT_LOGIN_RATE", 10)
+	}
+
+	// 11. Resolve CORS fallbacks & defaults
+	corsCredsVal := os.Getenv("CLOUDVITTA_CORS_ALLOW_CREDENTIALS")
+	if corsCredsVal == "" {
+		corsCredsVal = os.Getenv("CORS_ALLOW_CREDENTIALS")
+	}
+	if corsCredsVal != "" {
+		if parsed, err := strconv.ParseBool(corsCredsVal); err == nil {
+			cfg.CORS.AllowCredentials = parsed
+		}
+	} else if len(cfg.CORS.AllowedOrigins) == 0 {
+		cfg.CORS.AllowCredentials = true
+	}
+
+	corsOriginsVal := os.Getenv("CLOUDVITTA_CORS_ALLOWED_ORIGINS")
+	if corsOriginsVal == "" {
+		corsOriginsVal = os.Getenv("CORS_ALLOWED_ORIGINS")
+	}
+
+	if corsOriginsVal != "" {
+		parts := strings.Split(corsOriginsVal, ",")
+		var origins []string
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
+		if len(origins) > 0 {
+			cfg.CORS.AllowedOrigins = origins
+		}
+	} else if len(cfg.CORS.AllowedOrigins) == 1 && strings.Contains(cfg.CORS.AllowedOrigins[0], ",") {
+		parts := strings.Split(cfg.CORS.AllowedOrigins[0], ",")
+		var origins []string
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
+		if len(origins) > 0 {
+			cfg.CORS.AllowedOrigins = origins
+		}
+	}
+
+	if len(cfg.CORS.AllowedOrigins) == 0 {
+		if cfg.CORS.AllowCredentials {
+			cfg.CORS.AllowedOrigins = []string{
+				"https://cloudvitta.dev",
+				"http://localhost:3000",
+				"http://localhost:5173",
+			}
+		} else {
+			cfg.CORS.AllowedOrigins = []string{"*"}
+		}
+	}
+
+	// 12. Resolve Freshness fallbacks & defaults
+	if cfg.Freshness.StalenessThresholdHours == 0 {
+		cfg.Freshness.StalenessThresholdHours = resolveEnvInt64("CLOUDVITTA_FRESHNESS_STALENESS_THRESHOLD_HOURS", "FRESHNESS_STALENESS_THRESHOLD_HOURS", 168)
 	}
 
 	return nil

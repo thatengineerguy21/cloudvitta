@@ -9,7 +9,9 @@ import (
 var ErrUnmappedProduct = errors.New("catalogmap: unmapped product code")
 
 var awsCatalogMap = map[string]string{
-	"AmazonEC2": "compute",
+	"AmazonEC2":       "compute",
+	"AmazonS3":        "storage",
+	"AWSDataTransfer": "network",
 }
 
 // MapAWSProduct resolves an AWS product code to a normalized service category.
@@ -20,4 +22,13 @@ func MapAWSProduct(productCode string) (string, error) {
 		return "", fmt.Errorf("%w: %q", ErrUnmappedProduct, productCode)
 	}
 	return category, nil
+}
+
+// KnownAWSProducts returns a copy of known AWS product mappings.
+func KnownAWSProducts() map[string]string {
+	m := make(map[string]string, len(awsCatalogMap))
+	for k, v := range awsCatalogMap {
+		m[k] = v
+	}
+	return m
 }

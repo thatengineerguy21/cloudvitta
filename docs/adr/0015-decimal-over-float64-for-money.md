@@ -28,3 +28,11 @@ We will strictly use **`decimal.Decimal`** for any price amount, FX rate, or com
 ### Negative
 - **Minor Overhead**: `decimal.Decimal` carries a computational penalty compared to native floats.
 - However, we explicitly accept this because the performance argument is a fallacy for this system: ingestion is entirely I/O-bound, and API requests sum a handful of line items. Optimizing float throughput would be optimizing a part of the system that is fundamentally not the bottleneck. Precision is the core product requirement.
+
+## Alternatives Considered
+
+### Alternative 1: IEEE-754 Native `float64` Floating-Point Numbers
+Rejected. Binary floating-point representation causes cumulative rounding errors (e.g. `0.1 + 0.2 = 0.30000000000000004`), triggers false-positive price change detections in the upsert engine, and causes ranking flips in cost comparisons.
+
+### Alternative 2: Integer Scaling in Minor Currency Units (Cents / Micros)
+Rejected. Cloud services frequently quote prices in fractional cents with high decimal precision (for example, $0.00001667 per second). Fixed-integer scaling requires arbitrary multiplier constants across different resource dimensions and creates conversion bugs.

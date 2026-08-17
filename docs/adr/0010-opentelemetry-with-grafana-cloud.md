@@ -29,3 +29,11 @@ We will use **OpenTelemetry exporting to Grafana Cloud**, rather than New Relic 
 
 ### Negative
 - Introduces an external SaaS dependency with a free-tier ingest ceiling. This is acceptable at current traffic levels but will require reassessment if usage grows significantly.
+
+## Alternatives Considered
+
+### Alternative 1: Self-Hosted Prometheus, Grafana, and Jaeger on Virtual Machines
+Rejected. Self-hosting Prometheus requires continuously running virtual machines to perform scrape loops. This contradicts our scale-to-zero serverless design and creates unnecessary operational maintenance for patching and storage management.
+
+### Alternative 2: Proprietary APM SaaS Vendors (New Relic / Datadog)
+Rejected. Proprietary APM vendors require proprietary agent SDKs and proprietary query languages, increasing vendor lock-in and complicating potential future migrations. OpenTelemetry with Grafana Cloud preserves open standards (PromQL, LogQL, TraceQL) with zero application code changes required if the export target changes.

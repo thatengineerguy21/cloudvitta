@@ -8,21 +8,29 @@ Accepted
 
 ## Context
 
-CloudVitta requires a normalized relational database to store ingested price observations. In a traditional enterprise environment, a managed database like Google Cloud SQL or AWS RDS would be provisioned to ensure high availability and consistent low latency.
+CloudVitta requires a normalized relational database to store ingested price observations. In an enterprise environment, a managed database such as Google Cloud SQL or AWS RDS is provisioned to ensure high availability and consistent baseline latency.
 
-However, as a portfolio project, cost optimization is a primary constraint. A permanently running Cloud SQL instance carries a fixed baseline monthly cost, regardless of traffic. Serverless Postgres (Neon) offers an alternative that scales compute down to zero when idle.
+Cost sustainability is a primary constraint. A continuously running managed database instance incurs a fixed monthly baseline cost regardless of traffic volume. Serverless Postgres (Neon) scales compute resources down to zero when idle.
 
 ## Decision
 
-We will use **Neon (Serverless Postgres)** for our normalized database layer.
+We use **Neon (Serverless Postgres)** for the normalized relational database layer.
 
 ## Consequences
 
 ### Positive
-- Massive reduction in baseline infrastructure costs; we only pay for active compute and storage.
-- Eliminates the need to manage infrastructure provisioning or manual database scaling.
-- Provides a great talking point in interviews regarding cost-aware architecture.
+- Substantially reduces baseline infrastructure costs by billing only for active compute time and stored bytes.
+- Eliminates manual database scaling and virtual machine maintenance.
+- Aligns with serverless economics across the entire application stack.
 
 ### Negative
-- **Cold Starts**: Because the database scales to zero, API requests that trigger a Redis cache-miss while the database is asleep will incur a significant latency spike (several seconds) while Postgres spins back up. 
-- We explicitly accept this cold start penalty as a valid trade-off for a portfolio project, prioritizing budget sustainability over absolute p99 latency guarantees.
+- **Cold Starts**: When the database scales down to zero, API requests that encounter a cache miss during idle periods experience a latency spike (several seconds) while the database resumes compute.
+- We explicitly accept this cold-start delay to maintain zero idle costs.
+
+## Alternatives Considered
+
+### Alternative 1: Always-On Managed PostgreSQL (Google Cloud SQL / AWS RDS)
+Rejected. Managed cloud database instances require continuous baseline billing (approximately $30-$60/month minimum), conflicting with scale-to-zero budget requirements for this system.
+
+### Alternative 2: NoSQL / Document Store (MongoDB / AWS DynamoDB)
+Rejected. Cloud pricing comparisons require multi-dimensional filtering, range queries, and schema constraints. SQL relational storage with `sqlc` generates type-safe queries and compile-time verification that NoSQL systems lack.

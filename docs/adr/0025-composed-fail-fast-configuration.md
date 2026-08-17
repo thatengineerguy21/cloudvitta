@@ -29,3 +29,11 @@ We will use **Composed, Binary-Specific Configurations** combined with strict fa
 
 ### Negative
 - Requires a slightly more verbose configuration setup (multiple small structs instead of one large one) in the `internal/config` package.
+
+## Alternatives Considered
+
+### Alternative 1: Single Monolithic Global Configuration Struct
+Rejected. A single monolithic configuration forces worker containers (such as ingestion jobs) to require JWT authentication secrets and client-facing settings they do not need, violating least privilege principles.
+
+### Alternative 2: Lazy Runtime Configuration Retrieval via `os.Getenv`
+Rejected. Fetching environment variables lazily during request execution defers missing configuration errors to production runtime rather than catching them immediately at application startup.

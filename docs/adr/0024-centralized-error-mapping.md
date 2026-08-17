@@ -29,3 +29,11 @@ We mandate **Single Centralized Error Mapping** per transport. Ad-hoc error-to-s
 
 ### Negative
 - Requires developers to strictly use the custom domain error constructor rather than standard `fmt.Errorf()` across the entire codebase.
+
+## Alternatives Considered
+
+### Alternative 1: Ad-Hoc Error Formatting Inside Individual Handlers
+Rejected. Formatting error responses individually within each HTTP or gRPC handler causes inconsistent status codes, duplicated serialization code, and non-uniform error payload formats.
+
+### Alternative 2: Generic 500 Internal Server Error Responses for Unhandled Errors
+Rejected. Returning generic 500 errors obscures validation details and operational guidance, harming client developer experience and violating RFC 7807 problem details standards.

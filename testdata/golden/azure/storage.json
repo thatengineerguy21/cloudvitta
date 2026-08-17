@@ -1,0 +1,44 @@
+{
+  "Items": [
+    {
+      "currencyCode": "USD",
+      "tierMinimumUnits": 0.0,
+      "retailPrice": 0.0184,
+      "unitPrice": 0.0184,
+      "armRegionName": "eastus",
+      "location": "US East",
+      "meterId": "METER-BLOB-HOT-LRS",
+      "meterName": "Hot LRS Data Stored",
+      "productId": "DZH318Z0BNZ5",
+      "skuId": "DZH318Z0BNZ5/0001",
+      "productName": "Blob Storage",
+      "skuName": "Hot LRS",
+      "serviceName": "Storage",
+      "serviceFamily": "Storage",
+      "unitOfMeasure": "1 GB/Month",
+      "type": "Consumption",
+      "isPrimaryMeterRegion": true
+    },
+    {
+      "currencyCode": "USD",
+      "tierMinimumUnits": 0.0,
+      "retailPrice": 0.00099,
+      "unitPrice": 0.00099,
+      "armRegionName": "eastus",
+      "location": "US East",
+      "meterId": "METER-BLOB-ARCHIVE-LRS",
+      "meterName": "Archive LRS Data Stored",
+      "productId": "DZH318Z0BNZ5",
+      "skuId": "DZH318Z0BNZ5/0002",
+      "productName": "Blob Storage",
+      "skuName": "Archive LRS",
+      "serviceName": "Storage",
+      "serviceFamily": "Storage",
+      "unitOfMeasure": "1 GB/Month",
+      "type": "Consumption",
+      "isPrimaryMeterRegion": true
+    }
+  ],
+  "NextPageLink": "",
+  "Count": 2
+}

@@ -1,0 +1,102 @@
+{
+  "formatVersion": "v1.0",
+  "disclaimer": "This is a sample AWS Data Transfer test fixture for CloudVitta.",
+  "offerCode": "AWSDataTransfer",
+  "version": "20260815000000",
+  "publicationDate": "2026-08-15T00:00:00Z",
+  "products": {
+    "SKU-AWS-DT-FLAT": {
+      "sku": "SKU-AWS-DT-FLAT",
+      "productFamily": "Data Transfer",
+      "attributes": {
+        "servicecode": "AWSDataTransfer",
+        "location": "US East (N. Virginia)",
+        "fromLocation": "US East (N. Virginia)",
+        "toLocation": "External",
+        "usagetype": "USE1-DataTransfer-Out-Bytes",
+        "description": "AWS Data Transfer Out to Internet"
+      }
+    },
+    "SKU-AWS-DT-TIERED": {
+      "sku": "SKU-AWS-DT-TIERED",
+      "productFamily": "Data Transfer",
+      "attributes": {
+        "servicecode": "AWSDataTransfer",
+        "location": "US East (N. Virginia)",
+        "fromLocation": "US East (N. Virginia)",
+        "toLocation": "External",
+        "usagetype": "USE1-DataTransfer-Out-Tiered-Bytes",
+        "description": "AWS Tiered Data Transfer Out"
+      }
+    },
+    "SKU-AWS-NONMATCH": {
+      "sku": "SKU-AWS-NONMATCH",
+      "productFamily": "Fee",
+      "attributes": {
+        "servicecode": "AWSDataTransfer",
+        "usagetype": "USE1-Fee"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-AWS-DT-FLAT": {
+        "SKU-AWS-DT-FLAT.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "SKU-AWS-DT-FLAT",
+          "priceDimensions": {
+            "SKU-AWS-DT-FLAT.JRTCKXETXF.6YS6EN2CT7": {
+              "unit": "GB",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.0900000000"
+              },
+              "description": "Flat rate egress per GB"
+            }
+          }
+        }
+      },
+      "SKU-AWS-DT-TIERED": {
+        "SKU-AWS-DT-TIERED.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "SKU-AWS-DT-TIERED",
+          "priceDimensions": {
+            "SKU-AWS-DT-TIERED.JRTCKXETXF.TIER1": {
+              "unit": "GB",
+              "beginRange": "0",
+              "endRange": "10240",
+              "pricePerUnit": {
+                "USD": "0.0900000000"
+              },
+              "description": "First 10 TB"
+            },
+            "SKU-AWS-DT-TIERED.JRTCKXETXF.TIER2": {
+              "unit": "GB",
+              "beginRange": "10240",
+              "endRange": "51200",
+              "pricePerUnit": {
+                "USD": "0.0850000000"
+              },
+              "description": "Next 40 TB"
+            }
+          }
+        }
+      },
+      "SKU-AWS-NONMATCH": {
+        "SKU-AWS-NONMATCH.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "SKU-AWS-NONMATCH",
+          "priceDimensions": {
+            "SKU-AWS-NONMATCH.JRTCKXETXF.DIM": {
+              "unit": "Quantity",
+              "pricePerUnit": {
+                "USD": "1.0000000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -2,17 +2,15 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
-	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"go.opentelemetry.io/otel/trace"
@@ -27,6 +25,7 @@ type PricingService struct {
 	tracer       trace.Tracer
 	cacheMetrics *observability.CacheMetrics
 	sfGroup      singleflight.Group
+	freshnessSvc *FreshnessService
 }
 
 // PricingOption allows configuring optional dependencies for PricingService.
@@ -46,6 +45,13 @@ func WithCacheMetrics(metrics *observability.CacheMetrics) PricingOption {
 	}
 }
 
+// WithFreshnessService attaches a FreshnessService to PricingService for staleness evaluation.
+func WithFreshnessService(freshnessSvc *FreshnessService) PricingOption {
+	return func(s *PricingService) {
+		s.freshnessSvc = freshnessSvc
+	}
+}
+
 // NewPricingService constructs a new PricingService.
 func NewPricingService(queries *store.Queries, redisClient redis.Cmdable, opts ...PricingOption) *PricingService {
 	s := &PricingService{
@@ -58,11 +64,20 @@ func NewPricingService(queries *store.Queries, redisClient redis.Cmdable, opts .
 	return s
 }
 
-// GetComputePrices retrieves compute pricing observations for provider, category, and regionGroup.
+// GetPrices retrieves pricing observations for provider, category, and regionGroup.
 // It attempts a Redis read first; on miss, it uses singleflight to collapse concurrent DB queries,
 // queries Postgres by regionGroup, and warms the cache before returning.
-func (s *PricingService) GetComputePrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
-	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, regionGroup)
+func (s *PricingService) GetPrices(ctx context.Context, provider, category, regionGroup string) ([]domain.PriceObservation, error) {
+	if !IsProviderCategorySupported(provider, category) {
+		return nil, fmt.Errorf("%w: provider %q does not support category %q", ErrCategoryNotSupported, provider, category)
+	}
+
+	nativeRegion, err := regionmap.ResolveNativeRegion(provider, regionGroup)
+	if err != nil {
+		nativeRegion = regionGroup
+	}
+
+	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, nativeRegion)
 
 	// 1. Try Cache-Aside Read from Redis
 	if s.redisClient != nil {
@@ -104,6 +119,10 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 			var dbSpan trace.Span
 			dbCtx, dbSpan = s.tracer.Start(dbCtx, "Postgres Fallback Query")
 			defer dbSpan.End()
+		}
+
+		if s.queries == nil {
+			return nil, fmt.Errorf("pricing service: database query unavailable")
 		}
 
 		dbRows, dbErr := s.queries.GetPriceObservations(dbCtx, store.GetPriceObservationsParams{
@@ -150,14 +169,12 @@ func (s *PricingService) GetComputePrices(ctx context.Context, provider, categor
 }
 
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {
-	var attrs domain.ComputeAttributes
-	if len(row.Attributes) > 0 {
-		if err := json.Unmarshal(row.Attributes, &attrs); err != nil {
-			return domain.PriceObservation{}, fmt.Errorf("unmarshal attributes: %w", err)
-		}
+	computeAttrs, storageAttrs, networkAttrs, err := domain.UnmarshalAttributes(row.ServiceCategory, row.Attributes)
+	if err != nil {
+		return domain.PriceObservation{}, err
 	}
 
-	priceDec, err := numericToDecimal(row.PriceAmount)
+	priceDec, err := store.NumericToDecimal(row.PriceAmount)
 	if err != nil {
 		return domain.PriceObservation{}, fmt.Errorf("convert numeric price: %w", err)
 	}
@@ -168,32 +185,19 @@ func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, erro
 	}
 
 	return domain.PriceObservation{
-		Provider:        row.Provider,
-		ServiceCategory: row.ServiceCategory,
-		SkuID:           row.SkuID,
-		DisplayName:     row.DisplayName,
-		Region:          row.Region,
-		RegionGroup:     row.RegionGroup,
-		Unit:            row.Unit,
-		PriceAmount:     priceDec,
-		PriceCurrency:   row.PriceCurrency,
-		PricingModel:    row.PricingModel,
-		Attributes:      attrs,
-		FetchedAt:       fetchedAtTime,
+		Provider:          row.Provider,
+		ServiceCategory:   row.ServiceCategory,
+		SkuID:             row.SkuID,
+		DisplayName:       row.DisplayName,
+		Region:            row.Region,
+		RegionGroup:       row.RegionGroup,
+		Unit:              row.Unit,
+		PriceAmount:       priceDec,
+		PriceCurrency:     row.PriceCurrency,
+		PricingModel:      row.PricingModel,
+		Attributes:        computeAttrs,
+		StorageAttributes: storageAttrs,
+		NetworkAttributes: networkAttrs,
+		FetchedAt:         fetchedAtTime,
 	}, nil
-}
-
-func numericToDecimal(n pgtype.Numeric) (decimal.Decimal, error) {
-	if !n.Valid {
-		return decimal.Zero, nil
-	}
-	val, err := n.Value()
-	if err != nil || val == nil {
-		return decimal.Zero, nil
-	}
-	str, ok := val.(string)
-	if !ok {
-		str = fmt.Sprintf("%v", val)
-	}
-	return decimal.NewFromString(str)
 }

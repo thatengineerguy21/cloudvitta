@@ -1,0 +1,93 @@
+{
+  "formatVersion": "v1.0",
+  "disclaimer": "This pricing list is for informational purposes only.",
+  "offerCode": "AmazonS3",
+  "version": "20260815000000",
+  "publicationDate": "2026-08-15T00:00:00Z",
+  "products": {
+    "SKU-S3-STD-001": {
+      "sku": "SKU-S3-STD-001",
+      "productFamily": "Storage",
+      "attributes": {
+        "servicecode": "AmazonS3",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "storageClass": "General Purpose",
+        "volumeType": "Standard",
+        "usagetype": "TimedStorage-ByteHrs",
+        "operation": "StandardStorage",
+        "description": "$0.023 per GB - S3 Standard Storage"
+      }
+    },
+    "SKU-S3-IA-002": {
+      "sku": "SKU-S3-IA-002",
+      "productFamily": "Storage",
+      "attributes": {
+        "servicecode": "AmazonS3",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "storageClass": "Standard - Infrequent Access",
+        "volumeType": "Standard - Infrequent Access",
+        "usagetype": "TimedStorage-SIA-ByteHrs",
+        "operation": "StandardIAStorage",
+        "description": "$0.0125 per GB - S3 Standard Infrequent Access Storage"
+      }
+    },
+    "SKU-S3-API-REQUESTS-IGNORED": {
+      "sku": "SKU-S3-API-REQUESTS-IGNORED",
+      "productFamily": "API Requests",
+      "attributes": {
+        "servicecode": "AmazonS3",
+        "location": "US East (N. Virginia)",
+        "group": "S3-API-Tier1",
+        "usagetype": "Requests-Tier1"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-S3-STD-001": {
+        "SKU-S3-STD-001.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "SKU-S3-STD-001",
+          "effectiveDate": "2026-08-15T00:00:00Z",
+          "priceDimensions": {
+            "SKU-S3-STD-001.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "SKU-S3-STD-001.JRTCKXETXF.6YS6EN2CT7",
+              "description": "$0.023 per GB - first 50 TB / month of storage used",
+              "beginRange": "0",
+              "endRange": "51200",
+              "unit": "GB-Mo",
+              "pricePerUnit": {
+                "USD": "0.0230000000"
+              },
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "SKU-S3-IA-002": {
+        "SKU-S3-IA-002.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "SKU-S3-IA-002",
+          "effectiveDate": "2026-08-15T00:00:00Z",
+          "priceDimensions": {
+            "SKU-S3-IA-002.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "SKU-S3-IA-002.JRTCKXETXF.6YS6EN2CT7",
+              "description": "$0.0125 per GB - standard infrequent access storage",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "GB-Mo",
+              "pricePerUnit": {
+                "USD": "0.0125000000"
+              },
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      }
+    }
+  }
+}

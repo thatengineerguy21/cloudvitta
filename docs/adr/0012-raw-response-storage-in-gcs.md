@@ -26,3 +26,11 @@ We will store all raw JSON responses from upstream providers in **Google Cloud S
 ### Negative
 - Requires a secondary storage bucket and explicit lifecycle configuration.
 - Requires building a small "re-ingest from GCS" script/tool for developers to use when a parsing bug is actually discovered.
+
+## Alternatives Considered
+
+### Alternative 1: Discard Raw Payloads Immediately After Normalization
+Rejected. Discarding raw JSON prevents historical recovery when parser bugs are discovered. While static On-Demand prices can be refetched, volatile Spot price history cannot be reconstructed once the upstream tick has passed.
+
+### Alternative 2: Store Raw Payloads Inside PostgreSQL JSONB Columns
+Rejected. Storing multi-megabyte raw JSON payloads inside PostgreSQL rows creates severe database bloat, increases serverless storage costs, degrades index performance, and slows table scans. Object storage in GCS provides an isolated, cost-effective archive.

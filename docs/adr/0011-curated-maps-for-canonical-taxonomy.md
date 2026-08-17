@@ -31,3 +31,11 @@ When an unknown region or category is encountered:
 
 ### Negative
 - Requires a developer to manually update the Go maps and deploy a new version of the ingestion worker whenever a provider introduces a new region or product category.
+
+## Alternatives Considered
+
+### Alternative 1: Dynamic String Parsing and Regular Expression Heuristics
+Rejected. Provider naming schemes are inconsistent (e.g., `us-east-1`, `eastus`, `us-central1`). Dynamic string inference causes silent misclassification that pollutes comparison results and corrupts pricing aggregates.
+
+### Alternative 2: LLM Semantic Classification at Ingestion
+Rejected. Using an LLM to categorize regions or products during bulk ingestion introduces non-deterministic outputs, adds unnecessary network latency, and incurs ongoing token costs without mathematical guarantees of taxonomic correctness.

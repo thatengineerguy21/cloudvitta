@@ -1,0 +1,38 @@
+{
+  "skus": [
+    {
+      "name": "services/E89B-A08C-8A2D/skus/SKU-GCP-NETWORK-PREMIUM",
+      "skuId": "SKU-GCP-NETWORK-PREMIUM",
+      "description": "Premium Tier Internet Egress",
+      "category": {
+        "serviceDisplayName": "Networking",
+        "resourceFamily": "Network",
+        "resourceGroup": "PremiumInternetEgress",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy",
+            "usageUnitDescription": "gibibyte",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 120000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ],
+  "nextPageToken": ""
+}

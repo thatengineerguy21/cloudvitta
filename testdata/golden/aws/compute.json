@@ -1,0 +1,117 @@
+{
+  "formatVersion": "v1.0",
+  "offerCode": "AmazonEC2",
+  "products": {
+    "SKU-C5-XLARGE": {
+      "sku": "SKU-C5-XLARGE",
+      "productFamily": "Compute Instance",
+      "attributes": {
+        "servicecode": "AmazonEC2",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "instanceType": "c5.xlarge",
+        "vcpu": "4",
+        "memory": "8 GiB",
+        "operatingSystem": "Linux",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-LOCAL-ZONE-NYC": {
+      "sku": "SKU-LOCAL-ZONE-NYC",
+      "productFamily": "Compute Instance",
+      "attributes": {
+        "servicecode": "AmazonEC2",
+        "location": "US East (New York City)",
+        "locationType": "Local Zone",
+        "instanceType": "c5.large",
+        "vcpu": "2",
+        "memory": "4 GiB",
+        "operatingSystem": "Linux",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+        "regionCode": "us-east-1-nyc-1"
+      }
+    },
+    "SKU-WAVELENGTH-BOSTON": {
+      "sku": "SKU-WAVELENGTH-BOSTON",
+      "productFamily": "Compute Instance",
+      "attributes": {
+        "servicecode": "AmazonEC2",
+        "location": "US East (Verizon) - Boston",
+        "locationType": "Wavelength Zone",
+        "instanceType": "t3.medium",
+        "vcpu": "2",
+        "memory": "4 GiB",
+        "operatingSystem": "Linux",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+        "regionCode": "us-east-1-wl1-bos-wlz-1"
+      }
+    },
+    "SKU-WINDOWS-IGNORED": {
+      "sku": "SKU-WINDOWS-IGNORED",
+      "productFamily": "Compute Instance",
+      "attributes": {
+        "servicecode": "AmazonEC2",
+        "location": "US East (N. Virginia)",
+        "instanceType": "c5.xlarge",
+        "operatingSystem": "Windows",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+        "regionCode": "us-east-1"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-C5-XLARGE": {
+        "SKU-C5-XLARGE.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-C5-XLARGE",
+          "priceDimensions": {
+            "SKU-C5-XLARGE.TERM1.DIM1": {
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "0.1700000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-LOCAL-ZONE-NYC": {
+        "SKU-LOCAL-ZONE-NYC.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-LOCAL-ZONE-NYC",
+          "priceDimensions": {
+            "SKU-LOCAL-ZONE-NYC.TERM1.DIM1": {
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "0.1050000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-WAVELENGTH-BOSTON": {
+        "SKU-WAVELENGTH-BOSTON.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-WAVELENGTH-BOSTON",
+          "priceDimensions": {
+            "SKU-WAVELENGTH-BOSTON.TERM1.DIM1": {
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "0.0520000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

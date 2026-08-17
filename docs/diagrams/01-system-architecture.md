@@ -32,9 +32,11 @@ flowchart TD
             S_CE[Calculator Engine]
             S_SM[SKU Matching Strategy]
             S_FX[FX Service]
+            S_FS[Freshness Service]
             
             S_CE --> S_SM
             S_CE --> S_FX
+            S_CE --> S_FS
         end
 
         subgraph "Data Access & Cache Layer"

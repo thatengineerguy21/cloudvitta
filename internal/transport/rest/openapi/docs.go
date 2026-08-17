@@ -15,6 +15,294 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/auth/login": {
+            "post": {
+                "description": "Validates credentials with timing-safe comparison and issues JWT access token and opaque refresh token pair",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Authenticate user and issue tokens",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Authentication successful",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed JSON request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid email or password",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout": {
+            "post": {
+                "description": "Revokes the specified refresh token and purges it from the rotation cache",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Revoke session / Logout",
+                "parameters": [
+                    {
+                        "description": "Logout parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.LogoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Session revoked successfully",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.LogoutResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing refresh_token",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "description": "Rotates a valid refresh token, minting a new access and refresh token pair with idempotency-key gated replay and whole-family theft containment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Rotate refresh token",
+                "parameters": [
+                    {
+                        "description": "Refresh token parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.RefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tokens rotated successfully",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.RefreshResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing refresh_token or idempotency_key",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid, expired, revoked, or compromised token family",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/signup": {
+            "post": {
+                "description": "Creates a new user account with email and password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "Signup parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.SignupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "User registered successfully",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.SignupResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid email or password format",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "409": {
+                        "description": "User with this email already exists",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/calculate": {
+            "post": {
+                "description": "Calculates composite pricing across cloud providers for requested compute, storage, and network specs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "calculator"
+                ],
+                "summary": "Get composite pricing calculation",
+                "parameters": [
+                    {
+                        "description": "Composite workload request payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.CalculateRequestBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.CalculateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/prices/compute": {
             "get": {
                 "description": "Returns normalized compute pricing across cloud providers for requested specs.",
@@ -40,6 +328,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Instance family filter (e.g. t3, c5)",
+                        "name": "family",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Canonical region group (default: us-east)",
                         "name": "region",
                         "in": "query"
@@ -52,7 +346,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "boolean",
-                        "description": "Strict instance family matching",
+                        "description": "Strict instance family matching (default: true)",
                         "name": "strict_family",
                         "in": "query"
                     }
@@ -61,25 +355,200 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/rest.ComputeComparisonResponse"
+                            "$ref": "#/definitions/internal_transport_rest.ComputeComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/middleware.RFC7807Error"
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/middleware.RFC7807Error"
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/middleware.RFC7807Error"
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/prices/network": {
+            "get": {
+                "description": "Returns normalized network / data transfer egress pricing across cloud providers (AWS, Azure, GCP) for requested specs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "prices"
+                ],
+                "summary": "Get network pricing comparison",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Requested network egress in GB (e.g. 500, max 10000000)",
+                        "name": "egress_gb",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Canonical transfer type (intra_region, inter_region, internet_egress)",
+                        "name": "transfer_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Canonical region group (default: us-east)",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency code (default: USD)",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.NetworkComparisonResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/prices/storage": {
+            "get": {
+                "description": "Returns normalized storage pricing across cloud providers (AWS, Azure, GCP) for requested specs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "prices"
+                ],
+                "summary": "Get storage pricing comparison",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Requested storage size in GB (e.g. 500, max 1000000)",
+                        "name": "size_gb",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Requested canonical storage class (e.g. standard, infrequent_access, archive)",
+                        "name": "storage_class",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Canonical region group (default: us-east)",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency code (default: USD)",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.StorageComparisonResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/providers/{provider}/status": {
+            "get": {
+                "description": "Returns the latest successful fetch timestamp, per-category observation count, staleness flag, and active DLQ failure records for the specified cloud provider.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "providers"
+                ],
+                "summary": "Get cloud provider operational status and data freshness",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Cloud provider identifier (e.g. aws, azure, gcp, oracle, ibm, alibaba, digitalocean)",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Provider status and category freshness details",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transport_rest.ProviderStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid Parameters",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Provider Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
                         }
                     }
                 }
@@ -87,7 +556,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "domain.ComputeAttributes": {
+        "github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes": {
             "type": "object",
             "properties": {
                 "family": {
@@ -101,7 +570,33 @@ const docTemplate = `{
                 }
             }
         },
-        "middleware.RFC7807Error": {
+        "github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes": {
+            "type": "object",
+            "properties": {
+                "egress_gb": {
+                    "type": "number"
+                },
+                "transfer_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes": {
+            "type": "object",
+            "properties": {
+                "iops": {
+                    "description": "IOPS holds provisioned IOPS where reported (e.g. block storage EBS gp3/io2).\nCurrently unpopulated for S3/Blob/GCS object storage in stage 1.4.",
+                    "type": "integer"
+                },
+                "size_gb": {
+                    "type": "number"
+                },
+                "storage_class": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error": {
             "type": "object",
             "properties": {
                 "detail": {
@@ -121,7 +616,147 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.ComputeComparisonMeta": {
+        "internal_transport_rest.CalculateCategoryResult": {
+            "type": "object",
+            "properties": {
+                "match_delta_pct": {
+                    "type": "number"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_transport_rest.CalculateMeta": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "request": {
+                    "$ref": "#/definitions/internal_transport_rest.CalculateRequestBody"
+                }
+            }
+        },
+        "internal_transport_rest.CalculateProviderResult": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/internal_transport_rest.CalculateCategoryResult"
+                    }
+                },
+                "partial": {
+                    "type": "boolean"
+                },
+                "partial_total_normalized_hourly_usd": {
+                    "type": "number"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "total_normalized_hourly_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "internal_transport_rest.CalculateRequestBody": {
+            "type": "object",
+            "properties": {
+                "compute": {
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "network": {
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "storage": {
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes"
+                },
+                "strict_family": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_transport_rest.CalculateResponse": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/internal_transport_rest.CalculateMeta"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.CalculateProviderResult"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                    }
+                }
+            }
+        },
+        "internal_transport_rest.CategoryStatusResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "compute"
+                },
+                "dlq": {
+                    "$ref": "#/definitions/internal_transport_rest.DLQStatusResponse"
+                },
+                "last_fetched_at": {
+                    "type": "string"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "observation_count": {
+                    "type": "integer",
+                    "example": 450
+                },
+                "stale": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "staleness_threshold_hours": {
+                    "type": "number",
+                    "example": 168
+                },
+                "supported": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "internal_transport_rest.ComputeComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -136,27 +771,27 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.ComputeComparisonResponse": {
+        "internal_transport_rest.ComputeComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/rest.ComputeComparisonMeta"
+                    "$ref": "#/definitions/internal_transport_rest.ComputeComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/rest.ComputeResultEntry"
+                        "$ref": "#/definitions/internal_transport_rest.ComputeResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/rest.ProviderWarning"
+                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
                     }
                 }
             }
         },
-        "rest.ComputeResultEntry": {
+        "internal_transport_rest.ComputeResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -169,7 +804,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/domain.ComputeAttributes"
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -181,7 +816,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/rest.PriceDetail"
+                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -194,7 +829,144 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.PriceDetail": {
+        "internal_transport_rest.DLQStatusResponse": {
+            "type": "object",
+            "properties": {
+                "consecutive_failures": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "last_error": {
+                    "type": "string",
+                    "example": "503 Service Unavailable"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "failed"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.LoginRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.LogoutRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.LogoutResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.NetworkComparisonMeta": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "query": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "internal_transport_rest.NetworkComparisonResponse": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/internal_transport_rest.NetworkComparisonMeta"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.NetworkResultEntry"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                    }
+                }
+            }
+        },
+        "internal_transport_rest.NetworkResultEntry": {
+            "type": "object",
+            "properties": {
+                "fetched_at": {
+                    "type": "string"
+                },
+                "match_delta_pct": {
+                    "type": "number"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "matched_spec": {
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "monthly_cost_usd": {
+                    "type": "number"
+                },
+                "price": {
+                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_transport_rest.PriceDetail": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -208,7 +980,56 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.ProviderWarning": {
+        "internal_transport_rest.ProviderStatusResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/internal_transport_rest.CategoryStatusResponse"
+                    }
+                },
+                "last_successful_fetch": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "aws"
+                },
+                "stale": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "status": {
+                    "type": "string",
+                    "example": "healthy"
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.ProviderStatusWarningResponse"
+                    }
+                }
+            }
+        },
+        "internal_transport_rest.ProviderStatusWarningResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "not_yet_ingested"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Oracle OCI ingestion lands in stage 3."
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "oracle"
+                }
+            }
+        },
+        "internal_transport_rest.ProviderWarning": {
             "type": "object",
             "properties": {
                 "code": {
@@ -219,6 +1040,132 @@ const docTemplate = `{
                 },
                 "provider": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.RefreshRequest": {
+            "type": "object",
+            "properties": {
+                "idempotency_key": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.RefreshResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.SignupRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.SignupResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transport_rest.StorageComparisonMeta": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "query": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "internal_transport_rest.StorageComparisonResponse": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/internal_transport_rest.StorageComparisonMeta"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.StorageResultEntry"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                    }
+                }
+            }
+        },
+        "internal_transport_rest.StorageResultEntry": {
+            "type": "object",
+            "properties": {
+                "fetched_at": {
+                    "type": "string"
+                },
+                "match_delta_pct": {
+                    "type": "number"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "matched_spec": {
+                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "monthly_cost_usd": {
+                    "type": "number"
+                },
+                "price": {
+                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
                 }
             }
         }

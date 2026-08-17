@@ -1,0 +1,71 @@
+{
+  "skus": [
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-N2-STD-4",
+      "skuId": "SKU-GCP-N2-STD-4",
+      "description": "N2 Predefined Instance Core and Ram running in Virginia (n2-standard-4)",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "N2",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 194400000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-UNMAPPED-RAM",
+      "skuId": "SKU-GCP-UNMAPPED-RAM",
+      "description": "M4Ultramem224 Sole Tenancy Instance Ram running in Toronto",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "RAM",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "northamerica-northeast1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.h",
+            "usageUnitDescription": "gigabyte hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 5000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ],
+  "nextPageToken": ""
+}

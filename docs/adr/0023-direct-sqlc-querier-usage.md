@@ -25,3 +25,11 @@ We explicitly forbid hand-written repository interfaces wrapping `sqlc`. `intern
 
 ### Negative
 - Developers accustomed to "Repository Pattern" dogmas must adapt to using the generated `Querier` interface directly.
+
+## Alternatives Considered
+
+### Alternative 1: Hand-Written Custom Repository Interface Layer
+Rejected. Writing a manual repository struct and interface over `sqlc` duplicates type definitions, increases boilerplate code, and provides zero additional type safety or test isolation beyond what `sqlc.Querier` provides natively.
+
+### Alternative 2: Full Object-Relational Mapping (ORM) Libraries (GORM / Ent)
+Rejected. Heavy ORMs introduce runtime reflection overhead, generate opaque SQL queries, and make query optimization and index alignment harder to inspect in code reviews.

@@ -19,8 +19,20 @@ func TestMapAWSProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
-			name:         "unmapped product fails loudly",
+			name:         "valid AmazonS3 product",
 			productCode:  "AmazonS3",
+			wantCategory: "storage",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid AWSDataTransfer product",
+			productCode:  "AWSDataTransfer",
+			wantCategory: "network",
+			wantErr:      nil,
+		},
+		{
+			name:         "unmapped product fails loudly",
+			productCode:  "AmazonRDS",
 			wantCategory: "",
 			wantErr:      ErrUnmappedProduct,
 		},

@@ -7,12 +7,15 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
+	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
@@ -95,6 +98,109 @@ func TestComputeHandler_InvalidRAM_ReturnsRFC7807(t *testing.T) {
 	}
 }
 
+func TestComputeHandler_HappyPath_MultiProvider(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-AWS-T3-MED",
+			DisplayName:     "t3.medium",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			Unit:            "hour",
+			PriceAmount:     decimal.RequireFromString("0.0416"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+			FetchedAt:       time.Now().UTC(),
+		},
+	}
+	azureObs := []domain.PriceObservation{
+		{
+			Provider:        "azure",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-AZ-D2S-V5",
+			DisplayName:     "Standard_D2s_v5",
+			Region:          "eastus",
+			RegionGroup:     "us-east",
+			Unit:            "hour",
+			PriceAmount:     decimal.RequireFromString("0.048"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+			FetchedAt:       time.Now().UTC(),
+		},
+	}
+	gcpObs := []domain.PriceObservation{
+		{
+			Provider:        "gcp",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-GCP-E2-STD-2",
+			DisplayName:     "e2-standard-2",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			Unit:            "hour",
+			PriceAmount:     decimal.RequireFromString("0.067"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+			FetchedAt:       time.Now().UTC(),
+		},
+	}
+
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4"), gcpObs, cache.DefaultTTL)
+
+	pricingSvc := service.NewPricingService(nil, rdb)
+	handler := rest.NewComputeHandler(pricingSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute?vcpu=2&ram_gb=4&region=us-east", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 OK. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp rest.ComputeComparisonResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Meta.APIVersion != "v1" {
+		t.Errorf("APIVersion = %q, want v1", resp.Meta.APIVersion)
+	}
+	if len(resp.Results) != 3 {
+		t.Fatalf("got %d results, want 3 (AWS, Azure, GCP)", len(resp.Results))
+	}
+
+	var awsResult *rest.ComputeResultEntry
+	for i := range resp.Results {
+		if resp.Results[i].Provider == "aws" {
+			awsResult = &resp.Results[i]
+			break
+		}
+	}
+	if awsResult == nil {
+		t.Fatalf("missing AWS result")
+	}
+	if awsResult.MatchQuality != "exact" {
+		t.Errorf("AWS MatchQuality = %q, want exact", awsResult.MatchQuality)
+	}
+}
+
 func TestComputeHandler_CurrencyWarning(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -109,8 +215,12 @@ func TestComputeHandler_CurrencyWarning(t *testing.T) {
 	handler := rest.NewComputeHandler(pricingSvc)
 
 	// Pre-warm the cache so it doesn't hit the nil DB
-	cacheKey := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east")
-	_ = cache.Warm(context.Background(), rdb, cacheKey, []domain.PriceObservation{}, cache.DefaultTTL)
+	cacheKeyAWS := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1")
+	cacheKeyAzure := cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus")
+	cacheKeyGCP := cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4")
+	_ = cache.Warm(context.Background(), rdb, cacheKeyAWS, []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(context.Background(), rdb, cacheKeyAzure, []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(context.Background(), rdb, cacheKeyGCP, []domain.PriceObservation{}, cache.DefaultTTL)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute?currency=EUR", nil)
 	rec := httptest.NewRecorder()
@@ -156,19 +266,105 @@ func TestComputeHandler_StrictFamily(t *testing.T) {
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewComputeHandler(pricingSvc)
 
-	cacheKey := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east")
-	_ = cache.Warm(context.Background(), rdb, cacheKey, []domain.PriceObservation{}, cache.DefaultTTL)
+	cacheKeyAWS := cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1")
+	cacheKeyAzure := cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus")
+	cacheKeyGCP := cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4")
+	_ = cache.Warm(context.Background(), rdb, cacheKeyAWS, []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(context.Background(), rdb, cacheKeyAzure, []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(context.Background(), rdb, cacheKeyGCP, []domain.PriceObservation{}, cache.DefaultTTL)
 
-	// Since PricingService uses DB or Cache, we can test it just parses correctly.
-	// But without a DB, getComputePrices will return no rows or error if DB isn't mocked.
-	// In the handler, it just processes what comes out. We already tested the strict_family matching in match_test.go.
-	// We'll just ensure a request with strict_family=true doesn't error out (it parses the boolean correctly).
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute?strict_family=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute?strict_family=true&family=general_purpose", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 OK", rec.Code)
+	}
+
+	var resp rest.ComputeComparisonResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Meta.Query["family"] != "general_purpose" {
+		t.Errorf("expected family query meta = general_purpose, got %v", resp.Meta.Query["family"])
+	}
+}
+
+func TestComputeHandler_PartialProviderFailure_Returns200WithWarning(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-AWS-T3-MED",
+			PriceAmount:     decimal.RequireFromString("0.0416"),
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4},
+		},
+	}
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsObs, cache.DefaultTTL)
+
+	failingQueries := store.New(&failingDBTX{})
+	pricingSvc := service.NewPricingService(failingQueries, rdb)
+	handler := rest.NewComputeHandler(pricingSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute?vcpu=2&ram_gb=4&region=us-east", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 OK. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp rest.ComputeComparisonResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(resp.Results) != 1 {
+		t.Fatalf("expected 1 result (AWS), got %d", len(resp.Results))
+	}
+}
+
+func TestComputeHandler_AllProvidersFail_Returns502(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	failingQueries := store.New(&failingDBTX{})
+	pricingSvc := service.NewPricingService(failingQueries, rdb)
+	handler := rest.NewComputeHandler(pricingSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/compute?region=us-east", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502 Bad Gateway", rec.Code)
+	}
+
+	var rfcErr middleware.RFC7807Error
+	if err := json.NewDecoder(rec.Body).Decode(&rfcErr); err != nil {
+		t.Fatalf("failed to decode RFC7807 JSON: %v", err)
+	}
+	if rfcErr.Status != 502 {
+		t.Errorf("Status = %d, want 502", rfcErr.Status)
 	}
 }

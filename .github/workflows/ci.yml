@@ -78,3 +78,4 @@ jobs:
         run: |
           go build ./cmd/api
           go build ./cmd/ingest
+          go build ./cmd/migrate

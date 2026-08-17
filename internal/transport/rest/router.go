@@ -2,6 +2,7 @@ package rest
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -10,13 +11,15 @@ import (
 	_ "github.com/thatengineerguy21/CloudVitta/internal/transport/rest/openapi"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
 
 // NewRouter constructs a net/http.ServeMux with all API routes, health probes, metrics, and middlewares wired.
-func NewRouter(pricingSvc *service.PricingService, dbPool *pgxpool.Pool, redisClient redis.Cmdable) http.Handler {
+func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, freshnessSvc *service.FreshnessService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Probes & Metrics (unlimited)
@@ -27,13 +30,58 @@ func NewRouter(pricingSvc *service.PricingService, dbPool *pgxpool.Pool, redisCl
 	// OpenAPI Documentation (unlimited)
 	mux.Handle("/docs/", httpSwagger.WrapHandler)
 
-	// Setup standard middlewares
-	limiter := ratelimit.NewRateLimiter(redisClient, 60) // 60 req/min/IP
+	var jwtSecret []byte
+	var anonCookieSecret []byte
+	var rateCfg ratelimit.Config
+	var corsCfg config.CORSConfig
+	loginLimit := int64(10)
+
+	if cfg != nil {
+		jwtSecret = []byte(cfg.Auth.JWTSecret)
+		anonCookieSecret = []byte(cfg.Auth.AnonCookieSecret)
+		rateCfg = ratelimit.Config{
+			StandardTierRate: cfg.RateLimit.StandardTierRate,
+			FreeTierRate:     cfg.RateLimit.FreeTierRate,
+			IPCeilingRate:    cfg.RateLimit.IPCeilingRate,
+			CookieSecret:     anonCookieSecret,
+		}
+		corsCfg = cfg.CORS
+		if cfg.RateLimit.LoginRate > 0 {
+			loginLimit = cfg.RateLimit.LoginRate
+		}
+	}
+
+	limiter := ratelimit.NewRateLimiter(redisClient, rateCfg)
+	authMw := authmw.NewAuthMiddleware(jwtSecret, time.Now)
+	corsMw := middleware.NewCORSMiddleware(corsCfg)
+
 	computeHandler := NewComputeHandler(pricingSvc)
+	storageHandler := NewStorageHandler(pricingSvc)
+	networkHandler := NewNetworkHandler(pricingSvc)
+	calculateHandler := NewCalculateHandler(pricingSvc)
+	statusHandler := NewStatusHandler(freshnessSvc)
+
+	// Auth Handlers
+	signupHandler := NewSignupHandler(authSvc)
+	loginHandler := NewLoginHandler(authSvc)
+	refreshHandler := NewRefreshHandler(authSvc)
+	logoutHandler := NewLogoutHandler(authSvc)
 
 	mux.Handle("GET /api/v1/prices/compute", limiter.Handler(computeHandler))
+	mux.Handle("GET /api/v1/prices/storage", limiter.Handler(storageHandler))
+	mux.Handle("GET /api/v1/prices/network", limiter.Handler(networkHandler))
+	mux.Handle("GET /api/v1/providers/{provider}/status", limiter.Handler(statusHandler))
+	mux.Handle("POST /api/v1/calculate", limiter.Handler(calculateHandler))
+	mux.Handle("POST /api/v1/auth/signup", limiter.Handler(signupHandler))
+	// Rate limit: login gets a stricter profile as credential-guessing mitigation.
+	mux.Handle("POST /api/v1/auth/login", limiter.WithProfile("login", loginLimit)(loginHandler))
+	mux.Handle("POST /api/v1/auth/refresh", limiter.Handler(refreshHandler))
+	mux.Handle("POST /api/v1/auth/logout", limiter.Handler(logoutHandler))
 
-	// Wrap with recovery middleware and OpenTelemetry HTTP instrumentation
-	recoveredHandler := middleware.RecoverMiddleware(mux)
-	return otelhttp.NewHandler(recoveredHandler, "CloudVittaAPI")
+	// Global chain: CORS -> AuthContext -> Recovery -> ServeMux
+	handler := authMw(mux)
+	handler = corsMw.Handler(handler)
+	handler = middleware.RecoverMiddleware(handler)
+
+	return otelhttp.NewHandler(handler, "CloudVittaAPI")
 }

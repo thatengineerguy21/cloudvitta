@@ -6,11 +6,28 @@ package store
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceForSKUParams) (PriceObservation, error)
+	GetLatestPriceForSKUAndCategory(ctx context.Context, arg GetLatestPriceForSKUAndCategoryParams) (PriceObservation, error)
 	GetPriceObservations(ctx context.Context, arg GetPriceObservationsParams) ([]PriceObservation, error)
+	GetProviderCategoryStatus(ctx context.Context, provider string) ([]GetProviderCategoryStatusRow, error)
+	GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (RefreshToken, error)
+	GetRefreshTokenByID(ctx context.Context, id pgtype.UUID) (RefreshToken, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
+	// Note: Retained for Stage 1.9 user profile/tier lookup during token refresh rotation.
+	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	InsertPriceObservation(ctx context.Context, arg InsertPriceObservationParams) (int64, error)
+	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
+	ListRefreshTokensByFamilyID(ctx context.Context, familyID pgtype.UUID) ([]RefreshToken, error)
+	RevokeRefreshTokenByHash(ctx context.Context, arg RevokeRefreshTokenByHashParams) error
+	RevokeRefreshTokenFamily(ctx context.Context, arg RevokeRefreshTokenFamilyParams) error
+	RevokeRefreshTokenWithReplacement(ctx context.Context, arg RevokeRefreshTokenWithReplacementParams) error
+	UpdatePriceObservationLastSeenAt(ctx context.Context, arg UpdatePriceObservationLastSeenAtParams) error
 }
 
 var _ Querier = (*Queries)(nil)

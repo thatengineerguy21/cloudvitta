@@ -2,13 +2,12 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
@@ -38,8 +37,8 @@ func NewIngestionService(queries *store.Queries, fetcher Fetcher, redisClient re
 
 // RunAWSComputeIngestion triggers the AWS EC2 compute pricing ingestion pipeline:
 // fetches AWS price list, streams raw payload to storage, normalizes pricing records,
-// inserts each observation into Postgres via sqlc queries, and immediately warms Redis cache keys.
-// Returns the total number of inserted records.
+// upserts each observation into Postgres (inserting only on new/changed price, bumping last_seen_at on unchanged),
+// and immediately warms Redis cache keys. Returns the total number of inserted records.
 func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, error) {
 	result, err := s.fetcher.Fetch(ctx)
 	if err != nil {
@@ -48,13 +47,53 @@ func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, err
 
 	insertedCount := 0
 	for _, obs := range result.Observations {
-		params, err := toInsertParams(obs, result.RawGCSPath)
-		if err != nil {
-			return insertedCount, err
+		prev, prevErr := s.queries.GetLatestPriceForSKUAndCategory(ctx, store.GetLatestPriceForSKUAndCategoryParams{
+			Provider:        obs.Provider,
+			ServiceCategory: obs.ServiceCategory,
+			SkuID:           obs.SkuID,
+			Region:          obs.Region,
+		})
+
+		var oldPrice decimal.Decimal
+		hasPrior := false
+		if prevErr == nil {
+			hasPrior = true
+			if dec, decErr := store.NumericToDecimal(prev.PriceAmount); decErr == nil {
+				oldPrice = dec
+			}
+		} else if !store.IsNotFound(prevErr) {
+			slog.WarnContext(ctx, "failed to query previous price observation",
+				"provider", obs.Provider,
+				"sku", obs.SkuID,
+				"region", obs.Region,
+				"error", prevErr,
+			)
 		}
 
-		if _, err := s.queries.InsertPriceObservation(ctx, params); err != nil {
-			return insertedCount, fmt.Errorf("ingest service: insert observation for sku %s: %w", obs.SkuID, err)
+		// Check if price and billing dimensions are identical
+		if hasPrior && !oldPrice.IsZero() && oldPrice.Equal(obs.PriceAmount) &&
+			prev.Unit == obs.Unit && prev.PricingModel == obs.PricingModel && prev.PriceCurrency == obs.PriceCurrency {
+			// Unchanged observation: bump last_seen_at timestamp on existing row
+			if updateErr := s.queries.UpdatePriceObservationLastSeenAt(ctx, store.UpdatePriceObservationLastSeenAtParams{
+				ID:         prev.ID,
+				LastSeenAt: store.TimestamptzFromTime(obs.FetchedAt),
+			}); updateErr != nil {
+				slog.ErrorContext(ctx, "failed to update last_seen_at",
+					"provider", obs.Provider,
+					"sku", obs.SkuID,
+					"error", updateErr,
+				)
+			}
+			continue
+		}
+
+		params, paramErr := store.ToInsertPriceObservationParams(obs, result.RawGCSPath, "")
+		if paramErr != nil {
+			return insertedCount, paramErr
+		}
+
+		if _, insertErr := s.queries.InsertPriceObservation(ctx, params); insertErr != nil {
+			return insertedCount, fmt.Errorf("ingest service: insert observation for sku %s: %w", obs.SkuID, insertErr)
 		}
 		insertedCount++
 	}
@@ -77,34 +116,4 @@ func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, err
 	}
 
 	return insertedCount, nil
-}
-
-func toInsertParams(obs domain.PriceObservation, rawGCSPath string) (store.InsertPriceObservationParams, error) {
-	attrBytes, err := json.Marshal(obs.Attributes)
-	if err != nil {
-		return store.InsertPriceObservationParams{}, fmt.Errorf("ingest service: marshal attributes for sku %s: %w", obs.SkuID, err)
-	}
-
-	var priceAmt pgtype.Numeric
-	if err := priceAmt.Scan(obs.PriceAmount.String()); err != nil {
-		return store.InsertPriceObservationParams{}, fmt.Errorf("ingest service: scan price amount for sku %s: %w", obs.SkuID, err)
-	}
-
-	return store.InsertPriceObservationParams{
-		Provider:        obs.Provider,
-		ServiceCategory: obs.ServiceCategory,
-		SkuID:           obs.SkuID,
-		DisplayName:     obs.DisplayName,
-		Region:          obs.Region,
-		RegionGroup:     obs.RegionGroup,
-		Unit:            obs.Unit,
-		PriceAmount:     priceAmt,
-		PriceCurrency:   obs.PriceCurrency,
-		PricingModel:    obs.PricingModel,
-		Attributes:      attrBytes,
-		RawResponseRef:  pgtype.Text{String: rawGCSPath, Valid: rawGCSPath != ""},
-		FetchedAt:       pgtype.Timestamptz{Time: obs.FetchedAt, Valid: !obs.FetchedAt.IsZero()},
-		LastSeenAt:      pgtype.Timestamptz{Time: obs.FetchedAt, Valid: !obs.FetchedAt.IsZero()},
-		AnomalyStatus:   pgtype.Text{Valid: false},
-	}, nil
 }

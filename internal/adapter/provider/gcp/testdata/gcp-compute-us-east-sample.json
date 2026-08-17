@@ -1,0 +1,196 @@
+{
+  "skus": [
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-N2-STD-4",
+      "skuId": "SKU-GCP-N2-STD-4",
+      "description": "N2 Predefined Instance Core and Ram running in Virginia (n2-standard-4)",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "N2",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 194400000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-E2-STD-2",
+      "skuId": "SKU-GCP-E2-STD-2",
+      "description": "E2 Instance running in South Carolina (e2-standard-2)",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "E2",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 67000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-WINDOWS-IGNORED",
+      "skuId": "SKU-GCP-WINDOWS-IGNORED",
+      "description": "Windows Server running in Virginia",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "N2",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 250000000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-SPOT-IGNORED",
+      "skuId": "SKU-GCP-SPOT-IGNORED",
+      "description": "Spot Preemptible Instance running in Virginia",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "N2",
+        "usageType": "Preemptible"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 40000000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-COMMIT-IGNORED",
+      "skuId": "SKU-GCP-COMMIT-IGNORED",
+      "description": "Commitment 1 Year Instance running in Virginia",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "N2",
+        "usageType": "Commit1Yr"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 100000000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "services/6F81-5844-456A/skus/SKU-GCP-UNMAPPED",
+      "skuId": "SKU-GCP-UNMAPPED",
+      "description": "Unknown Instance Core and Ram running in Virginia (unknown-standard-2)",
+      "category": {
+        "serviceDisplayName": "Compute Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "Unknown",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 194400000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ]
+}

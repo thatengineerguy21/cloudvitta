@@ -32,3 +32,11 @@ We will use **Schema-Versioned Cache Keys** (e.g., `v1:aws:compute:us-east-1` tr
 ### Negative
 - Requires a deliberate pre-warming and canary deployment strategy for major schema updates.
 - Temporarily doubles Redis memory usage during the rollout window while both `v1` and `v2` keys coexist before the `v1` TTL expires.
+
+## Alternatives Considered
+
+### Alternative 1: In-Place Cache Schema Migration on Read
+Rejected. Writing dynamic field transformations and schema migration logic inside cache deserializers pollutes domain models, introduces runtime branches, and creates brittle legacy conversion code.
+
+### Alternative 2: Global Cache Flush on Deployment (`FLUSHDB`)
+Rejected. Flushing Redis on deployment causes a 100% cache miss storm across all concurrent API requests, overwhelming PostgreSQL and creating severe latency spikes for end users.

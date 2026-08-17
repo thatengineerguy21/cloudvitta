@@ -145,7 +145,7 @@ Execute the provider data ingestion pipeline:
 ```bash
 go run ./cmd/ingest
 ```
-This fetches raw pricing payloads from provider APIs (e.g. AWS EC2), uploads raw JSON to your GCS bucket, and inserts normalized pricing rows into `price_observations`.
+The orchestrator concurrently fetches pricing data from all registered provider/category pairs (e.g. AWS EC2). Each job uses per-provider rate limiting and retry policies, acquires a Redis idempotency lock to prevent overlapping runs, uploads raw JSON to GCS, inserts normalized pricing rows into `price_observations` with anomaly detection (flagging >10x price swings as `pending_review`), and records permanently failed jobs to the Redis DLQ.
 
 ---
 
@@ -160,6 +160,14 @@ This fetches raw pricing payloads from provider APIs (e.g. AWS EC2), uploads raw
 | `/metrics` | `GET` | Prometheus metrics endpoint (includes `cache_requests_total`) |
 | `/docs/` | `GET` | Interactive Swagger UI OpenAPI documentation |
 | `/api/v1/prices/compute` | `GET` | Compute pricing lookup & SKU comparison endpoint |
+| `/api/v1/prices/storage` | `GET` | Storage pricing lookup & cost comparison endpoint |
+| `/api/v1/prices/network` | `GET` | Network pricing lookup & egress cost comparison endpoint |
+| `/api/v1/calculate` | `POST` | Composite multi-category workload total, server-computed |
+| `/api/v1/providers/{provider}/status` | `GET` | Provider operational status, category data age, and DLQ state |
+| `/api/v1/auth/signup` | `POST` | User registration endpoint (returns user details) |
+| `/api/v1/auth/login` | `POST` | User authentication endpoint (returns JWT access and refresh tokens) |
+| `/api/v1/auth/refresh` | `POST` | Token rotation endpoint (requires `idempotency_key`, returns new token pair) |
+| `/api/v1/auth/logout` | `POST` | Session revocation endpoint (revokes refresh token and clears cache) |
 
 ### Local Verification Commands
 
@@ -169,15 +177,47 @@ This fetches raw pricing payloads from provider APIs (e.g. AWS EC2), uploads raw
    curl http://localhost:8080/readyz
    ```
 
-2. **Query Compute Pricing Endpoint**:
+2. **Query Compute, Storage, and Network Pricing Endpoints**:
    ```bash
-   curl "http://localhost:8080/api/v1/prices/compute?vcpu=4&ram_gb=16&region=us-east-1"
+   curl "http://localhost:8080/api/v1/prices/compute?vcpu=4&ram_gb=16&region=us-east"
+   curl "http://localhost:8080/api/v1/prices/storage?size_gb=500&storage_class=standard&region=us-east"
+   curl "http://localhost:8080/api/v1/prices/network?egress_gb=1000&region=us-east"
    ```
 
-3. **Verify Rate Limiter (60 req/min)**:
-   Execute >60 requests within 1 minute to receive `429 Too Many Requests` with a `Retry-After` header.
+3. **Query Composite Calculation Endpoint**:
+   ```bash
+   curl -X POST "http://localhost:8080/api/v1/calculate" \
+     -H "Content-Type: application/json" \
+     -d '{"region":"us-east","compute":{"vcpu":4,"ram_gb":16},"storage":{"size_gb":500},"network":{"egress_gb":100}}'
+   ```
 
-4. **Inspect Local Prometheus Metrics**:
+4. **Register and Authenticate User**:
+   ```bash
+   # Register new user
+   curl -X POST "http://localhost:8080/api/v1/auth/signup" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"user@example.com","password":"securePassword123"}'
+
+   # Authenticate and receive tokens
+   curl -X POST "http://localhost:8080/api/v1/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"user@example.com","password":"securePassword123"}'
+
+   # Rotate refresh token (requires idempotency_key)
+   curl -X POST "http://localhost:8080/api/v1/auth/refresh" \
+     -H "Content-Type: application/json" \
+     -d '{"refresh_token":"<raw_refresh_token>","idempotency_key":"b57422f1-6789-4a0b-93f4-2f22c544e311"}'
+
+   # Logout / Revoke session
+   curl -X POST "http://localhost:8080/api/v1/auth/logout" \
+     -H "Content-Type: application/json" \
+     -d '{"refresh_token":"<raw_refresh_token>"}'
+   ```
+
+5. **Verify Rate Limiter (60 req/min generic, 10 req/min login)**:
+   Execute >10 requests to `/api/v1/auth/login` or >60 requests to generic endpoints within 1 minute to receive `429 Too Many Requests` with a `Retry-After` header.
+
+6. **Inspect Local Prometheus Metrics**:
    ```bash
    curl http://localhost:8080/metrics | grep cache_requests_total
    ```

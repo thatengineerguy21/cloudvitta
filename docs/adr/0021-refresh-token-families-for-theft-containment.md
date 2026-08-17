@@ -29,3 +29,11 @@ We will map refresh token chains using a **`family_id`** UUID generated uniquely
 
 ### Negative
 - Requires maintaining two indexes on the `refresh_tokens` table (one for `family_id` and one for `user_id`) to ensure fast updates.
+
+## Alternatives Considered
+
+### Alternative 1: Single Reusable Refresh Token Without Rotation
+Rejected. Reusable refresh tokens allow an attacker who obtains a token to maintain indefinite unauthorized session access without detection.
+
+### Alternative 2: Linked-List Token Chains Without Family Identifier
+Rejected. Tracking token chains solely through `replaced_by` foreign keys requires recursive CTE queries or iterative lookups to revoke token trees, slowing down theft mitigation and increasing database lock contention.

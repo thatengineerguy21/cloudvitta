@@ -26,3 +26,21 @@ type PriceObservation struct {
 	LastSeenAt      pgtype.Timestamptz `json:"last_seen_at"`
 	AnomalyStatus   pgtype.Text        `json:"anomaly_status"`
 }
+
+type RefreshToken struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	FamilyID   pgtype.UUID        `json:"family_id"`
+	TokenHash  string             `json:"token_hash"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
+	ReplacedBy pgtype.UUID        `json:"replaced_by"`
+}
+
+type User struct {
+	ID           pgtype.UUID        `json:"id"`
+	Email        string             `json:"email"`
+	PasswordHash string             `json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}

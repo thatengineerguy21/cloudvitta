@@ -10,26 +10,33 @@ Accepted
 
 CloudVitta uses stateless short-lived JWTs paired with stateful, hashed refresh tokens stored in Postgres. To protect against token theft, presenting an already-revoked refresh token triggers an immediate revocation of the entire token family, forcing a re-login.
 
-However, flakey networks (e.g., mobile connections) can cause a client to legitimately retry a refresh request if the network drops just after the server mints a new token but before the client receives it. 
+However, unstable network connections (such as mobile handoffs) can cause a client to retry a refresh request if the connection drops after the server rotates the token but before the client receives the response.
 
-The original design proposed a "5-10s time-based grace window" where the server would guess that a reused token was a benign retry. This introduced a small window where an attacker who stole the old token could replay it and steal the session. Complex mitigations like IP-binding were considered but rejected because they fail against the actual threat model (compromised proxy) and produce false positives for legitimate users switching networks (WiFi to Cellular).
+A time-based grace window (5 to 10 seconds) creates a security window where an attacker who steals a token can replay it. Network-based heuristics like IP binding fail against proxy attackers and disrupt legitimate users switching networks.
 
 ## Decision
 
-We will use **Client-generated Idempotency Keys (Nonces)** to solve the token rotation retry problem definitively.
-
-1. **Client Nonce**: When requesting a token rotation, the client must submit a unique, one-time `idempotency_key` (nonce) alongside the refresh token.
-2. **Server Caching**: The server processes the rotation, issues the new token pair, revokes the old token, and caches the *new pair* against that exact `idempotency_key` for a short period.
-3. **Unambiguous Retry**: If a revoked token is presented again, the server checks the presented `idempotency_key`. If it matches the cached key for that rotation, it is unambiguously a benign network retry, and the server returns the cached new pair.
-4. **Immediate Revocation**: If a revoked token is presented *without* the matching nonce, it is unambiguously token theft. The grace window is eliminated, and the entire token family is immediately revoked.
+We use **Client-Generated Idempotency Keys (Nonces)** to handle token rotation retries:
+1. **Client Nonce**: When requesting token rotation, the client submits a unique `idempotency_key` alongside the refresh token.
+2. **Server Replay Cache**: The server executes the rotation inside a database transaction, revokes the old token, issues a new token pair, and caches the new token pair against the old token hash and `idempotency_key` in a thread-safe cache for 10 seconds.
+3. **Deterministic Benign Replay**: If a revoked token is presented with the matching cached `idempotency_key`, the server returns the cached token pair without creating new database records.
+4. **Immediate Theft Containment**: If a revoked token is presented with a mismatched `idempotency_key` or after the replay cache window, the server immediately revokes the entire token family and logs a security alert.
 
 ## Consequences
 
 ### Positive
-- Shrinks the attack surface for stolen tokens close to zero by removing the timing heuristic.
-- Avoids the complexity and false-positive risk of IP-binding or client fingerprinting.
-- Definitively solves the flakey network retry problem with a mathematically precise mechanism rather than a guess.
+- Prevents token replay vulnerabilities without relying on arbitrary timing heuristics.
+- Eliminates false positives caused by client IP changes or mobile network transitions.
+- Provides mathematically deterministic retry handling for distributed clients.
 
 ### Negative
-- Requires clients (e.g., frontend, CLI, agents) to correctly generate and send a unique nonce with every rotation request.
-- Requires short-lived server-side caching (e.g., in Redis) to hold the response payload mapped to the idempotency key.
+- Clients must generate and send a unique `idempotency_key` (UUID or nonce) with every token rotation request.
+- The server must maintain a short-lived in-memory replay cache (`RotationCache`) to store recent rotation results.
+
+## Alternatives Considered
+
+### Alternative 1: Time-Based Grace Window (5 to 10 Seconds)
+Rejected. A time-based grace window permits an attacker who intercepts a refresh token to reuse it within the window, defeating prompt theft containment.
+
+### Alternative 2: Client IP Binding and Device Fingerprinting
+Rejected. IP binding produces frequent false-positive logouts when mobile devices transition between Wi-Fi and cellular connections, and fails to protect against attacks routed through shared corporate proxies.

@@ -28,3 +28,11 @@ We will strictly enforce the **Dummy Hash Mitigation**, explicitly accepting and
 
 ### Negative
 - Removing the dummy hash would fix a bounded problem (DoS, capped by rate limits) by reopening an unmitigated problem (account enumeration). Layering the two controls ensures each solves its respective threat without trading one for the other.
+
+## Alternatives Considered
+
+### Alternative 1: Early Return on Email Not Found Without Password Verification
+Rejected. Returning immediately when an email does not exist introduces a 50-100ms timing difference between registered and unregistered emails, allowing attackers to enumerate valid user accounts via timing attacks.
+
+### Alternative 2: Lightweight Dummy Hash (Fast String Comparison or MD5)
+Rejected. Fast hashing algorithms execute in microseconds, failing to match the computational duration of real bcrypt password hashing and leaving the timing discrepancy measurable over network requests.

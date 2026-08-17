@@ -1,0 +1,60 @@
+{
+  "formatVersion": "v1.0",
+  "offerCode": "AmazonS3",
+  "products": {
+    "SKU-S3-STANDARD": {
+      "sku": "SKU-S3-STANDARD",
+      "productFamily": "Storage",
+      "attributes": {
+        "servicecode": "AmazonS3",
+        "location": "US East (N. Virginia)",
+        "storageClass": "General Purpose",
+        "volumeType": "Standard",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-S3-GLACIER": {
+      "sku": "SKU-S3-GLACIER",
+      "productFamily": "Storage",
+      "attributes": {
+        "servicecode": "AmazonS3",
+        "location": "US East (N. Virginia)",
+        "storageClass": "Archive",
+        "volumeType": "Glacier Flexible Retrieval",
+        "regionCode": "us-east-1"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-S3-STANDARD": {
+        "SKU-S3-STANDARD.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-S3-STANDARD",
+          "priceDimensions": {
+            "SKU-S3-STANDARD.TERM1.DIM1": {
+              "unit": "GB-Mo",
+              "pricePerUnit": {
+                "USD": "0.0230000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-S3-GLACIER": {
+        "SKU-S3-GLACIER.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-S3-GLACIER",
+          "priceDimensions": {
+            "SKU-S3-GLACIER.TERM1.DIM1": {
+              "unit": "GB-Mo",
+              "pricePerUnit": {
+                "USD": "0.0036000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

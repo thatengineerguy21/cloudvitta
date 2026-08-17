@@ -139,8 +139,11 @@ Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> 
    ```
 4. **`NEON_PROD_DSN`**: The connection string to your production Neon Postgres database (e.g., `postgres://user:password@ep-cool-db-1234.us-east-2.aws.neon.tech/neondb?sslmode=require`).
 5. **`REDIS_URL`**: The connection string for Upstash/Redis (e.g., `rediss://default:password@us1-cool-redis-1234.upstash.io:32451`).
-6. **`GRAFANA_OTLP_ENDPOINT`**: Your Grafana Cloud OTLP HTTP endpoint (e.g., `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`).
-7. **`GRAFANA_OTLP_HEADERS`**: Base64-encoded basic authentication header for Grafana Cloud (e.g., `Authorization=Basic <BASE64_ENCODED_INSTANCE_ID_AND_TOKEN>`).
+6. **`CLOUDVITTA_AUTH_JWT_SECRET`** (or **`JWT_SECRET`**): Secret used for signing JWT access tokens (must be at least 32 characters long).
+7. **`CLOUDVITTA_AUTH_ANON_COOKIE_SECRET`**: Secret used for HMAC-signing anonymous tracking cookies (`cv_anon_id`).
+8. **`CLOUDVITTA_GCP_API_KEY`**: Optional API key for Google Cloud Billing Catalog API access during ingestion.
+9. **`GRAFANA_OTLP_ENDPOINT`**: Your Grafana Cloud OTLP HTTP endpoint (e.g., `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`).
+10. **`GRAFANA_OTLP_HEADERS`**: Base64-encoded basic authentication header for Grafana Cloud (e.g., `Authorization=Basic <BASE64_ENCODED_INSTANCE_ID_AND_TOKEN>`).
 
 ### 2. Repository Variables (Optional Overrides)
 Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Variables** -> **New repository variable**.
