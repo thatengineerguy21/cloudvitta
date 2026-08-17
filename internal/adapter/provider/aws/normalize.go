@@ -466,6 +466,9 @@ func isStorageProduct(product awsProduct, attrs map[string]string) bool {
 	if rawClass == "" {
 		return false
 	}
+	if _, err := storageclassmap.MapAWSStorageClass(rawClass); err != nil {
+		return false
+	}
 	usageType := attrs["usagetype"]
 	if usageType != "" && !strings.Contains(usageType, "ByteHrs") && !strings.Contains(usageType, "Storage") {
 		return false

@@ -8,13 +8,13 @@ import (
 )
 
 // DefaultRetailPricesURL is the standard Azure Retail Prices API URL for Virtual Machines in eastus.
-const DefaultRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName eq 'Virtual Machines' and armRegionName eq 'eastus' and priceType eq 'Consumption'"
+const DefaultRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Virtual%20Machines'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
 
-// DefaultStorageRetailPricesURL is the standard Azure Retail Prices API URL for Storage.
-const DefaultStorageRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName eq 'Storage'"
+// DefaultStorageRetailPricesURL is the standard Azure Retail Prices API URL for Storage in eastus.
+const DefaultStorageRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Storage'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
 
 // DefaultNetworkRetailPricesURL is the standard Azure Retail Prices API URL for Bandwidth / Network.
-const DefaultNetworkRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName eq 'Bandwidth'"
+const DefaultNetworkRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Bandwidth'%20and%20priceType%20eq%20'Consumption'"
 
 // Client is an HTTP client for fetching Azure Retail Prices API data.
 type Client struct {

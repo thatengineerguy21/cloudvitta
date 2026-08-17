@@ -5,13 +5,69 @@ import (
 )
 
 var gcpRegionMap = map[string]string{
-	"us-east1":    "us-east",
-	"us-east4":    "us-east",
+	// US East
+	"us-east1": "us-east",
+	"us-east4": "us-east",
+	"us-east5": "us-east",
+
+	// US Central
 	"us-central1": "us-central",
-	"us-west1":    "us-west",
-	"us-west2":    "us-west",
-	"us-west3":    "us-west",
-	"us-west4":    "us-west",
+	"us-south1":   "us-central",
+
+	// US West
+	"us-west1": "us-west",
+	"us-west2": "us-west",
+	"us-west3": "us-west",
+	"us-west4": "us-west",
+
+	// Canada
+	"northamerica-northeast1": "ca-central",
+	"northamerica-northeast2": "ca-central",
+
+	// South America
+	"southamerica-east1": "sa-east",
+	"southamerica-west1": "sa-east",
+
+	// Europe
+	"europe-west1":      "eu-west",
+	"europe-west2":      "eu-west",
+	"europe-west3":      "eu-central",
+	"europe-west4":      "eu-west",
+	"europe-west6":      "eu-central",
+	"europe-west8":      "eu-south",
+	"europe-west9":      "eu-west",
+	"europe-west10":     "eu-central",
+	"europe-west12":     "eu-south",
+	"europe-north1":     "eu-north",
+	"europe-central2":   "eu-central",
+	"europe-southwest1": "eu-south",
+
+	// Asia Pacific
+	"asia-east1":           "ap-east",
+	"asia-east2":           "ap-east",
+	"asia-northeast1":      "ap-northeast",
+	"asia-northeast2":      "ap-northeast",
+	"asia-northeast3":      "ap-northeast",
+	"asia-south1":          "ap-south",
+	"asia-south2":          "ap-south",
+	"asia-southeast1":      "ap-southeast",
+	"asia-southeast2":      "ap-southeast",
+	"australia-southeast1": "ap-southeast",
+	"australia-southeast2": "ap-southeast",
+
+	// Middle East
+	"me-west1":    "il-central",
+	"me-central1": "me-central",
+	"me-central2": "me-central",
+
+	// Africa
+	"africa-south1": "af-south",
+
+	// Global / Multi-region
+	"global": "global",
+	"us":     "us-east",
+	"eu":     "eu-west",
+	"asia":   "ap-east",
 }
 
 var gcpGroupToNativeMap = map[string]string{
