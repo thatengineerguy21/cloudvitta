@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	_ "github.com/joho/godotenv/autoload"
@@ -48,6 +47,16 @@ func main() {
 
 	slog.Info("connected to database for migrations", "host", migrationHost)
 
+	// Ensure schema_migrations tracking table exists
+	createTrackerSQL := `CREATE TABLE IF NOT EXISTS schema_migrations (
+		version    TEXT PRIMARY KEY,
+		applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	);`
+	if _, err := conn.Exec(ctx, createTrackerSQL); err != nil {
+		slog.Error("failed to initialize schema_migrations tracking table", "error", err)
+		os.Exit(1)
+	}
+
 	// Read all SQL migration files in migrations directory
 	files, err := filepath.Glob("migrations/*.sql")
 	if err != nil {
@@ -58,23 +67,49 @@ func main() {
 	sort.Strings(files)
 
 	for _, file := range files {
+		filename := filepath.Base(file)
+
+		var alreadyApplied bool
+		checkErr := conn.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)", filename).Scan(&alreadyApplied)
+		if checkErr != nil {
+			slog.Error("failed to check migration status", "file", filename, "error", checkErr)
+			os.Exit(1)
+		}
+
+		if alreadyApplied {
+			slog.Info("migration already applied", "file", filename)
+			continue
+		}
+
 		sqlBytes, readErr := os.ReadFile(file)
 		if readErr != nil {
 			slog.Error("failed to read migration file", "file", file, "error", readErr)
 			os.Exit(1)
 		}
 
-		filename := filepath.Base(file)
 		slog.Info("applying migration", "file", filename)
 
-		// Execute SQL script
-		if _, execErr := conn.Exec(ctx, string(sqlBytes)); execErr != nil {
-			// Check if error is due to pre-existing table/index (idempotent run)
-			if strings.Contains(execErr.Error(), "already exists") {
-				slog.Info("migration already applied", "file", filename)
-				continue
-			}
+		// Execute SQL script and record applied status inside a transaction
+		tx, txErr := conn.Begin(ctx)
+		if txErr != nil {
+			slog.Error("failed to begin transaction for migration", "file", filename, "error", txErr)
+			os.Exit(1)
+		}
+
+		if _, execErr := tx.Exec(ctx, string(sqlBytes)); execErr != nil {
+			_ = tx.Rollback(ctx)
 			slog.Error("failed to execute migration", "file", filename, "error", execErr)
+			os.Exit(1)
+		}
+
+		if _, recErr := tx.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING", filename); recErr != nil {
+			_ = tx.Rollback(ctx)
+			slog.Error("failed to record applied migration", "file", filename, "error", recErr)
+			os.Exit(1)
+		}
+
+		if commitErr := tx.Commit(ctx); commitErr != nil {
+			slog.Error("failed to commit migration transaction", "file", filename, "error", commitErr)
 			os.Exit(1)
 		}
 
