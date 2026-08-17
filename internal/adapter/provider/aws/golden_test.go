@@ -45,7 +45,7 @@ func TestAWSNormalize_GoldenCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to open golden file %s: %v", tt.goldenFile, err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			obs, err := Normalize(f, fixedTime)
 			if err != nil {

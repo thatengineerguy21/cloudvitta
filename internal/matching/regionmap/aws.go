@@ -71,8 +71,8 @@ var awsRegionMap = map[string]string{
 	"Canada West (Calgary)":   "ca-central",
 
 	// Mexico
-	"mx-central-1":      "us-central",
-	"Mexico (Central)":  "us-central",
+	"mx-central-1":       "us-central",
+	"Mexico (Central)":   "us-central",
 	"Mexico (Queretaro)": "us-central",
 
 	// Europe
@@ -205,11 +205,11 @@ var awsRegionMap = map[string]string{
 	"Israel (Tel Aviv)":     "il-central",
 
 	// Africa
-	"af-south-1":          "af-south",
-	"Africa (Cape Town)":  "af-south",
-	"Nigeria (Lagos)":     "af-south",
+	"af-south-1":           "af-south",
+	"Africa (Cape Town)":   "af-south",
+	"Nigeria (Lagos)":      "af-south",
 	"Morocco (Casablanca)": "af-south",
-	"Senegal (Dakar)":     "af-south",
+	"Senegal (Dakar)":      "af-south",
 
 	// GovCloud & Secret Regions
 	"us-gov-west-1":          "us-west",
@@ -232,10 +232,10 @@ var awsRegionMap = map[string]string{
 	"Tel Aviv":              "il-central",
 
 	// Global / Any
-	"Global":           "global",
-	"global":           "global",
-	"Any":              "global",
-	"External":         "global",
+	"Global":            "global",
+	"global":            "global",
+	"Any":               "global",
+	"External":          "global",
 	"Amazon CloudFront": "global",
 }
 

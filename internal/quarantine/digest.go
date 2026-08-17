@@ -154,9 +154,9 @@ func GenerateDigestFromStorage(ctx context.Context, st storage.RawStorage, prefi
 func (r *DigestReport) Markdown() string {
 	var sb strings.Builder
 	sb.WriteString("# Quarantine Digest Report\n\n")
-	sb.WriteString(fmt.Sprintf("**Generated At:** %s  \n", r.GeneratedAt.Format(time.RFC3339)))
-	sb.WriteString(fmt.Sprintf("**Total Unmapped Items Quarantined:** %d  \n", r.TotalItems))
-	sb.WriteString(fmt.Sprintf("**Unique Unmapped Taxonomies:** %d\n\n", r.UniqueCount))
+	fmt.Fprintf(&sb, "**Generated At:** %s  \n", r.GeneratedAt.Format(time.RFC3339))
+	fmt.Fprintf(&sb, "**Total Unmapped Items Quarantined:** %d  \n", r.TotalItems)
+	fmt.Fprintf(&sb, "**Unique Unmapped Taxonomies:** %d\n\n", r.UniqueCount)
 
 	if len(r.Entries) == 0 {
 		sb.WriteString("No unmapped items found in quarantine.\n")
@@ -176,8 +176,8 @@ func (r *DigestReport) Markdown() string {
 			suggested = "*(manual review)*"
 		}
 
-		sb.WriteString(fmt.Sprintf("| `%s` | `%s` | `%s` | %d | %s | %s | [`%s`](file:///%s) |\n",
-			e.Provider, e.Kind, e.RawValue, e.Count, suggested, closestInfo, e.TargetFile, e.TargetFile))
+		fmt.Fprintf(&sb, "| `%s` | `%s` | `%s` | %d | %s | %s | [`%s`](file:///%s) |\n",
+			e.Provider, e.Kind, e.RawValue, e.Count, suggested, closestInfo, e.TargetFile, e.TargetFile)
 	}
 
 	sb.WriteString("\n## Ready-To-Paste Go Snippets\n\n")
@@ -205,16 +205,16 @@ func (r *DigestReport) GoSnippets() string {
 	sort.Strings(files)
 
 	for _, file := range files {
-		sb.WriteString(fmt.Sprintf("// --- %s ---\n", file))
+		fmt.Fprintf(&sb, "// --- %s ---\n", file)
 		for _, e := range byFile[file] {
 			val := e.SuggestedCanonical
 			if val == "" {
 				val = "TODO"
 			}
 			if e.ClosestKey != "" {
-				sb.WriteString(fmt.Sprintf("\t%q: %q, // closest: %q (dist=%d, count=%d)\n", e.RawValue, val, e.ClosestKey, e.Distance, e.Count))
+				fmt.Fprintf(&sb, "\t%q: %q, // closest: %q (dist=%d, count=%d)\n", e.RawValue, val, e.ClosestKey, e.Distance, e.Count)
 			} else {
-				sb.WriteString(fmt.Sprintf("\t%q: %q, // count=%d\n", e.RawValue, val, e.Count))
+				fmt.Fprintf(&sb, "\t%q: %q, // count=%d\n", e.RawValue, val, e.Count)
 			}
 		}
 		sb.WriteString("\n")
