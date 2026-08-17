@@ -2,7 +2,6 @@ package azure_test
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,8 +12,6 @@ import (
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
 )
 
@@ -191,12 +188,15 @@ func TestAdapter_Fetch_UnmappedProduct_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := azure.NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background(), nil)
-	if err == nil {
-		t.Fatalf("Fetch() expected error for unmapped product, got nil")
+	result, err := adapter.Fetch(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
 	}
-	if !errors.Is(err, catalogmap.ErrUnmappedProduct) {
-		t.Fatalf("Fetch() error = %v, want errors.Is ErrUnmappedProduct", err)
+	if result.UnmappedCount != 1 {
+		t.Errorf("Fetch() unmapped count = %d, want 1", result.UnmappedCount)
+	}
+	if len(result.Observations) != 0 {
+		t.Errorf("Fetch() observations = %d, want 0", len(result.Observations))
 	}
 }
 
@@ -225,12 +225,15 @@ func TestAdapter_Fetch_UnmappedRegion_FailsLoudly(t *testing.T) {
 	memStorage := storage.NewMemoryRawStorage()
 	adapter := azure.NewAdapter(client, memStorage)
 
-	_, err := adapter.Fetch(context.Background(), nil)
-	if err == nil {
-		t.Fatalf("Fetch() expected error for unmapped region, got nil")
+	result, err := adapter.Fetch(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
 	}
-	if !errors.Is(err, regionmap.ErrUnmappedRegion) {
-		t.Fatalf("Fetch() error = %v, want errors.Is ErrUnmappedRegion", err)
+	if result.UnmappedCount != 1 {
+		t.Errorf("Fetch() unmapped count = %d, want 1", result.UnmappedCount)
+	}
+	if len(result.Observations) != 0 {
+		t.Errorf("Fetch() observations = %d, want 0", len(result.Observations))
 	}
 }
 

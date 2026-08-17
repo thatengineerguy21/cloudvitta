@@ -103,7 +103,7 @@ func run() error {
 
 	// Register AWS compute adapter with rate limiting and retry config
 	awsClient := aws.NewClient()
-	awsAdapter := aws.NewAdapter(awsClient, rawStorage)
+	awsAdapter := aws.NewAdapter(awsClient, rawStorage, aws.WithCategory("compute"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
 		Category:       "compute",
@@ -114,7 +114,7 @@ func run() error {
 
 	// Register AWS storage adapter with rate limiting and retry config
 	awsStorageClient := aws.NewClient(aws.WithURL(aws.DefaultS3PriceListURL))
-	awsStorageAdapter := aws.NewAdapter(awsStorageClient, rawStorage)
+	awsStorageAdapter := aws.NewAdapter(awsStorageClient, rawStorage, aws.WithCategory("storage"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
 		Category:       "storage",
@@ -125,7 +125,7 @@ func run() error {
 
 	// Register AWS network adapter with rate limiting and retry config
 	awsNetworkClient := aws.NewClient(aws.WithURL(aws.DefaultDataTransferPriceListURL))
-	awsNetworkAdapter := aws.NewAdapter(awsNetworkClient, rawStorage)
+	awsNetworkAdapter := aws.NewAdapter(awsNetworkClient, rawStorage, aws.WithCategory("network"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
 		Category:       "network",
@@ -136,7 +136,7 @@ func run() error {
 
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
-	azureAdapter := azure.NewAdapter(azureClient, rawStorage)
+	azureAdapter := azure.NewAdapter(azureClient, rawStorage, azure.WithCategory("compute"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
 		Category:       "compute",
@@ -147,7 +147,7 @@ func run() error {
 
 	// Register Azure storage adapter with rate limiting and retry config
 	azureStorageClient := azure.NewClient(azure.WithURL(azure.DefaultStorageRetailPricesURL))
-	azureStorageAdapter := azure.NewAdapter(azureStorageClient, rawStorage)
+	azureStorageAdapter := azure.NewAdapter(azureStorageClient, rawStorage, azure.WithCategory("storage"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
 		Category:       "storage",
@@ -158,7 +158,7 @@ func run() error {
 
 	// Register Azure network adapter with rate limiting and retry config
 	azureNetworkClient := azure.NewClient(azure.WithURL(azure.DefaultNetworkRetailPricesURL))
-	azureNetworkAdapter := azure.NewAdapter(azureNetworkClient, rawStorage)
+	azureNetworkAdapter := azure.NewAdapter(azureNetworkClient, rawStorage, azure.WithCategory("network"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
 		Category:       "network",
@@ -173,7 +173,7 @@ func run() error {
 		gcpOpts = append(gcpOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
 	}
 	gcpClient := gcp.NewClient(gcpOpts...)
-	gcpAdapter := gcp.NewAdapter(gcpClient, rawStorage)
+	gcpAdapter := gcp.NewAdapter(gcpClient, rawStorage, gcp.WithCategory("compute"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "gcp",
 		Category:       "compute",
@@ -183,12 +183,13 @@ func run() error {
 	}, gcpAdapter)
 
 	// Register GCP storage adapter with rate limiting and retry config
-	gcpStorageOpts := []gcp.Option{gcp.WithURL(gcp.DefaultStorageBillingCatalogURL)}
+	var gcpStorageOpts []gcp.Option
 	if cfg.GCP.APIKey != "" {
 		gcpStorageOpts = append(gcpStorageOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
 	}
+	gcpStorageOpts = append(gcpStorageOpts, gcp.WithURL(gcp.DefaultStorageBillingCatalogURL))
 	gcpStorageClient := gcp.NewClient(gcpStorageOpts...)
-	gcpStorageAdapter := gcp.NewAdapter(gcpStorageClient, rawStorage)
+	gcpStorageAdapter := gcp.NewAdapter(gcpStorageClient, rawStorage, gcp.WithCategory("storage"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "gcp",
 		Category:       "storage",
@@ -198,12 +199,13 @@ func run() error {
 	}, gcpStorageAdapter)
 
 	// Register GCP network adapter with rate limiting and retry config
-	gcpNetworkOpts := []gcp.Option{gcp.WithURL(gcp.DefaultNetworkBillingCatalogURL)}
+	var gcpNetworkOpts []gcp.Option
 	if cfg.GCP.APIKey != "" {
 		gcpNetworkOpts = append(gcpNetworkOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
 	}
+	gcpNetworkOpts = append(gcpNetworkOpts, gcp.WithURL(gcp.DefaultNetworkBillingCatalogURL))
 	gcpNetworkClient := gcp.NewClient(gcpNetworkOpts...)
-	gcpNetworkAdapter := gcp.NewAdapter(gcpNetworkClient, rawStorage)
+	gcpNetworkAdapter := gcp.NewAdapter(gcpNetworkClient, rawStorage, gcp.WithCategory("network"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "gcp",
 		Category:       "network",

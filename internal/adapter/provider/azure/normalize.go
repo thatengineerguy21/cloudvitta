@@ -1,7 +1,9 @@
 package azure
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,38 +18,36 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
+	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
 
 type azureItem struct {
-	CurrencyCode       string      `json:"currencyCode"`
-	TierMinimumUnits   float64     `json:"tierMinimumUnits"`
-	RetailPrice        json.Number `json:"retailPrice"`
-	UnitPrice          json.Number `json:"unitPrice"`
-	ArmRegionName      string      `json:"armRegionName"`
-	Location           string      `json:"location"`
-	EffectiveStartDate string      `json:"effectiveStartDate"`
-	MeterID            string      `json:"meterId"`
-	MeterName          string      `json:"meterName"`
-	ProductID          string      `json:"productId"`
-	SkuID              string      `json:"skuId"`
-	ProductName        string      `json:"productName"`
-	SkuName            string      `json:"skuName"`
-	ServiceID          string      `json:"serviceId"`
-	ServiceName        string      `json:"serviceName"`
-	ServiceFamily      string      `json:"serviceFamily"`
-	UnitOfMeasure      string      `json:"unitOfMeasure"`
-	Type               string      `json:"type"`
-	IsPrimaryMeter     bool        `json:"isPrimaryMeterRegion"`
-	ArmSkuName         string      `json:"armSkuName"`
+	CurrencyCode         string      `json:"currencyCode"`
+	TierMinimumUnits     float64     `json:"tierMinimumUnits"`
+	RetailPrice          json.Number `json:"retailPrice"`
+	UnitPrice            json.Number `json:"unitPrice"`
+	ArmRegionName        string      `json:"armRegionName"`
+	Location             string      `json:"location"`
+	EffectiveStartDate   string      `json:"effectiveStartDate"`
+	MeterID              string      `json:"meterId"`
+	MeterName            string      `json:"meterName"`
+	ProductID            string      `json:"productId"`
+	SkuID                string      `json:"skuId"`
+	ProductName          string      `json:"productName"`
+	SkuName              string      `json:"skuName"`
+	ServiceName          string      `json:"serviceName"`
+	ServiceID            string      `json:"serviceId"`
+	ServiceFamily        string      `json:"serviceFamily"`
+	UnitOfMeasure        string      `json:"unitOfMeasure"`
+	Type                 string      `json:"type"`
+	IsPrimaryMeterRegion bool        `json:"isPrimaryMeterRegion"`
+	ArmSkuName           string      `json:"armSkuName"`
 }
 
 type azurePriceListResponse struct {
-	BillingCurrency    string      `json:"BillingCurrency"`
-	CustomerEntityID   string      `json:"CustomerEntityId"`
-	CustomerEntityType string      `json:"CustomerEntityType"`
-	Items              []azureItem `json:"Items"`
-	NextPageLink       string      `json:"NextPageLink"`
-	Count              int         `json:"Count"`
+	Items        []azureItem `json:"Items"`
+	NextPageLink string      `json:"NextPageLink"`
+	Count        int         `json:"Count"`
 }
 
 type azureVMSpec struct {
@@ -86,8 +86,13 @@ var knownAzureVMSpecs = map[string]azureVMSpec{
 }
 
 // Normalize parses an Azure Retail Prices API JSON stream and returns normalized domain observations and the next page link.
-// It fails loudly if an unmapped product code or region is encountered.
-func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, string, error) {
+// Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, string, error) {
+	var sink quarantine.Sink
+	if len(sinks) > 0 {
+		sink = sinks[0]
+	}
+
 	var payload azurePriceListResponse
 	dec := json.NewDecoder(r)
 	if err := dec.Decode(&payload); err != nil {
@@ -102,9 +107,28 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 			continue
 		}
 
+		skuID := item.SkuID
+		if skuID == "" {
+			skuID = item.MeterID
+		}
+
 		// Filter 2: Check service category mapping (fails loudly if unmapped)
 		category, err := catalogmap.MapAzureProduct(item.ServiceName)
 		if err != nil {
+			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "azure",
+						Category:   "unknown",
+						Kind:       "product",
+						RawValue:   item.ServiceName,
+						SkuID:      skuID,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("azure normalize: skipping SKU due to unmapped product", "sku", skuID, "product", item.ServiceName)
+				continue
+			}
 			return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 		}
 
@@ -115,17 +139,26 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 		}
 		regionGroup, err := regionmap.MapAzureRegion(region)
 		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "azure",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   region,
+						SkuID:      skuID,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("azure normalize: skipping SKU due to unmapped region", "sku", skuID, "region", region)
+				continue
+			}
 			return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 		}
 
 		priceAmount, err := decimal.NewFromString(item.UnitPrice.String())
 		if err != nil {
 			return nil, "", fmt.Errorf("azure normalize sku %s: invalid unit price %q: %w", item.SkuID, item.UnitPrice, err)
-		}
-
-		skuID := item.SkuID
-		if skuID == "" {
-			skuID = item.MeterID
 		}
 
 		if category == "compute" {
@@ -170,6 +203,20 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 			}
 			storageClass, err := parseAzureStorageClass(item.SkuName, item.MeterName, item.ProductName)
 			if err != nil {
+				if errors.Is(err, storageclassmap.ErrUnmappedStorageClass) {
+					if sink != nil {
+						_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+							Provider:   "azure",
+							Category:   category,
+							Kind:       "storage_class",
+							RawValue:   item.SkuName,
+							SkuID:      skuID,
+							ObservedAt: fetchedAt,
+						})
+					}
+					slog.Warn("azure normalize: skipping SKU due to unmapped storage class", "sku", skuID, "sku_name", item.SkuName, "meter_name", item.MeterName)
+					continue
+				}
 				return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 			}
 
@@ -203,8 +250,6 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 			observations = append(observations, obs)
 
 		} else if category == "network" {
-			// Tiered Pricing Detection (PRD §16.1):
-			// If an item has TierMinimumUnits > 0 (starts after initial tier), skip it.
 			if item.TierMinimumUnits > 0 {
 				slog.Debug("skipping Azure SKU due to tiered pricing", "provider", "azure", "sku", skuID, "tierMinimumUnits", item.TierMinimumUnits, "reason", "tiered_pricing_not_supported_in_v1")
 				continue
@@ -222,6 +267,20 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 
 			transferType, err := parseAzureTransferType(displayName, item.MeterName, item.SkuName)
 			if err != nil {
+				if errors.Is(err, transfertypemap.ErrUnmappedTransferType) {
+					if sink != nil {
+						_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+							Provider:   "azure",
+							Category:   category,
+							Kind:       "transfer_type",
+							RawValue:   displayName,
+							SkuID:      skuID,
+							ObservedAt: fetchedAt,
+						})
+					}
+					slog.Warn("azure normalize: skipping SKU due to unmapped transfer type", "sku", skuID, "display_name", displayName)
+					continue
+				}
 				return nil, "", fmt.Errorf("azure normalize sku %s transfer type: %w", skuID, err)
 			}
 

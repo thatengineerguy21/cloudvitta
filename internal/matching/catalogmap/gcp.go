@@ -24,3 +24,12 @@ func MapGCPProduct(serviceName string) (string, error) {
 	}
 	return category, nil
 }
+
+// KnownGCPProducts returns a copy of known GCP product mappings.
+func KnownGCPProducts() map[string]string {
+	m := make(map[string]string, len(gcpCatalogMap))
+	for k, v := range gcpCatalogMap {
+		m[k] = v
+	}
+	return m
+}

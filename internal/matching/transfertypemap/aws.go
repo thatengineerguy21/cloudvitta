@@ -34,3 +34,12 @@ func MapAWSTransferType(rawType string) (string, error) {
 	}
 	return canonical, nil
 }
+
+// KnownAWSTransferTypes returns a copy of known AWS transfer type mappings.
+func KnownAWSTransferTypes() map[string]string {
+	m := make(map[string]string, len(awsTransferTypeMap))
+	for k, v := range awsTransferTypeMap {
+		m[k] = v
+	}
+	return m
+}

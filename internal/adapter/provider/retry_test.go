@@ -7,6 +7,10 @@ import (
 	"time"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
 )
 
 func TestDo_SuccessOnFirstAttempt(t *testing.T) {
@@ -258,5 +262,42 @@ func TestDo_BackoffIncreases(t *testing.T) {
 	}
 	if sleeps[1] < 15*time.Millisecond || sleeps[1] > 25*time.Millisecond {
 		t.Errorf("expected second sleep ~20ms, got %v", sleeps[1])
+	}
+}
+
+func TestDo_UnmappedErrors_ArePermanentFailure(t *testing.T) {
+	unmappedErrors := []struct {
+		name string
+		err  error
+	}{
+		{"unmapped product", regionmap.ErrUnmappedRegion},
+		{"unmapped region", catalogmap.ErrUnmappedProduct},
+		{"unmapped storage class", storageclassmap.ErrUnmappedStorageClass},
+		{"unmapped transfer type", transfertypemap.ErrUnmappedTransferType},
+	}
+
+	for _, tt := range unmappedErrors {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			cfg := provider.DefaultRetryConfig()
+			cfg.MaxAttempts = 3
+
+			attempts := 0
+			fn := func(ctx context.Context) (string, error) {
+				attempts++
+				return "", tt.err
+			}
+
+			_, err := provider.Do(ctx, cfg, fn)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !errors.Is(err, provider.ErrPermanentFailure) {
+				t.Errorf("expected ErrPermanentFailure, got %v", err)
+			}
+			if attempts != 1 {
+				t.Errorf("expected 1 attempt (no retries for unmapped errors), got %d", attempts)
+			}
+		})
 	}
 }

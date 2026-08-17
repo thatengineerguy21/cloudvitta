@@ -1,0 +1,74 @@
+package aws
+
+import (
+	"os"
+	"testing"
+	"time"
+)
+
+func TestAWSNormalize_GoldenCorpus(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name          string
+		goldenFile    string
+		wantObsCount  int
+		expectedSKUs  []string
+		expectedPrice string
+	}{
+		{
+			name:          "AWS Compute Golden",
+			goldenFile:    "../../../../testdata/golden/aws/compute.json",
+			wantObsCount:  3, // C5.xlarge, Local Zone NYC, Wavelength Boston (Windows ignored)
+			expectedSKUs:  []string{"SKU-C5-XLARGE", "SKU-LOCAL-ZONE-NYC", "SKU-WAVELENGTH-BOSTON"},
+			expectedPrice: "0.1700000000",
+		},
+		{
+			name:          "AWS Storage Golden",
+			goldenFile:    "../../../../testdata/golden/aws/storage.json",
+			wantObsCount:  2, // S3 Standard, S3 Glacier
+			expectedSKUs:  []string{"SKU-S3-STANDARD", "SKU-S3-GLACIER"},
+			expectedPrice: "0.0230000000",
+		},
+		{
+			name:          "AWS Network Golden",
+			goldenFile:    "../../../../testdata/golden/aws/network.json",
+			wantObsCount:  2, // US East, Vodafone Dortmund
+			expectedSKUs:  []string{"SKU-TRANSFER-US-EAST", "SKU-TRANSFER-VODAFONE-DORTMUND"},
+			expectedPrice: "0.0900000000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, err := os.Open(tt.goldenFile)
+			if err != nil {
+				t.Fatalf("failed to open golden file %s: %v", tt.goldenFile, err)
+			}
+			defer f.Close()
+
+			obs, err := Normalize(f, fixedTime)
+			if err != nil {
+				t.Fatalf("Normalize() unexpected error: %v", err)
+			}
+
+			if len(obs) != tt.wantObsCount {
+				t.Fatalf("got %d observations, want %d", len(obs), tt.wantObsCount)
+			}
+
+			skuMap := make(map[string]bool)
+			for _, o := range obs {
+				skuMap[o.SkuID] = true
+				if o.FetchedAt != fixedTime {
+					t.Errorf("expected FetchedAt %v, got %v", fixedTime, o.FetchedAt)
+				}
+			}
+
+			for _, expectedSKU := range tt.expectedSKUs {
+				if !skuMap[expectedSKU] {
+					t.Errorf("missing expected SKU %s in normalized output", expectedSKU)
+				}
+			}
+		})
+	}
+}

@@ -48,10 +48,11 @@ type PriceObservation struct {
 	FetchedAt         time.Time         `json:"fetched_at"`
 }
 
-// FetchResult bundles a batch of observations and the storage path of their raw payload.
+// FetchResult bundles a batch of observations, raw storage path, and unmapped count.
 type FetchResult struct {
-	Observations []PriceObservation
-	RawGCSPath   string
+	Observations  []PriceObservation
+	RawGCSPath    string
+	UnmappedCount int
 }
 
 // ScoredComputeObservation represents a scored and filtered compute observation.

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"time"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/matching"
 )
 
 // RetryConfig defines retry behavior for provider HTTP calls.
@@ -95,6 +97,11 @@ func Do[T any](ctx context.Context, cfg RetryConfig, fn func(ctx context.Context
 				var zero T
 				return zero, fmt.Errorf("%w: %w", ErrPermanentFailure, err)
 			}
+		}
+
+		if matching.IsUnmappedError(err) {
+			var zero T
+			return zero, fmt.Errorf("%w: %w", ErrPermanentFailure, err)
 		}
 
 		if attempt == cfg.MaxAttempts-1 {

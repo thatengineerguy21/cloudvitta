@@ -1,7 +1,9 @@
 package aws
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,6 +18,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
+	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
 
 type awsProduct struct {
@@ -46,13 +49,17 @@ type awsProductMeta struct {
 	networkAttrs domain.NetworkAttributes
 }
 
-// Normalize parses an AWS Price List JSON stream and returns normalized domain observations.
 // Normalize parses an AWS Pricing Bulk JSON file stream and returns normalized domain observations.
 // It streams tokens using json.Decoder with depth-aware skipping to minimize memory overhead
 // on large provider files. It enforces that products precede terms, returning ErrPermanentFailure
 // if the payload order violates this streaming invariant.
-// It fails loudly if an unmapped product code or region is encountered.
-func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, error) {
+// Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
+	var sink quarantine.Sink
+	if len(sinks) > 0 {
+		sink = sinks[0]
+	}
+
 	dec := json.NewDecoder(r)
 
 	// Advance to opening '{' of root object
@@ -81,7 +88,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 			offerCode = val
 
 		case "products":
-			prods, err := parseProductsMap(dec, offerCode)
+			prods, err := parseProductsMap(dec, offerCode, fetchedAt, sink)
 			if err != nil {
 				return nil, err
 			}
@@ -110,7 +117,7 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, err
 	return observations, nil
 }
 
-func parseProductsMap(dec *json.Decoder, offerCode string) (map[string]awsProductMeta, error) {
+func parseProductsMap(dec *json.Decoder, offerCode string, fetchedAt time.Time, sink quarantine.Sink) (map[string]awsProductMeta, error) {
 	if err := consumeDelim(dec, '{'); err != nil {
 		return nil, fmt.Errorf("aws normalize: products open delim: %w", err)
 	}
@@ -128,7 +135,7 @@ func parseProductsMap(dec *json.Decoder, offerCode string) (map[string]awsProduc
 			return nil, fmt.Errorf("aws normalize: decode product %s: %w", sku, err)
 		}
 
-		meta, err := parseSingleProduct(prod, sku, offerCode)
+		meta, err := parseSingleProduct(prod, sku, offerCode, fetchedAt, sink)
 		if err != nil {
 			return nil, err
 		}
@@ -143,7 +150,7 @@ func parseProductsMap(dec *json.Decoder, offerCode string) (map[string]awsProduc
 	return filteredProducts, nil
 }
 
-func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta, error) {
+func parseSingleProduct(prod awsProduct, sku, offerCode string, fetchedAt time.Time, sink quarantine.Sink) (*awsProductMeta, error) {
 	serviceCode := prod.Attributes["servicecode"]
 	if serviceCode == "" {
 		serviceCode = offerCode
@@ -152,6 +159,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 	if isComputeInstance(prod, prod.Attributes) {
 		category, err := catalogmap.MapAWSProduct(serviceCode)
 		if err != nil {
+			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   "compute",
+						Kind:       "product",
+						RawValue:   serviceCode,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 		}
 
@@ -161,6 +182,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 		}
 		regionGroup, err := regionmap.MapAWSRegion(location)
 		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   location,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped region", "sku", sku, "region", location)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 		}
 
@@ -191,6 +226,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 	if isStorageProduct(prod, prod.Attributes) {
 		category, err := catalogmap.MapAWSProduct(serviceCode)
 		if err != nil {
+			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   "storage",
+						Kind:       "product",
+						RawValue:   serviceCode,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 		}
 
@@ -200,6 +249,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 		}
 		regionGroup, err := regionmap.MapAWSRegion(location)
 		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   location,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped region", "sku", sku, "region", location)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 		}
 
@@ -209,6 +272,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 		}
 		storageClass, err := storageclassmap.MapAWSStorageClass(rawStorageClass)
 		if err != nil {
+			if errors.Is(err, storageclassmap.ErrUnmappedStorageClass) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   category,
+						Kind:       "storage_class",
+						RawValue:   rawStorageClass,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped storage class", "sku", sku, "storage_class", rawStorageClass)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 		}
 
@@ -235,6 +312,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 	if isNetworkProduct(prod, prod.Attributes) {
 		category, err := catalogmap.MapAWSProduct(serviceCode)
 		if err != nil {
+			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   "network",
+						Kind:       "product",
+						RawValue:   serviceCode,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 		}
 
@@ -247,6 +338,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 		}
 		regionGroup, err := regionmap.MapAWSRegion(location)
 		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   location,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped region", "sku", sku, "region", location)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 		}
 
@@ -262,6 +367,20 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string) (*awsProductMeta
 
 		transferType, err := transfertypemap.MapAWSTransferType(displayName)
 		if err != nil {
+			if errors.Is(err, transfertypemap.ErrUnmappedTransferType) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   category,
+						Kind:       "transfer_type",
+						RawValue:   displayName,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped transfer type", "sku", sku, "transfer_type", displayName)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("aws normalize sku %s transfer type: %w", sku, err)
 		}
 
@@ -464,9 +583,6 @@ func isStorageProduct(product awsProduct, attrs map[string]string) bool {
 		rawClass = attrs["volumeType"]
 	}
 	if rawClass == "" {
-		return false
-	}
-	if _, err := storageclassmap.MapAWSStorageClass(rawClass); err != nil {
 		return false
 	}
 	usageType := attrs["usagetype"]

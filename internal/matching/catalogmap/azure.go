@@ -19,3 +19,12 @@ func MapAzureProduct(serviceName string) (string, error) {
 	}
 	return category, nil
 }
+
+// KnownAzureProducts returns a copy of known Azure product mappings.
+func KnownAzureProducts() map[string]string {
+	m := make(map[string]string, len(azureCatalogMap))
+	for k, v := range azureCatalogMap {
+		m[k] = v
+	}
+	return m
+}

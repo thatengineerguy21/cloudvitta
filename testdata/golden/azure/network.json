@@ -1,0 +1,44 @@
+{
+  "Items": [
+    {
+      "currencyCode": "USD",
+      "tierMinimumUnits": 0.0,
+      "retailPrice": 0.087,
+      "unitPrice": 0.087,
+      "armRegionName": "eastus",
+      "location": "US East",
+      "meterId": "METER-DATA-OUT-EASTUS",
+      "meterName": "Standard Data Transfer Out",
+      "productId": "DZH318Z0BNZ7",
+      "skuId": "DZH318Z0BNZ7/0001",
+      "productName": "Bandwidth",
+      "skuName": "Standard Data Transfer Out",
+      "serviceName": "Bandwidth",
+      "serviceFamily": "Networking",
+      "unitOfMeasure": "1 GB",
+      "type": "Consumption",
+      "isPrimaryMeterRegion": true
+    },
+    {
+      "currencyCode": "USD",
+      "tierMinimumUnits": 0.0,
+      "retailPrice": 0.120,
+      "unitPrice": 0.120,
+      "armRegionName": "Intercontinental",
+      "location": "Intercontinental",
+      "meterId": "METER-DATA-OUT-INTERCONTINENTAL",
+      "meterName": "Data Transfer Out - Intercontinental",
+      "productId": "DZH318Z0BNZ7",
+      "skuId": "DZH318Z0BNZ7/0002",
+      "productName": "Bandwidth",
+      "skuName": "Intercontinental Egress",
+      "serviceName": "Bandwidth",
+      "serviceFamily": "Networking",
+      "unitOfMeasure": "1 GB",
+      "type": "Consumption",
+      "isPrimaryMeterRegion": true
+    }
+  ],
+  "NextPageLink": "",
+  "Count": 2
+}

@@ -191,3 +191,59 @@ func TestJob_Fetch_CancelledContext(t *testing.T) {
 		t.Error("expected error from cancelled context")
 	}
 }
+
+func TestJob_Fetch_UnmappedRatio_WithinThreshold_Succeeds(t *testing.T) {
+	// 2 unmapped out of 100 observations (2% <= 5% threshold)
+	obs := make([]domain.PriceObservation, 98)
+	adapter := &stubAdapter{
+		result: domain.FetchResult{
+			Observations:  obs,
+			UnmappedCount: 2,
+			RawGCSPath:    "test/path",
+		},
+	}
+
+	f := provider.NewFactory()
+	f.Register(provider.ProviderConfig{
+		Provider:         "aws",
+		Category:         "compute",
+		MaxUnmappedRatio: 0.05,
+	}, adapter)
+
+	jobs := f.BuildJobs()
+	result, err := jobs[0].Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("expected success when within unmapped threshold, got: %v", err)
+	}
+	if len(result.Observations) != 98 {
+		t.Errorf("got %d observations, want 98", len(result.Observations))
+	}
+	if result.UnmappedCount != 2 {
+		t.Errorf("got %d unmapped, want 2", result.UnmappedCount)
+	}
+}
+
+func TestJob_Fetch_UnmappedRatio_ExceedsThreshold_Fails(t *testing.T) {
+	// 10 unmapped out of 20 total items (50% > 5% threshold)
+	obs := make([]domain.PriceObservation, 10)
+	adapter := &stubAdapter{
+		result: domain.FetchResult{
+			Observations:  obs,
+			UnmappedCount: 10,
+			RawGCSPath:    "test/path",
+		},
+	}
+
+	f := provider.NewFactory()
+	f.Register(provider.ProviderConfig{
+		Provider:         "azure",
+		Category:         "compute",
+		MaxUnmappedRatio: 0.05,
+	}, adapter)
+
+	jobs := f.BuildJobs()
+	_, err := jobs[0].Fetch(context.Background())
+	if err == nil {
+		t.Fatal("expected error when unmapped ratio exceeds threshold, got nil")
+	}
+}

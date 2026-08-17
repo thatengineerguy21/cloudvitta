@@ -10,13 +10,13 @@ var ErrUnmappedRegion = errors.New("regionmap: unmapped region")
 
 var awsRegionMap = map[string]string{
 	// US East
-	"us-east-1":                 "us-east",
-	"US East (N. Virginia)":     "us-east",
-	"US East (New York City)":   "us-east",
-	"US East (New York)":        "us-east",
-	"US East (Boston)":          "us-east",
-	"US East (Philadelphia)":    "us-east",
-	"US East (Atlanta)":         "us-east",
+	"us-east-1":                         "us-east",
+	"US East (N. Virginia)":             "us-east",
+	"US East (New York City)":           "us-east",
+	"US East (New York)":                "us-east",
+	"US East (Boston)":                  "us-east",
+	"US East (Philadelphia)":            "us-east",
+	"US East (Atlanta)":                 "us-east",
 	"US East (Miami)":                   "us-east",
 	"US East (Chicago)":                 "us-east",
 	"US East (Dallas)":                  "us-central",
@@ -70,45 +70,45 @@ var awsRegionMap = map[string]string{
 	"Mexico (Central)": "us-central",
 
 	// Europe
-	"eu-west-1":            "eu-west",
-	"Europe (Ireland)":     "eu-west",
-	"EU (Ireland)":         "eu-west",
-	"eu-west-2":            "eu-west",
-	"Europe (London)":      "eu-west",
-	"EU (London)":          "eu-west",
-	"Vodafone - London":             "eu-west",
-	"Europe (Vodafone) - London":    "eu-west",
-	"Vodafone - Manchester":         "eu-west",
+	"eu-west-1":                      "eu-west",
+	"Europe (Ireland)":               "eu-west",
+	"EU (Ireland)":                   "eu-west",
+	"eu-west-2":                      "eu-west",
+	"Europe (London)":                "eu-west",
+	"EU (London)":                    "eu-west",
+	"Vodafone - London":              "eu-west",
+	"Europe (Vodafone) - London":     "eu-west",
+	"Vodafone - Manchester":          "eu-west",
 	"Europe (Vodafone) - Manchester": "eu-west",
-	"eu-west-3":            "eu-west",
-	"Europe (Paris)":       "eu-west",
-	"EU (Paris)":           "eu-west",
-	"eu-central-1":         "eu-central",
-	"Europe (Frankfurt)":   "eu-central",
-	"EU (Frankfurt)":       "eu-central",
-	"Europe (Munich)":      "eu-central",
-	"Europe (Berlin)":      "eu-central",
-	"Vodafone - Munich":            "eu-central",
-	"Europe (Vodafone) - Munich":   "eu-central",
-	"Vodafone - Berlin":            "eu-central",
-	"Europe (Vodafone) - Berlin":   "eu-central",
-	"Vodafone - Dortmund":          "eu-central",
-	"Europe (Vodafone) - Dortmund": "eu-central",
-	"eu-central-2":         "eu-central",
-	"Europe (Zurich)":      "eu-central",
-	"EU (Zurich)":          "eu-central",
-	"eu-north-1":           "eu-north",
-	"Europe (Stockholm)":   "eu-north",
-	"EU (Stockholm)":       "eu-north",
-	"Europe (Copenhagen)":  "eu-north",
-	"Denmark (Copenhagen)": "eu-north",
-	"Europe (Helsinki)":    "eu-north",
-	"eu-south-1":           "eu-south",
-	"Europe (Milan)":       "eu-south",
-	"EU (Milan)":           "eu-south",
-	"eu-south-2":           "eu-south",
-	"Europe (Spain)":       "eu-south",
-	"EU (Spain)":           "eu-south",
+	"eu-west-3":                      "eu-west",
+	"Europe (Paris)":                 "eu-west",
+	"EU (Paris)":                     "eu-west",
+	"eu-central-1":                   "eu-central",
+	"Europe (Frankfurt)":             "eu-central",
+	"EU (Frankfurt)":                 "eu-central",
+	"Europe (Munich)":                "eu-central",
+	"Europe (Berlin)":                "eu-central",
+	"Vodafone - Munich":              "eu-central",
+	"Europe (Vodafone) - Munich":     "eu-central",
+	"Vodafone - Berlin":              "eu-central",
+	"Europe (Vodafone) - Berlin":     "eu-central",
+	"Vodafone - Dortmund":            "eu-central",
+	"Europe (Vodafone) - Dortmund":   "eu-central",
+	"eu-central-2":                   "eu-central",
+	"Europe (Zurich)":                "eu-central",
+	"EU (Zurich)":                    "eu-central",
+	"eu-north-1":                     "eu-north",
+	"Europe (Stockholm)":             "eu-north",
+	"EU (Stockholm)":                 "eu-north",
+	"Europe (Copenhagen)":            "eu-north",
+	"Denmark (Copenhagen)":           "eu-north",
+	"Europe (Helsinki)":              "eu-north",
+	"eu-south-1":                     "eu-south",
+	"Europe (Milan)":                 "eu-south",
+	"EU (Milan)":                     "eu-south",
+	"eu-south-2":                     "eu-south",
+	"Europe (Spain)":                 "eu-south",
+	"EU (Spain)":                     "eu-south",
 
 	// Asia Pacific
 	"ap-east-1":                  "ap-east",
@@ -164,10 +164,10 @@ var awsRegionMap = map[string]string{
 	"Asia Pacific (Osaka-Local)": "ap-northeast",
 
 	// China
-	"cn-north-1":       "ap-northeast",
-	"China (Beijing)":  "ap-northeast",
-	"cn-northwest-1":   "ap-northeast",
-	"China (Ningxia)":  "ap-northeast",
+	"cn-north-1":      "ap-northeast",
+	"China (Beijing)": "ap-northeast",
+	"cn-northwest-1":  "ap-northeast",
+	"China (Ningxia)": "ap-northeast",
 
 	// South America
 	"sa-east-1":                    "sa-east",
@@ -185,7 +185,7 @@ var awsRegionMap = map[string]string{
 	"Israel (Tel Aviv)":     "il-central",
 
 	// Africa
-	"af-south-1":        "af-south",
+	"af-south-1":         "af-south",
 	"Africa (Cape Town)": "af-south",
 	"Nigeria (Lagos)":    "af-south",
 
@@ -256,4 +256,13 @@ func ResolveAWSNativeRegion(regionGroup string) (string, error) {
 		return "", fmt.Errorf("%w: %q", ErrUnmappedRegion, regionGroup)
 	}
 	return native, nil
+}
+
+// KnownAWSRegions returns a copy of known AWS region mapping pairs.
+func KnownAWSRegions() map[string]string {
+	m := make(map[string]string, len(awsRegionMap))
+	for k, v := range awsRegionMap {
+		m[k] = v
+	}
+	return m
 }

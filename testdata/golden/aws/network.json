@@ -1,0 +1,62 @@
+{
+  "formatVersion": "v1.0",
+  "offerCode": "AWSDataTransfer",
+  "products": {
+    "SKU-TRANSFER-US-EAST": {
+      "sku": "SKU-TRANSFER-US-EAST",
+      "productFamily": "Data Transfer",
+      "attributes": {
+        "servicecode": "AWSDataTransfer",
+        "fromLocation": "US East (N. Virginia)",
+        "fromLocationType": "AWS Region",
+        "fromRegionCode": "us-east-1",
+        "transferType": "AWS Outbound",
+        "description": "AWS Data Transfer Out"
+      }
+    },
+    "SKU-TRANSFER-VODAFONE-DORTMUND": {
+      "sku": "SKU-TRANSFER-VODAFONE-DORTMUND",
+      "productFamily": "Data Transfer",
+      "attributes": {
+        "servicecode": "AWSDataTransfer",
+        "fromLocation": "Europe (Vodafone) - Dortmund",
+        "fromLocationType": "Wavelength Zone",
+        "fromRegionCode": "eu-central-1-wl1-dtm-wlz-1",
+        "transferType": "AWS Outbound",
+        "description": "AWS Data Transfer Out"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-TRANSFER-US-EAST": {
+        "SKU-TRANSFER-US-EAST.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-TRANSFER-US-EAST",
+          "priceDimensions": {
+            "SKU-TRANSFER-US-EAST.TERM1.DIM1": {
+              "unit": "GB",
+              "pricePerUnit": {
+                "USD": "0.0900000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-TRANSFER-VODAFONE-DORTMUND": {
+        "SKU-TRANSFER-VODAFONE-DORTMUND.TERM1": {
+          "offerTermCode": "TERM1",
+          "sku": "SKU-TRANSFER-VODAFONE-DORTMUND",
+          "priceDimensions": {
+            "SKU-TRANSFER-VODAFONE-DORTMUND.TERM1.DIM1": {
+              "unit": "GB",
+              "pricePerUnit": {
+                "USD": "0.1000000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -21,6 +21,7 @@ var awsStorageClassMap = map[string]string{
 	"Glacier Flexible Retrieval":   "archive",
 	"Glacier":                      "archive",
 	"Glacier Deep Archive":         "archive",
+	"Archive":                      "archive",
 	"Express One Zone":             "standard",
 	"Reduced Redundancy":           "standard",
 	"S3 Outposts":                  "standard",
@@ -47,4 +48,13 @@ func MapAWSStorageClass(rawClass string) (string, error) {
 		return "", fmt.Errorf("%w: %q", ErrUnmappedStorageClass, rawClass)
 	}
 	return canonical, nil
+}
+
+// KnownAWSStorageClasses returns a copy of known AWS storage class mappings.
+func KnownAWSStorageClasses() map[string]string {
+	m := make(map[string]string, len(awsStorageClassMap))
+	for k, v := range awsStorageClassMap {
+		m[k] = v
+	}
+	return m
 }

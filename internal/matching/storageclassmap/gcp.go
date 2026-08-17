@@ -24,3 +24,12 @@ func MapGCPStorageClass(rawClass string) (string, error) {
 	}
 	return canonical, nil
 }
+
+// KnownGCPStorageClasses returns a copy of known GCP storage class mappings.
+func KnownGCPStorageClasses() map[string]string {
+	m := make(map[string]string, len(gcpStorageClassMap))
+	for k, v := range gcpStorageClassMap {
+		m[k] = v
+	}
+	return m
+}

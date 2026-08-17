@@ -35,3 +35,12 @@ func MapAzureTransferType(rawType string) (string, error) {
 	}
 	return canonical, nil
 }
+
+// KnownAzureTransferTypes returns a copy of known Azure transfer type mappings.
+func KnownAzureTransferTypes() map[string]string {
+	m := make(map[string]string, len(azureTransferTypeMap))
+	for k, v := range azureTransferTypeMap {
+		m[k] = v
+	}
+	return m
+}

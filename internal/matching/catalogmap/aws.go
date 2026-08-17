@@ -23,3 +23,12 @@ func MapAWSProduct(productCode string) (string, error) {
 	}
 	return category, nil
 }
+
+// KnownAWSProducts returns a copy of known AWS product mappings.
+func KnownAWSProducts() map[string]string {
+	m := make(map[string]string, len(awsCatalogMap))
+	for k, v := range awsCatalogMap {
+		m[k] = v
+	}
+	return m
+}

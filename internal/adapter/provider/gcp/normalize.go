@@ -1,7 +1,9 @@
 package gcp
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,6 +18,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
+	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
 
 type gcpUnitPrice struct {
@@ -121,8 +124,13 @@ var knownGCPVMSpecs = map[string]domain.ComputeAttributes{
 }
 
 // Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
-// It skips SKUs with unmapped compute attributes, logging them at warn level.
-func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, string, error) {
+// Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, string, error) {
+	var sink quarantine.Sink
+	if len(sinks) > 0 {
+		sink = sinks[0]
+	}
+
 	dec := json.NewDecoder(r)
 
 	var observations []domain.PriceObservation
@@ -174,17 +182,31 @@ func Normalize(r io.Reader, fetchedAt time.Time) ([]domain.PriceObservation, str
 				}
 				category, err := catalogmap.MapGCPProduct(serviceName)
 				if err != nil {
+					if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+						if sink != nil {
+							_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+								Provider:   "gcp",
+								Category:   "unknown",
+								Kind:       "product",
+								RawValue:   serviceName,
+								SkuID:      sku.SkuID,
+								ObservedAt: fetchedAt,
+							})
+						}
+						slog.Warn("gcp normalize: skipping SKU due to unmapped product", "sku", sku.SkuID, "product", serviceName)
+						continue
+					}
 					return nil, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 				}
 
 				var skuObs []domain.PriceObservation
 				switch category {
 				case "compute":
-					skuObs, err = normalizeComputeSKU(sku, category, fetchedAt)
+					skuObs, err = normalizeComputeSKU(sku, category, fetchedAt, sink)
 				case "storage":
-					skuObs, err = normalizeStorageSKU(sku, category, fetchedAt)
+					skuObs, err = normalizeStorageSKU(sku, category, fetchedAt, sink)
 				case "network":
-					skuObs, err = normalizeNetworkSKU(sku, category, fetchedAt)
+					skuObs, err = normalizeNetworkSKU(sku, category, fetchedAt, sink)
 				}
 				if err != nil {
 					return nil, "", err
@@ -226,7 +248,7 @@ func extractUnitPrice(unitPrice gcpUnitPrice) (decimal.Decimal, error) {
 	return unitsDec.Add(nanosDec), nil
 }
 
-func normalizeComputeSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]domain.PriceObservation, error) {
+func normalizeComputeSKU(sku gcpSKU, category string, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
 	if !isComputeInstance(sku) {
 		return nil, nil
 	}
@@ -266,6 +288,20 @@ func normalizeComputeSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]do
 	for _, region := range regions {
 		regionGroup, err := regionmap.MapGCPRegion(region)
 		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "gcp",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   region,
+						SkuID:      sku.SkuID,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("gcp normalize: skipping SKU due to unmapped region", "sku", sku.SkuID, "region", region)
+				continue
+			}
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 		}
 
@@ -287,7 +323,7 @@ func normalizeComputeSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]do
 	return results, nil
 }
 
-func normalizeStorageSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]domain.PriceObservation, error) {
+func normalizeStorageSKU(sku gcpSKU, category string, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
 	if !isStorageProduct(sku) {
 		return nil, nil
 	}
@@ -306,6 +342,20 @@ func normalizeStorageSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]do
 
 	storageClass, err := parseGCPStorageClass(sku.Category.ResourceGroup, sku.Description, sku.Name)
 	if err != nil {
+		if errors.Is(err, storageclassmap.ErrUnmappedStorageClass) {
+			if sink != nil {
+				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+					Provider:   "gcp",
+					Category:   category,
+					Kind:       "storage_class",
+					RawValue:   sku.Category.ResourceGroup,
+					SkuID:      sku.SkuID,
+					ObservedAt: fetchedAt,
+				})
+			}
+			slog.Warn("gcp normalize: skipping SKU due to unmapped storage class", "sku", sku.SkuID, "resource_group", sku.Category.ResourceGroup)
+			return nil, nil
+		}
 		return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 	}
 
@@ -323,6 +373,20 @@ func normalizeStorageSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]do
 	for _, region := range regions {
 		regionGroup, err := regionmap.MapGCPRegion(region)
 		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "gcp",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   region,
+						SkuID:      sku.SkuID,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("gcp normalize: skipping SKU due to unmapped region", "sku", sku.SkuID, "region", region)
+				continue
+			}
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 		}
 
@@ -347,7 +411,7 @@ func normalizeStorageSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]do
 	return results, nil
 }
 
-func normalizeNetworkSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]domain.PriceObservation, error) {
+func normalizeNetworkSKU(sku gcpSKU, category string, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
 	if !isNetworkProduct(sku) {
 		return nil, nil
 	}
@@ -385,16 +449,44 @@ func normalizeNetworkSKU(sku gcpSKU, category string, fetchedAt time.Time) ([]do
 		regions = []string{"us-east1"}
 	}
 
+	transferType, err := parseGCPTransferType(sku.Description, sku.Category.ResourceGroup)
+	if err != nil {
+		if errors.Is(err, transfertypemap.ErrUnmappedTransferType) {
+			if sink != nil {
+				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+					Provider:   "gcp",
+					Category:   category,
+					Kind:       "transfer_type",
+					RawValue:   sku.Description,
+					SkuID:      sku.SkuID,
+					ObservedAt: fetchedAt,
+				})
+			}
+			slog.Warn("gcp normalize: skipping SKU due to unmapped transfer type", "sku", sku.SkuID, "description", sku.Description)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("gcp normalize sku %s transfer type: %w", sku.SkuID, err)
+	}
+
 	var results []domain.PriceObservation
 	for _, region := range regions {
 		regionGroup, err := regionmap.MapGCPRegion(region)
 		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "gcp",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   region,
+						SkuID:      sku.SkuID,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("gcp normalize: skipping SKU due to unmapped region", "sku", sku.SkuID, "region", region)
+				continue
+			}
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
-		}
-
-		transferType, err := parseGCPTransferType(sku.Description, sku.Category.ResourceGroup)
-		if err != nil {
-			return nil, fmt.Errorf("gcp normalize sku %s transfer type: %w", sku.SkuID, err)
 		}
 
 		results = append(results, domain.PriceObservation{

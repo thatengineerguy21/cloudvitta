@@ -191,3 +191,12 @@ func ResolveGCPNativeRegion(regionGroup string) (string, error) {
 	}
 	return native, nil
 }
+
+// KnownGCPRegions returns a copy of known GCP region mapping pairs.
+func KnownGCPRegions() map[string]string {
+	m := make(map[string]string, len(gcpRegionMap))
+	for k, v := range gcpRegionMap {
+		m[k] = v
+	}
+	return m
+}
