@@ -460,12 +460,31 @@ func isStorageProduct(sku gcpSKU) bool {
 	if !strings.Contains(usageUnit, "mo") && !strings.Contains(usageUnit, "month") && !strings.Contains(usageUnit, "Mo") {
 		return false
 	}
-	return true
+
+	// Exclude metadata, tag bindings, and auxiliary operations
+	desc := sku.Description + " " + sku.Category.ResourceGroup + " " + sku.Name
+	if strings.Contains(desc, "TagBinding") || strings.Contains(desc, "Tag Binding") || strings.Contains(desc, "Autoclass") || strings.Contains(desc, "Early Delete") {
+		return false
+	}
+
+	// Must match a recognized storage class keyword
+	for _, candidate := range []string{
+		"Standard", "Nearline", "Coldline", "Archive", "DRA", "DRAStorage",
+		"Regional", "Multi-Regional", "Dual-Region", "Storage",
+	} {
+		if strings.Contains(desc, candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseGCPStorageClass(resourceGroup, description, name string) (string, error) {
 	for _, text := range []string{resourceGroup, description, name} {
-		for _, candidate := range []string{"DRAStorage", "DRA", "Standard", "Nearline", "Coldline", "Archive"} {
+		for _, candidate := range []string{
+			"DRAStorage", "DRA", "Standard", "Nearline", "Coldline", "Archive",
+			"Regional", "Multi-Regional", "Dual-Region",
+		} {
 			if strings.Contains(text, candidate) {
 				return storageclassmap.MapGCPStorageClass(candidate)
 			}

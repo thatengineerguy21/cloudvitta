@@ -283,6 +283,7 @@ func parseAzureStorageClass(skuName, meterName, productName string) (string, err
 			"Standard LRS", "Standard ZRS", "Standard GRS", "Standard GZRS",
 			"Account Encrypted GZRS", "Account Encrypted GRS", "Account Encrypted ZRS", "Account Encrypted LRS", "Account Encrypted",
 			"GZRS", "GRS", "ZRS", "LRS", "RA-GRS", "RA-GZRS",
+			"Blob", "Block Blob", "Page Blob", "Append Blob", "Files", "Disks", "Managed Disks",
 		} {
 			if strings.Contains(text, candidate) {
 				return storageclassmap.MapAzureStorageClass(candidate)

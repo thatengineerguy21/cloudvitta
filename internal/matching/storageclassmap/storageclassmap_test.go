@@ -45,6 +45,7 @@ func TestMapAzureStorageClass(t *testing.T) {
 		{"Premium ZRS", "standard", nil},
 		{"SSD ZRS", "standard", nil},
 		{"SSD LRS", "standard", nil},
+		{"Blob", "standard", nil},
 		{"Account Encrypted GZRS", "standard", nil},
 		{"Cool", "infrequent_access", nil},
 		{"Archive", "archive", nil},
@@ -72,6 +73,9 @@ func TestMapGCPStorageClass(t *testing.T) {
 		wantErr   error
 	}{
 		{"Standard", "standard", nil},
+		{"Regional", "standard", nil},
+		{"Multi-Regional", "standard", nil},
+		{"Dual-Region", "standard", nil},
 		{"Nearline", "infrequent_access", nil},
 		{"Coldline", "archive", nil},
 		{"Archive", "archive", nil},
