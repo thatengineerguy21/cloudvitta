@@ -257,11 +257,13 @@ var azureRegionMap = map[string]string{
 	"LATAM":         "sa-east",
 
 	// Global & Transfer
-	"global":       "global",
-	"Global":       "global",
-	"Any":          "global",
-	"Inter-Region": "global",
-	"Intra-Region": "global",
+	"global":           "global",
+	"Global":           "global",
+	"Any":              "global",
+	"Inter-Region":     "global",
+	"Intra-Region":     "global",
+	"Intercontinental": "global",
+	"intercontinental": "global",
 }
 
 var azureGroupToNativeMap = map[string]string{
