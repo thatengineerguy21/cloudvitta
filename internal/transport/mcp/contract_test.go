@@ -26,6 +26,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
@@ -144,7 +145,7 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	fixedNow := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 
-	mockQ := &contractMockQuerier{
+	mockQuerier := &contractMockQuerier{
 		getProviderCategoryStatusFunc: func(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error) {
 			switch provider {
 			case "aws":
@@ -234,7 +235,7 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 	}
 
 	freshnessSvc := service.NewFreshnessService(
-		mockQ,
+		mockQuerier,
 		mockDLQ,
 		service.WithNowFunc(func() time.Time { return fixedNow }),
 		service.WithDefaultThreshold(168*time.Hour),
@@ -307,6 +308,20 @@ func (h *contractTestHarness) Close() {
 
 func seedContractComputeObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
 	t.Helper()
+
+	awsRegionGroup, err := regionmap.MapRegion("aws", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(aws, us-east-1) failed: %v", err)
+	}
+	azureRegionGroup, err := regionmap.MapRegion("azure", "eastus")
+	if err != nil {
+		t.Fatalf("MapRegion(azure, eastus) failed: %v", err)
+	}
+	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
+	if err != nil {
+		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+
 	awsObs := []domain.PriceObservation{
 		{
 			Provider:        "aws",
@@ -314,7 +329,7 @@ func seedContractComputeObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:           "SKU-AWS-T3-MED",
 			DisplayName:     "t3.medium",
 			Region:          "us-east-1",
-			RegionGroup:     "us-east",
+			RegionGroup:     awsRegionGroup,
 			Unit:            "hour",
 			PriceAmount:     decimal.RequireFromString("0.0416"),
 			PriceCurrency:   "USD",
@@ -328,7 +343,7 @@ func seedContractComputeObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:           "SKU-AWS-C5-LRG",
 			DisplayName:     "c5.large",
 			Region:          "us-east-1",
-			RegionGroup:     "us-east",
+			RegionGroup:     awsRegionGroup,
 			Unit:            "hour",
 			PriceAmount:     decimal.RequireFromString("0.0850"),
 			PriceCurrency:   "USD",
@@ -344,7 +359,7 @@ func seedContractComputeObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:           "SKU-AZ-D2S-V5",
 			DisplayName:     "Standard_D2s_v5",
 			Region:          "eastus",
-			RegionGroup:     "us-east",
+			RegionGroup:     azureRegionGroup,
 			Unit:            "hour",
 			PriceAmount:     decimal.RequireFromString("0.0480"),
 			PriceCurrency:   "USD",
@@ -360,7 +375,7 @@ func seedContractComputeObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:           "SKU-GCP-E2-STD-2",
 			DisplayName:     "e2-standard-2",
 			Region:          "us-east4",
-			RegionGroup:     "us-east",
+			RegionGroup:     gcpRegionGroup,
 			Unit:            "hour",
 			PriceAmount:     decimal.RequireFromString("0.0670"),
 			PriceCurrency:   "USD",
@@ -377,6 +392,20 @@ func seedContractComputeObservations(ctx context.Context, t *testing.T, rdb *red
 
 func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
 	t.Helper()
+
+	awsRegionGroup, err := regionmap.MapRegion("aws", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(aws, us-east-1) failed: %v", err)
+	}
+	azureRegionGroup, err := regionmap.MapRegion("azure", "eastus")
+	if err != nil {
+		t.Fatalf("MapRegion(azure, eastus) failed: %v", err)
+	}
+	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
+	if err != nil {
+		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+
 	awsObs := []domain.PriceObservation{
 		{
 			Provider:          "aws",
@@ -384,7 +413,7 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AWS-S3-STD",
 			DisplayName:       "S3 Standard",
 			Region:            "us-east-1",
-			RegionGroup:       "us-east",
+			RegionGroup:       awsRegionGroup,
 			Unit:              "GB-Mo",
 			PriceAmount:       decimal.RequireFromString("0.0230"),
 			PriceCurrency:     "USD",
@@ -398,7 +427,7 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AWS-S3-IA",
 			DisplayName:       "S3 Standard-IA",
 			Region:            "us-east-1",
-			RegionGroup:       "us-east",
+			RegionGroup:       awsRegionGroup,
 			Unit:              "GB-Mo",
 			PriceAmount:       decimal.RequireFromString("0.0125"),
 			PriceCurrency:     "USD",
@@ -414,7 +443,7 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AZ-BLOB-HOT",
 			DisplayName:       "Blob Hot",
 			Region:            "eastus",
-			RegionGroup:       "us-east",
+			RegionGroup:       azureRegionGroup,
 			Unit:              "GB-Mo",
 			PriceAmount:       decimal.RequireFromString("0.0200"),
 			PriceCurrency:     "USD",
@@ -428,7 +457,7 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AZ-BLOB-COOL",
 			DisplayName:       "Blob Cool",
 			Region:            "eastus",
-			RegionGroup:       "us-east",
+			RegionGroup:       azureRegionGroup,
 			Unit:              "GB-Mo",
 			PriceAmount:       decimal.RequireFromString("0.0100"),
 			PriceCurrency:     "USD",
@@ -444,7 +473,7 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-GCP-GCS-STD",
 			DisplayName:       "Standard Storage",
 			Region:            "us-east4",
-			RegionGroup:       "us-east",
+			RegionGroup:       gcpRegionGroup,
 			Unit:              "GB-Mo",
 			PriceAmount:       decimal.RequireFromString("0.0200"),
 			PriceCurrency:     "USD",
@@ -458,7 +487,7 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-GCP-GCS-NEAR",
 			DisplayName:       "Nearline Storage",
 			Region:            "us-east4",
-			RegionGroup:       "us-east",
+			RegionGroup:       gcpRegionGroup,
 			Unit:              "GB-Mo",
 			PriceAmount:       decimal.RequireFromString("0.0100"),
 			PriceCurrency:     "USD",
@@ -475,6 +504,20 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 
 func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
 	t.Helper()
+
+	awsRegionGroup, err := regionmap.MapRegion("aws", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(aws, us-east-1) failed: %v", err)
+	}
+	azureRegionGroup, err := regionmap.MapRegion("azure", "eastus")
+	if err != nil {
+		t.Fatalf("MapRegion(azure, eastus) failed: %v", err)
+	}
+	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
+	if err != nil {
+		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+
 	awsObs := []domain.PriceObservation{
 		{
 			Provider:          "aws",
@@ -482,7 +525,7 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AWS-NET-EGRESS",
 			DisplayName:       "Data Transfer Out",
 			Region:            "us-east-1",
-			RegionGroup:       "us-east",
+			RegionGroup:       awsRegionGroup,
 			Unit:              "GB",
 			PriceAmount:       decimal.RequireFromString("0.0900"),
 			PriceCurrency:     "USD",
@@ -496,7 +539,7 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AWS-NET-INTRA",
 			DisplayName:       "Intra-Region Transfer",
 			Region:            "us-east-1",
-			RegionGroup:       "us-east",
+			RegionGroup:       awsRegionGroup,
 			Unit:              "GB",
 			PriceAmount:       decimal.RequireFromString("0.0100"),
 			PriceCurrency:     "USD",
@@ -512,7 +555,7 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AZ-NET-EGRESS",
 			DisplayName:       "Bandwidth Out",
 			Region:            "eastus",
-			RegionGroup:       "us-east",
+			RegionGroup:       azureRegionGroup,
 			Unit:              "GB",
 			PriceAmount:       decimal.RequireFromString("0.0870"),
 			PriceCurrency:     "USD",
@@ -526,7 +569,7 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-AZ-NET-INTRA",
 			DisplayName:       "Intra-Region VNet Transfer",
 			Region:            "eastus",
-			RegionGroup:       "us-east",
+			RegionGroup:       azureRegionGroup,
 			Unit:              "GB",
 			PriceAmount:       decimal.RequireFromString("0.0100"),
 			PriceCurrency:     "USD",
@@ -542,7 +585,7 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-GCP-NET-EGRESS",
 			DisplayName:       "Internet Egress",
 			Region:            "us-east4",
-			RegionGroup:       "us-east",
+			RegionGroup:       gcpRegionGroup,
 			Unit:              "GB",
 			PriceAmount:       decimal.RequireFromString("0.0850"),
 			PriceCurrency:     "USD",
@@ -556,7 +599,7 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 			SkuID:             "SKU-GCP-NET-INTRA",
 			DisplayName:       "Intra-Region Egress",
 			Region:            "us-east4",
-			RegionGroup:       "us-east",
+			RegionGroup:       gcpRegionGroup,
 			Unit:              "GB",
 			PriceAmount:       decimal.RequireFromString("0.0100"),
 			PriceCurrency:     "USD",
@@ -661,6 +704,21 @@ func invokeMCP[T any](ctx context.Context, t *testing.T, client *sdk.ClientSessi
 
 // --- Deep Parity Comparators ---
 
+func assertWarningsParity(t *testing.T, contextName string, restWarnings []rest.ProviderWarning, mcpWarnings []mcp.ProviderWarning) {
+	t.Helper()
+
+	if len(restWarnings) != len(mcpWarnings) {
+		t.Fatalf("%s: warnings count mismatch: REST=%d, MCP=%d", contextName, len(restWarnings), len(mcpWarnings))
+	}
+	for j := range restWarnings {
+		restWarn := restWarnings[j]
+		mcpWarn := mcpWarnings[j]
+		if restWarn.Provider != mcpWarn.Provider || restWarn.Code != mcpWarn.Code || restWarn.Message != mcpWarn.Message {
+			t.Errorf("%s: warning[%d] mismatch: REST=%+v, MCP=%+v", contextName, j, restWarn, mcpWarn)
+		}
+	}
+}
+
 func assertComputeParity(t *testing.T, restResp rest.ComputeComparisonResponse, mcpResp mcp.ComputeComparisonResponse) {
 	t.Helper()
 
@@ -669,60 +727,51 @@ func assertComputeParity(t *testing.T, restResp rest.ComputeComparisonResponse, 
 	}
 
 	for i := range restResp.Results {
-		rItem := restResp.Results[i]
-		mItem := mcpResp.Results[i]
+		restItem := restResp.Results[i]
+		mcpItem := mcpResp.Results[i]
 
-		if rItem.Provider != mItem.Provider {
-			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, rItem.Provider, mItem.Provider)
+		if restItem.Provider != mcpItem.Provider {
+			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, restItem.Provider, mcpItem.Provider)
 		}
-		if rItem.SkuID != mItem.SkuID {
-			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.SkuID, mItem.SkuID)
+		if restItem.SkuID != mcpItem.SkuID {
+			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.SkuID, mcpItem.SkuID)
 		}
-		if rItem.MatchedSpec != mItem.MatchedSpec {
-			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, rItem.Provider, rItem.MatchedSpec, mItem.MatchedSpec)
+		if restItem.MatchedSpec != mcpItem.MatchedSpec {
+			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, restItem.Provider, restItem.MatchedSpec, mcpItem.MatchedSpec)
 		}
-		if rItem.MatchQuality != mItem.MatchQuality {
-			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.MatchQuality, mItem.MatchQuality)
+		if restItem.MatchQuality != mcpItem.MatchQuality {
+			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MatchQuality, mcpItem.MatchQuality)
 		}
-		if math.Abs(rItem.MatchDeltaPct-mItem.MatchDeltaPct) > 0.0001 {
-			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, rItem.Provider, rItem.MatchDeltaPct, mItem.MatchDeltaPct)
+		if math.Abs(restItem.MatchDeltaPct-mcpItem.MatchDeltaPct) > 0.0001 {
+			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, restItem.Provider, restItem.MatchDeltaPct, mcpItem.MatchDeltaPct)
 		}
-		if !reflect.DeepEqual(rItem.MissingAttributes, mItem.MissingAttributes) {
-			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.MissingAttributes, mItem.MissingAttributes)
+		if !reflect.DeepEqual(restItem.MissingAttributes, mcpItem.MissingAttributes) {
+			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.MissingAttributes, mcpItem.MissingAttributes)
 		}
-		if !rItem.Price.Amount.Equal(mItem.Price.Amount) {
-			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Amount, mItem.Price.Amount)
+		if !restItem.Price.Amount.Equal(mcpItem.Price.Amount) {
+			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Amount, mcpItem.Price.Amount)
 		}
-		if rItem.Price.Unit != mItem.Price.Unit {
-			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Unit, mItem.Price.Unit)
+		if restItem.Price.Unit != mcpItem.Price.Unit {
+			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Unit, mcpItem.Price.Unit)
 		}
-		if rItem.Price.Currency != mItem.Price.Currency {
-			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Currency, mItem.Price.Currency)
+		if restItem.Price.Currency != mcpItem.Price.Currency {
+			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Currency, mcpItem.Price.Currency)
 		}
-		if !rItem.NormalizedHourlyUSD.Equal(mItem.NormalizedHourlyUSD) {
-			t.Errorf("item[%d] normalized_hourly_usd mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.NormalizedHourlyUSD, mItem.NormalizedHourlyUSD)
+		if !restItem.NormalizedHourlyUSD.Equal(mcpItem.NormalizedHourlyUSD) {
+			t.Errorf("item[%d] normalized_hourly_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.NormalizedHourlyUSD, mcpItem.NormalizedHourlyUSD)
 		}
-		if rItem.NormalizedHourlyUSD.IsZero() {
-			t.Errorf("item[%d] normalized_hourly_usd is zero for %s (loud typo guard)", i, rItem.Provider)
+		if restItem.NormalizedHourlyUSD.IsZero() {
+			t.Errorf("item[%d] normalized_hourly_usd is zero for %s (loud typo guard)", i, restItem.Provider)
 		}
-		if rItem.Stale != mItem.Stale {
-			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.Stale, mItem.Stale)
+		if restItem.Stale != mcpItem.Stale {
+			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.Stale, mcpItem.Stale)
 		}
-		if !rItem.FetchedAt.Equal(mItem.FetchedAt) {
-			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.FetchedAt, mItem.FetchedAt)
+		if !restItem.FetchedAt.Equal(mcpItem.FetchedAt) {
+			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.FetchedAt, mcpItem.FetchedAt)
 		}
 	}
 
-	if len(restResp.Warnings) != len(mcpResp.Warnings) {
-		t.Fatalf("warnings count mismatch: REST=%d, MCP=%d", len(restResp.Warnings), len(mcpResp.Warnings))
-	}
-	for j := range restResp.Warnings {
-		rWarn := restResp.Warnings[j]
-		mWarn := mcpResp.Warnings[j]
-		if rWarn.Provider != mWarn.Provider || rWarn.Code != mWarn.Code || rWarn.Message != mWarn.Message {
-			t.Errorf("warning[%d] mismatch: REST=%+v, MCP=%+v", j, rWarn, mWarn)
-		}
-	}
+	assertWarningsParity(t, "compute", restResp.Warnings, mcpResp.Warnings)
 }
 
 func assertStorageParity(t *testing.T, restResp rest.StorageComparisonResponse, mcpResp mcp.StorageComparisonResponse) {
@@ -733,60 +782,51 @@ func assertStorageParity(t *testing.T, restResp rest.StorageComparisonResponse, 
 	}
 
 	for i := range restResp.Results {
-		rItem := restResp.Results[i]
-		mItem := mcpResp.Results[i]
+		restItem := restResp.Results[i]
+		mcpItem := mcpResp.Results[i]
 
-		if rItem.Provider != mItem.Provider {
-			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, rItem.Provider, mItem.Provider)
+		if restItem.Provider != mcpItem.Provider {
+			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, restItem.Provider, mcpItem.Provider)
 		}
-		if rItem.SkuID != mItem.SkuID {
-			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.SkuID, mItem.SkuID)
+		if restItem.SkuID != mcpItem.SkuID {
+			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.SkuID, mcpItem.SkuID)
 		}
-		if rItem.MatchedSpec != mItem.MatchedSpec {
-			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, rItem.Provider, rItem.MatchedSpec, mItem.MatchedSpec)
+		if restItem.MatchedSpec != mcpItem.MatchedSpec {
+			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, restItem.Provider, restItem.MatchedSpec, mcpItem.MatchedSpec)
 		}
-		if rItem.MatchQuality != mItem.MatchQuality {
-			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.MatchQuality, mItem.MatchQuality)
+		if restItem.MatchQuality != mcpItem.MatchQuality {
+			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MatchQuality, mcpItem.MatchQuality)
 		}
-		if math.Abs(rItem.MatchDeltaPct-mItem.MatchDeltaPct) > 0.0001 {
-			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, rItem.Provider, rItem.MatchDeltaPct, mItem.MatchDeltaPct)
+		if math.Abs(restItem.MatchDeltaPct-mcpItem.MatchDeltaPct) > 0.0001 {
+			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, restItem.Provider, restItem.MatchDeltaPct, mcpItem.MatchDeltaPct)
 		}
-		if !reflect.DeepEqual(rItem.MissingAttributes, mItem.MissingAttributes) {
-			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.MissingAttributes, mItem.MissingAttributes)
+		if !reflect.DeepEqual(restItem.MissingAttributes, mcpItem.MissingAttributes) {
+			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.MissingAttributes, mcpItem.MissingAttributes)
 		}
-		if !rItem.Price.Amount.Equal(mItem.Price.Amount) {
-			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Amount, mItem.Price.Amount)
+		if !restItem.Price.Amount.Equal(mcpItem.Price.Amount) {
+			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Amount, mcpItem.Price.Amount)
 		}
-		if rItem.Price.Unit != mItem.Price.Unit {
-			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Unit, mItem.Price.Unit)
+		if restItem.Price.Unit != mcpItem.Price.Unit {
+			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Unit, mcpItem.Price.Unit)
 		}
-		if rItem.Price.Currency != mItem.Price.Currency {
-			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Currency, mItem.Price.Currency)
+		if restItem.Price.Currency != mcpItem.Price.Currency {
+			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Currency, mcpItem.Price.Currency)
 		}
-		if !rItem.MonthlyCostUSD.Equal(mItem.MonthlyCostUSD) {
-			t.Errorf("item[%d] monthly_cost_usd mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.MonthlyCostUSD, mItem.MonthlyCostUSD)
+		if !restItem.MonthlyCostUSD.Equal(mcpItem.MonthlyCostUSD) {
+			t.Errorf("item[%d] monthly_cost_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MonthlyCostUSD, mcpItem.MonthlyCostUSD)
 		}
-		if rItem.MonthlyCostUSD.IsZero() {
-			t.Errorf("item[%d] monthly_cost_usd is zero for %s (loud typo guard)", i, rItem.Provider)
+		if restItem.MonthlyCostUSD.IsZero() {
+			t.Errorf("item[%d] monthly_cost_usd is zero for %s (loud typo guard)", i, restItem.Provider)
 		}
-		if rItem.Stale != mItem.Stale {
-			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.Stale, mItem.Stale)
+		if restItem.Stale != mcpItem.Stale {
+			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.Stale, mcpItem.Stale)
 		}
-		if !rItem.FetchedAt.Equal(mItem.FetchedAt) {
-			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.FetchedAt, mItem.FetchedAt)
+		if !restItem.FetchedAt.Equal(mcpItem.FetchedAt) {
+			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.FetchedAt, mcpItem.FetchedAt)
 		}
 	}
 
-	if len(restResp.Warnings) != len(mcpResp.Warnings) {
-		t.Fatalf("warnings count mismatch: REST=%d, MCP=%d", len(restResp.Warnings), len(mcpResp.Warnings))
-	}
-	for j := range restResp.Warnings {
-		rWarn := restResp.Warnings[j]
-		mWarn := mcpResp.Warnings[j]
-		if rWarn.Provider != mWarn.Provider || rWarn.Code != mWarn.Code || rWarn.Message != mWarn.Message {
-			t.Errorf("warning[%d] mismatch: REST=%+v, MCP=%+v", j, rWarn, mWarn)
-		}
-	}
+	assertWarningsParity(t, "storage", restResp.Warnings, mcpResp.Warnings)
 }
 
 func assertNetworkParity(t *testing.T, restResp rest.NetworkComparisonResponse, mcpResp mcp.NetworkComparisonResponse) {
@@ -797,60 +837,51 @@ func assertNetworkParity(t *testing.T, restResp rest.NetworkComparisonResponse, 
 	}
 
 	for i := range restResp.Results {
-		rItem := restResp.Results[i]
-		mItem := mcpResp.Results[i]
+		restItem := restResp.Results[i]
+		mcpItem := mcpResp.Results[i]
 
-		if rItem.Provider != mItem.Provider {
-			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, rItem.Provider, mItem.Provider)
+		if restItem.Provider != mcpItem.Provider {
+			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, restItem.Provider, mcpItem.Provider)
 		}
-		if rItem.SkuID != mItem.SkuID {
-			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.SkuID, mItem.SkuID)
+		if restItem.SkuID != mcpItem.SkuID {
+			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.SkuID, mcpItem.SkuID)
 		}
-		if rItem.MatchedSpec != mItem.MatchedSpec {
-			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, rItem.Provider, rItem.MatchedSpec, mItem.MatchedSpec)
+		if restItem.MatchedSpec != mcpItem.MatchedSpec {
+			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, restItem.Provider, restItem.MatchedSpec, mcpItem.MatchedSpec)
 		}
-		if rItem.MatchQuality != mItem.MatchQuality {
-			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.MatchQuality, mItem.MatchQuality)
+		if restItem.MatchQuality != mcpItem.MatchQuality {
+			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MatchQuality, mcpItem.MatchQuality)
 		}
-		if math.Abs(rItem.MatchDeltaPct-mItem.MatchDeltaPct) > 0.0001 {
-			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, rItem.Provider, rItem.MatchDeltaPct, mItem.MatchDeltaPct)
+		if math.Abs(restItem.MatchDeltaPct-mcpItem.MatchDeltaPct) > 0.0001 {
+			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, restItem.Provider, restItem.MatchDeltaPct, mcpItem.MatchDeltaPct)
 		}
-		if !reflect.DeepEqual(rItem.MissingAttributes, mItem.MissingAttributes) {
-			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.MissingAttributes, mItem.MissingAttributes)
+		if !reflect.DeepEqual(restItem.MissingAttributes, mcpItem.MissingAttributes) {
+			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.MissingAttributes, mcpItem.MissingAttributes)
 		}
-		if !rItem.Price.Amount.Equal(mItem.Price.Amount) {
-			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Amount, mItem.Price.Amount)
+		if !restItem.Price.Amount.Equal(mcpItem.Price.Amount) {
+			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Amount, mcpItem.Price.Amount)
 		}
-		if rItem.Price.Unit != mItem.Price.Unit {
-			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Unit, mItem.Price.Unit)
+		if restItem.Price.Unit != mcpItem.Price.Unit {
+			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Unit, mcpItem.Price.Unit)
 		}
-		if rItem.Price.Currency != mItem.Price.Currency {
-			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.Price.Currency, mItem.Price.Currency)
+		if restItem.Price.Currency != mcpItem.Price.Currency {
+			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Currency, mcpItem.Price.Currency)
 		}
-		if !rItem.MonthlyCostUSD.Equal(mItem.MonthlyCostUSD) {
-			t.Errorf("item[%d] monthly_cost_usd mismatch for %s: REST=%s, MCP=%s", i, rItem.Provider, rItem.MonthlyCostUSD, mItem.MonthlyCostUSD)
+		if !restItem.MonthlyCostUSD.Equal(mcpItem.MonthlyCostUSD) {
+			t.Errorf("item[%d] monthly_cost_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MonthlyCostUSD, mcpItem.MonthlyCostUSD)
 		}
-		if rItem.MonthlyCostUSD.IsZero() {
-			t.Errorf("item[%d] monthly_cost_usd is zero for %s (loud typo guard)", i, rItem.Provider)
+		if restItem.MonthlyCostUSD.IsZero() {
+			t.Errorf("item[%d] monthly_cost_usd is zero for %s (loud typo guard)", i, restItem.Provider)
 		}
-		if rItem.Stale != mItem.Stale {
-			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.Stale, mItem.Stale)
+		if restItem.Stale != mcpItem.Stale {
+			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.Stale, mcpItem.Stale)
 		}
-		if !rItem.FetchedAt.Equal(mItem.FetchedAt) {
-			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, rItem.Provider, rItem.FetchedAt, mItem.FetchedAt)
+		if !restItem.FetchedAt.Equal(mcpItem.FetchedAt) {
+			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.FetchedAt, mcpItem.FetchedAt)
 		}
 	}
 
-	if len(restResp.Warnings) != len(mcpResp.Warnings) {
-		t.Fatalf("warnings count mismatch: REST=%d, MCP=%d", len(restResp.Warnings), len(mcpResp.Warnings))
-	}
-	for j := range restResp.Warnings {
-		rWarn := restResp.Warnings[j]
-		mWarn := mcpResp.Warnings[j]
-		if rWarn.Provider != mWarn.Provider || rWarn.Code != mWarn.Code || rWarn.Message != mWarn.Message {
-			t.Errorf("warning[%d] mismatch: REST=%+v, MCP=%+v", j, rWarn, mWarn)
-		}
-	}
+	assertWarningsParity(t, "network", restResp.Warnings, mcpResp.Warnings)
 }
 
 func assertCalculateParity(t *testing.T, restResp rest.CalculateResponse, mcpResp mcp.CalculateResponse) {
@@ -865,91 +896,82 @@ func assertCalculateParity(t *testing.T, restResp rest.CalculateResponse, mcpRes
 		restMap[r.Provider] = r
 	}
 
-	for _, mItem := range mcpResp.Results {
-		rItem, ok := restMap[mItem.Provider]
+	for _, mcpItem := range mcpResp.Results {
+		restItem, ok := restMap[mcpItem.Provider]
 		if !ok {
-			t.Fatalf("provider %s present in MCP results but missing in REST", mItem.Provider)
+			t.Fatalf("provider %s present in MCP results but missing in REST", mcpItem.Provider)
 		}
 
-		if rItem.Partial != mItem.Partial {
-			t.Errorf("provider %s partial mismatch: REST=%v, MCP=%v", mItem.Provider, rItem.Partial, mItem.Partial)
+		if restItem.Partial != mcpItem.Partial {
+			t.Errorf("provider %s partial mismatch: REST=%v, MCP=%v", mcpItem.Provider, restItem.Partial, mcpItem.Partial)
 		}
 
 		// ADR 0022 Honesty Contract Verification
-		if rItem.Partial {
-			if rItem.TotalNormalizedHourlyUSD != nil || mItem.TotalNormalizedHourlyUSD != nil {
-				t.Errorf("provider %s partial result must omit total_normalized_hourly_usd: REST=%v, MCP=%v", mItem.Provider, rItem.TotalNormalizedHourlyUSD, mItem.TotalNormalizedHourlyUSD)
+		if restItem.Partial {
+			if restItem.TotalNormalizedHourlyUSD != nil || mcpItem.TotalNormalizedHourlyUSD != nil {
+				t.Errorf("provider %s partial result must omit total_normalized_hourly_usd: REST=%v, MCP=%v", mcpItem.Provider, restItem.TotalNormalizedHourlyUSD, mcpItem.TotalNormalizedHourlyUSD)
 			}
-			if rItem.PartialTotalNormalizedHourlyUSD == nil || mItem.PartialTotalNormalizedHourlyUSD == nil {
-				t.Errorf("provider %s partial result must populate partial_total_normalized_hourly_usd: REST=%v, MCP=%v", mItem.Provider, rItem.PartialTotalNormalizedHourlyUSD, mItem.PartialTotalNormalizedHourlyUSD)
+			if restItem.PartialTotalNormalizedHourlyUSD == nil || mcpItem.PartialTotalNormalizedHourlyUSD == nil {
+				t.Errorf("provider %s partial result must populate partial_total_normalized_hourly_usd: REST=%v, MCP=%v", mcpItem.Provider, restItem.PartialTotalNormalizedHourlyUSD, mcpItem.PartialTotalNormalizedHourlyUSD)
 			} else {
-				if !rItem.PartialTotalNormalizedHourlyUSD.Equal(*mItem.PartialTotalNormalizedHourlyUSD) {
-					t.Errorf("provider %s partial_total_normalized_hourly_usd mismatch: REST=%s, MCP=%s", mItem.Provider, rItem.PartialTotalNormalizedHourlyUSD, mItem.PartialTotalNormalizedHourlyUSD)
+				if !restItem.PartialTotalNormalizedHourlyUSD.Equal(*mcpItem.PartialTotalNormalizedHourlyUSD) {
+					t.Errorf("provider %s partial_total_normalized_hourly_usd mismatch: REST=%s, MCP=%s", mcpItem.Provider, restItem.PartialTotalNormalizedHourlyUSD, mcpItem.PartialTotalNormalizedHourlyUSD)
 				}
-				if rItem.PartialTotalNormalizedHourlyUSD.IsZero() {
-					t.Errorf("provider %s partial_total_normalized_hourly_usd is zero (loud typo guard)", mItem.Provider)
+				if restItem.PartialTotalNormalizedHourlyUSD.IsZero() {
+					t.Errorf("provider %s partial_total_normalized_hourly_usd is zero (loud typo guard)", mcpItem.Provider)
 				}
 			}
 		} else {
-			if rItem.TotalNormalizedHourlyUSD == nil || mItem.TotalNormalizedHourlyUSD == nil {
-				t.Errorf("provider %s complete result must populate total_normalized_hourly_usd: REST=%v, MCP=%v", mItem.Provider, rItem.TotalNormalizedHourlyUSD, mItem.TotalNormalizedHourlyUSD)
+			if restItem.TotalNormalizedHourlyUSD == nil || mcpItem.TotalNormalizedHourlyUSD == nil {
+				t.Errorf("provider %s complete result must populate total_normalized_hourly_usd: REST=%v, MCP=%v", mcpItem.Provider, restItem.TotalNormalizedHourlyUSD, mcpItem.TotalNormalizedHourlyUSD)
 			} else {
-				if !rItem.TotalNormalizedHourlyUSD.Equal(*mItem.TotalNormalizedHourlyUSD) {
-					t.Errorf("provider %s total_normalized_hourly_usd mismatch: REST=%s, MCP=%s", mItem.Provider, rItem.TotalNormalizedHourlyUSD, mItem.TotalNormalizedHourlyUSD)
+				if !restItem.TotalNormalizedHourlyUSD.Equal(*mcpItem.TotalNormalizedHourlyUSD) {
+					t.Errorf("provider %s total_normalized_hourly_usd mismatch: REST=%s, MCP=%s", mcpItem.Provider, restItem.TotalNormalizedHourlyUSD, mcpItem.TotalNormalizedHourlyUSD)
 				}
-				if rItem.TotalNormalizedHourlyUSD.IsZero() {
-					t.Errorf("provider %s total_normalized_hourly_usd is zero (loud typo guard)", mItem.Provider)
+				if restItem.TotalNormalizedHourlyUSD.IsZero() {
+					t.Errorf("provider %s total_normalized_hourly_usd is zero (loud typo guard)", mcpItem.Provider)
 				}
 			}
-			if rItem.PartialTotalNormalizedHourlyUSD != nil || mItem.PartialTotalNormalizedHourlyUSD != nil {
-				t.Errorf("provider %s complete result must omit partial_total_normalized_hourly_usd: REST=%v, MCP=%v", mItem.Provider, rItem.PartialTotalNormalizedHourlyUSD, mItem.PartialTotalNormalizedHourlyUSD)
+			if restItem.PartialTotalNormalizedHourlyUSD != nil || mcpItem.PartialTotalNormalizedHourlyUSD != nil {
+				t.Errorf("provider %s complete result must omit partial_total_normalized_hourly_usd: REST=%v, MCP=%v", mcpItem.Provider, restItem.PartialTotalNormalizedHourlyUSD, mcpItem.PartialTotalNormalizedHourlyUSD)
 			}
 		}
 
-		if len(rItem.Categories) != len(mItem.Categories) {
-			t.Fatalf("provider %s categories count mismatch: REST=%d, MCP=%d", mItem.Provider, len(rItem.Categories), len(mItem.Categories))
+		if len(restItem.Categories) != len(mcpItem.Categories) {
+			t.Fatalf("provider %s categories count mismatch: REST=%d, MCP=%d", mcpItem.Provider, len(restItem.Categories), len(mcpItem.Categories))
 		}
 
-		for catKey, mCat := range mItem.Categories {
-			rCat, catExists := rItem.Categories[catKey]
+		for catKey, mcpCategory := range mcpItem.Categories {
+			restCategory, catExists := restItem.Categories[catKey]
 			if !catExists {
-				t.Fatalf("provider %s category %s present in MCP but missing in REST", mItem.Provider, catKey)
+				t.Fatalf("provider %s category %s present in MCP but missing in REST", mcpItem.Provider, catKey)
 			}
 
-			if rCat.SkuID != mCat.SkuID {
-				t.Errorf("provider %s category %s sku_id mismatch: REST=%s, MCP=%s", mItem.Provider, catKey, rCat.SkuID, mCat.SkuID)
+			if restCategory.SkuID != mcpCategory.SkuID {
+				t.Errorf("provider %s category %s sku_id mismatch: REST=%s, MCP=%s", mcpItem.Provider, catKey, restCategory.SkuID, mcpCategory.SkuID)
 			}
-			if rCat.MatchQuality != mCat.MatchQuality {
-				t.Errorf("provider %s category %s match_quality mismatch: REST=%s, MCP=%s", mItem.Provider, catKey, rCat.MatchQuality, mCat.MatchQuality)
+			if restCategory.MatchQuality != mcpCategory.MatchQuality {
+				t.Errorf("provider %s category %s match_quality mismatch: REST=%s, MCP=%s", mcpItem.Provider, catKey, restCategory.MatchQuality, mcpCategory.MatchQuality)
 			}
-			if math.Abs(rCat.MatchDeltaPct-mCat.MatchDeltaPct) > 0.0001 {
-				t.Errorf("provider %s category %s match_delta_pct mismatch: REST=%f, MCP=%f", mItem.Provider, catKey, rCat.MatchDeltaPct, mCat.MatchDeltaPct)
+			if math.Abs(restCategory.MatchDeltaPct-mcpCategory.MatchDeltaPct) > 0.0001 {
+				t.Errorf("provider %s category %s match_delta_pct mismatch: REST=%f, MCP=%f", mcpItem.Provider, catKey, restCategory.MatchDeltaPct, mcpCategory.MatchDeltaPct)
 			}
-			if !reflect.DeepEqual(rCat.MissingAttributes, mCat.MissingAttributes) {
-				t.Errorf("provider %s category %s missing_attributes mismatch: REST=%v, MCP=%v", mItem.Provider, catKey, rCat.MissingAttributes, mCat.MissingAttributes)
+			if !reflect.DeepEqual(restCategory.MissingAttributes, mcpCategory.MissingAttributes) {
+				t.Errorf("provider %s category %s missing_attributes mismatch: REST=%v, MCP=%v", mcpItem.Provider, catKey, restCategory.MissingAttributes, mcpCategory.MissingAttributes)
 			}
-			if rCat.Stale != mCat.Stale {
-				t.Errorf("provider %s category %s stale mismatch: REST=%v, MCP=%v", mItem.Provider, catKey, rCat.Stale, mCat.Stale)
+			if restCategory.Stale != mcpCategory.Stale {
+				t.Errorf("provider %s category %s stale mismatch: REST=%v, MCP=%v", mcpItem.Provider, catKey, restCategory.Stale, mcpCategory.Stale)
 			}
-			if !rCat.NormalizedHourlyUSD.Equal(mCat.NormalizedHourlyUSD) {
-				t.Errorf("provider %s category %s normalized_hourly_usd mismatch: REST=%s, MCP=%s", mItem.Provider, catKey, rCat.NormalizedHourlyUSD, mCat.NormalizedHourlyUSD)
+			if !restCategory.NormalizedHourlyUSD.Equal(mcpCategory.NormalizedHourlyUSD) {
+				t.Errorf("provider %s category %s normalized_hourly_usd mismatch: REST=%s, MCP=%s", mcpItem.Provider, catKey, restCategory.NormalizedHourlyUSD, mcpCategory.NormalizedHourlyUSD)
 			}
-			if rCat.NormalizedHourlyUSD.IsZero() {
-				t.Errorf("provider %s category %s normalized_hourly_usd is zero (loud typo guard)", mItem.Provider, catKey)
+			if restCategory.NormalizedHourlyUSD.IsZero() {
+				t.Errorf("provider %s category %s normalized_hourly_usd is zero (loud typo guard)", mcpItem.Provider, catKey)
 			}
 		}
 	}
 
-	if len(restResp.Warnings) != len(mcpResp.Warnings) {
-		t.Fatalf("calculate warnings count mismatch: REST=%d, MCP=%d", len(restResp.Warnings), len(mcpResp.Warnings))
-	}
-	for j := range restResp.Warnings {
-		rWarn := restResp.Warnings[j]
-		mWarn := mcpResp.Warnings[j]
-		if rWarn.Provider != mWarn.Provider || rWarn.Code != mWarn.Code || rWarn.Message != mWarn.Message {
-			t.Errorf("calculate warning[%d] mismatch: REST=%+v, MCP=%+v", j, rWarn, mWarn)
-		}
-	}
+	assertWarningsParity(t, "calculate", restResp.Warnings, mcpResp.Warnings)
 }
 
 func assertProviderStatusParity(t *testing.T, restResp rest.ProviderStatusResponse, mcpResp domain.ProviderStatus) {
@@ -975,33 +997,33 @@ func assertProviderStatusParity(t *testing.T, restResp rest.ProviderStatusRespon
 		t.Fatalf("categories count mismatch for %s: REST=%d, MCP=%d", restResp.Provider, len(restResp.Categories), len(mcpResp.Categories))
 	}
 
-	for catKey, mCat := range mcpResp.Categories {
-		rCat, ok := restResp.Categories[catKey]
+	for catKey, mcpCat := range mcpResp.Categories {
+		restCat, ok := restResp.Categories[catKey]
 		if !ok {
 			t.Fatalf("category %s missing in REST status response for %s", catKey, restResp.Provider)
 		}
 
-		if rCat.Category != mCat.Category {
-			t.Errorf("category name mismatch for %s:%s: REST=%s, MCP=%s", restResp.Provider, catKey, rCat.Category, mCat.Category)
+		if restCat.Category != mcpCat.Category {
+			t.Errorf("category name mismatch for %s:%s: REST=%s, MCP=%s", restResp.Provider, catKey, restCat.Category, mcpCat.Category)
 		}
-		if rCat.Supported != mCat.Supported {
-			t.Errorf("supported flag mismatch for %s:%s: REST=%v, MCP=%v", restResp.Provider, catKey, rCat.Supported, mCat.Supported)
+		if restCat.Supported != mcpCat.Supported {
+			t.Errorf("supported flag mismatch for %s:%s: REST=%v, MCP=%v", restResp.Provider, catKey, restCat.Supported, mcpCat.Supported)
 		}
-		if rCat.ObservationCount != mCat.ObservationCount {
-			t.Errorf("observation_count mismatch for %s:%s: REST=%d, MCP=%d", restResp.Provider, catKey, rCat.ObservationCount, mCat.ObservationCount)
+		if restCat.ObservationCount != mcpCat.ObservationCount {
+			t.Errorf("observation_count mismatch for %s:%s: REST=%d, MCP=%d", restResp.Provider, catKey, restCat.ObservationCount, mcpCat.ObservationCount)
 		}
-		if rCat.Stale != mCat.Stale {
-			t.Errorf("category stale flag mismatch for %s:%s: REST=%v, MCP=%v", restResp.Provider, catKey, rCat.Stale, mCat.Stale)
+		if restCat.Stale != mcpCat.Stale {
+			t.Errorf("category stale flag mismatch for %s:%s: REST=%v, MCP=%v", restResp.Provider, catKey, restCat.Stale, mcpCat.Stale)
 		}
-		if math.Abs(rCat.StalenessThresholdHours-mCat.StalenessThresholdHours) > 0.0001 {
-			t.Errorf("staleness_threshold_hours mismatch for %s:%s: REST=%f, MCP=%f", restResp.Provider, catKey, rCat.StalenessThresholdHours, mCat.StalenessThresholdHours)
+		if math.Abs(restCat.StalenessThresholdHours-mcpCat.StalenessThresholdHours) > 0.0001 {
+			t.Errorf("staleness_threshold_hours mismatch for %s:%s: REST=%f, MCP=%f", restResp.Provider, catKey, restCat.StalenessThresholdHours, mcpCat.StalenessThresholdHours)
 		}
 
-		if (rCat.DLQ == nil) != (mCat.DLQ == nil) {
-			t.Errorf("DLQ nilness mismatch for %s:%s: REST=%v, MCP=%v", restResp.Provider, catKey, rCat.DLQ, mCat.DLQ)
-		} else if rCat.DLQ != nil {
-			if rCat.DLQ.Status != mCat.DLQ.Status || rCat.DLQ.LastError != mCat.DLQ.LastError || rCat.DLQ.ConsecutiveFailures != mCat.DLQ.ConsecutiveFailures {
-				t.Errorf("DLQ content mismatch for %s:%s: REST=%+v, MCP=%+v", restResp.Provider, catKey, rCat.DLQ, mCat.DLQ)
+		if (restCat.DLQ == nil) != (mcpCat.DLQ == nil) {
+			t.Errorf("DLQ nilness mismatch for %s:%s: REST=%v, MCP=%v", restResp.Provider, catKey, restCat.DLQ, mcpCat.DLQ)
+		} else if restCat.DLQ != nil {
+			if restCat.DLQ.Status != mcpCat.DLQ.Status || restCat.DLQ.LastError != mcpCat.DLQ.LastError || restCat.DLQ.ConsecutiveFailures != mcpCat.DLQ.ConsecutiveFailures {
+				t.Errorf("DLQ content mismatch for %s:%s: REST=%+v, MCP=%+v", restResp.Provider, catKey, restCat.DLQ, mcpCat.DLQ)
 			}
 		}
 	}
@@ -1010,10 +1032,10 @@ func assertProviderStatusParity(t *testing.T, restResp rest.ProviderStatusRespon
 		t.Fatalf("provider status warnings count mismatch for %s: REST=%d, MCP=%d", restResp.Provider, len(restResp.Warnings), len(mcpResp.Warnings))
 	}
 	for j := range restResp.Warnings {
-		rWarn := restResp.Warnings[j]
-		mWarn := mcpResp.Warnings[j]
-		if rWarn.Provider != mWarn.Provider || rWarn.Code != mWarn.Code || rWarn.Message != mWarn.Message {
-			t.Errorf("status warning[%d] mismatch for %s: REST=%+v, MCP=%+v", j, restResp.Provider, rWarn, mWarn)
+		restWarn := restResp.Warnings[j]
+		mcpWarn := mcpResp.Warnings[j]
+		if restWarn.Provider != mcpWarn.Provider || restWarn.Code != mcpWarn.Code || restWarn.Message != mcpWarn.Message {
+			t.Errorf("status warning[%d] mismatch for %s: REST=%+v, MCP=%+v", j, restResp.Provider, restWarn, mcpWarn)
 		}
 	}
 }
@@ -1770,28 +1792,34 @@ func TestContractParity_ProviderStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("Stage3Provider_Oracle", func(t *testing.T) {
-		restResp, code, body := invokeREST[rest.ProviderStatusResponse](
-			t, harness.restRouter, http.MethodGet, "/api/v1/providers/oracle/status", nil, harness.bearerToken,
-		)
-		if code != http.StatusOK {
-			t.Fatalf("REST returned status %d: %s", code, body)
-		}
+	t.Run("Stage3Providers_AllCatalogItems", func(t *testing.T) {
+		stage3Providers := []string{"oracle", "ibm", "alibaba", "digitalocean"}
 
-		mcpResp, err := invokeMCP[domain.ProviderStatus](
-			ctx, t, harness.mcpClient, "get_provider_status",
-			mcp.GetProviderStatusInput{Provider: "oracle"},
-		)
-		if err != nil {
-			t.Fatalf("MCP invoke failed: %v", err)
-		}
+		for _, p := range stage3Providers {
+			t.Run(p, func(t *testing.T) {
+				restResp, code, body := invokeREST[rest.ProviderStatusResponse](
+					t, harness.restRouter, http.MethodGet, fmt.Sprintf("/api/v1/providers/%s/status", p), nil, harness.bearerToken,
+				)
+				if code != http.StatusOK {
+					t.Fatalf("REST returned status %d for %s: %s", code, p, body)
+				}
 
-		assertProviderStatusParity(t, restResp, mcpResp)
-		if mcpResp.Status != "not_yet_ingested" {
-			t.Errorf("expected status 'not_yet_ingested', got %s", mcpResp.Status)
-		}
-		if !mcpResp.Stale {
-			t.Error("expected Stale=true for stage 3 provider")
+				mcpResp, err := invokeMCP[domain.ProviderStatus](
+					ctx, t, harness.mcpClient, "get_provider_status",
+					mcp.GetProviderStatusInput{Provider: p},
+				)
+				if err != nil {
+					t.Fatalf("MCP invoke failed for %s: %v", p, err)
+				}
+
+				assertProviderStatusParity(t, restResp, mcpResp)
+				if mcpResp.Status != "not_yet_ingested" {
+					t.Errorf("expected status 'not_yet_ingested' for %s, got %s", p, mcpResp.Status)
+				}
+				if !mcpResp.Stale {
+					t.Errorf("expected Stale=true for %s", p)
+				}
+			})
 		}
 	})
 
