@@ -9,7 +9,7 @@ Accepted
 ## Context
 
 CloudVitta requires two primary runtime execution contexts:
-1. A public-facing API serving HTTP/gRPC/MCP traffic (`cmd/api`).
+1. A public-facing API serving REST and MCP traffic (`cmd/api`).
 2. A background ingestion worker triggered on a schedule to fetch upstream provider prices (`cmd/ingest`).
 
 While these two components have different scaling characteristics and triggers, they operate over the same business domain, database schema, and caching logic. A microservices architecture introduces network boundaries between the ingest logic and the store logic, and duplicates struct definitions and database drivers across repositories.

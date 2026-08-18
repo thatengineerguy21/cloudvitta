@@ -22,7 +22,7 @@ sequenceDiagram
     Svc->>Svc: CheckPasswordTimingSafe()
     Svc->>DB: InsertRefreshToken(user_id, family_id, token_hash, expires_at)
     DB-->>Svc: refresh_token record
-    Svc->>Svc: GenerateAccessToken(user_id, "standard")
+    Svc->>Svc: GenerateAccessToken(user_id, standard)
     Svc-->>Router: TokenPair (access_token, refresh_token)
     Router-->>Client: 200 OK {access_token, refresh_token, token_type, expires_in}
 
@@ -30,26 +30,29 @@ sequenceDiagram
     Note over Client,DB: Refresh Token Rotation Flow
     Client->>Router: POST /api/v1/auth/refresh {refresh_token, idempotency_key}
     Router->>Svc: Refresh(ctx, refresh_token, idempotency_key)
-    Svc->>DB: BEGIN TX; GetRefreshTokenByHashForUpdate(token_hash)
+    Svc->>DB: BEGIN TX
+    Svc->>DB: GetRefreshTokenByHashForUpdate(token_hash)
     DB-->>Svc: token row (locked)
 
     alt Token Active and Unrevoked
-        Svc->>Svc: GenerateRefreshToken() & GenerateAccessToken()
+        Svc->>Svc: GenerateRefreshToken() and GenerateAccessToken()
         Svc->>DB: InsertRefreshToken(same family_id, new token_hash)
         DB-->>Svc: new token record
-        Svc->>DB: RevokeRefreshTokenWithReplacement(old_id, replaced_by=new_id); COMMIT TX
+        Svc->>DB: RevokeRefreshTokenWithReplacement(old_id, replaced_by=new_id)
+        Svc->>DB: COMMIT TX
         Svc->>Cache: Put(old_token_hash, idempotency_key, token_pair, ttl=10s)
         Svc-->>Router: New TokenPair
         Router-->>Client: 200 OK {access_token, refresh_token, token_type, expires_in}
     else Token Revoked (Replay or Theft)
         Svc->>Cache: Get(old_token_hash)
-        alt Cache Hit & Same Idempotency Key (Benign Replay)
+        alt Cache Hit and Same Idempotency Key (Benign Replay)
             Cache-->>Svc: cached TokenPair
             Svc->>DB: COMMIT TX
             Svc-->>Router: Cached TokenPair
             Router-->>Client: 200 OK (Replay of original response)
         else Cache Miss or Mismatched Idempotency Key (Theft Detected)
-            Svc->>DB: RevokeRefreshTokenFamily(family_id, revoked_at=now()); COMMIT TX
+            Svc->>DB: RevokeRefreshTokenFamily(family_id, revoked_at=now())
+            Svc->>DB: COMMIT TX
             Svc->>Svc: Log Security Warning (slog.WarnContext)
             Svc-->>Router: ErrTokenFamilyRevoked
             Router-->>Client: 401 Unauthorized (RFC 7807 problem details)
@@ -63,7 +66,7 @@ sequenceDiagram
     Svc->>DB: RevokeRefreshTokenByHash(token_hash)
     Svc->>Cache: Delete(token_hash)
     Svc-->>Router: nil
-    Router-->>Client: 200 OK {"message": "logged out successfully"}
+    Router-->>Client: 200 OK (Logged out successfully)
 ```
 
 ## 2. Security Invariants

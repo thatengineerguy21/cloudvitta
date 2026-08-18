@@ -20,7 +20,7 @@ flowchart TD
             I_AD --> I_RL
         end
 
-        subgraph "API Layer (REST / gRPC / MCP)"
+        subgraph "API & Tool Layer (REST / MCP)"
             API_R[Standard Lib HTTP Routing]
             API_RL[Tiered Rate Limiting]
             API_Auth[Auth Middleware]
