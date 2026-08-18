@@ -2,6 +2,7 @@ package authmw
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -66,4 +67,25 @@ func NewAuthMiddleware(jwtSecret []byte, clock func() time.Time) func(http.Handl
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// RequireAuth enforces that the request context contains a valid, authenticated user.
+// If unauthenticated, it immediately returns HTTP 401 Unauthorized with RFC 7807 problem details.
+func RequireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authCtx, ok := AuthFromContext(r.Context())
+		if !ok || !authCtx.IsAuth || authCtx.UserID == "" {
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"type":     "https://cloudvitta.dev/errors/unauthorized",
+				"title":    "Unauthorized",
+				"status":   http.StatusUnauthorized,
+				"detail":   "Valid Bearer token required for MCP access",
+				"instance": r.URL.Path,
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

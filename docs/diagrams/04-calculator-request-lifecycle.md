@@ -165,9 +165,57 @@ sequenceDiagram
 
 ---
 
-## 4. Key Architectural Invariants
+## 4. Model Context Protocol (MCP) Streamable HTTP Lifecycle (`/mcp`)
+
+The following diagram illustrates how AI agent clients connect, authenticate, discover tools, and invoke comparison operations over Streamable HTTP transport.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as AI Agent Client (Claude / Custom)
+    participant AuthMW as Auth Middleware (Extract Claims)
+    participant Guard as RequireAuth Guard
+    participant RateLimit as Rate Limiter (Standard Tier)
+    participant MCPHandler as Streamable HTTP Handler
+    participant MCPServer as MCP Server Adapter
+    participant Svc as PricingService / FreshnessService
+
+    Agent->>AuthMW: POST /mcp (JSON-RPC initialize / tools/list / tools/call)
+    Note over AuthMW: Parse Authorization: Bearer <jwt><br/>Attach AuthContext to Request Context
+    
+    AuthMW->>Guard: Forward Request
+    alt Unauthenticated (Missing / Invalid Bearer Token)
+        Guard-->>Agent: 401 Unauthorized (application/problem+json)
+    else Authenticated User Context Present
+        Guard->>RateLimit: Forward Request
+        Note over RateLimit: User-keyed Standard Tier Quota<br/>Key: ratelimit:user:{user_id}:{window}<br/>Quota: 120 req/min
+        
+        alt Quota Exceeded
+            RateLimit-->>Agent: 429 Too Many Requests + Retry-After
+        else Within Quota
+            RateLimit->>MCPHandler: Forward Request + RateLimit Headers
+            MCPHandler->>MCPServer: Dispatch JSON-RPC Method
+            
+            alt tools/list
+                MCPServer-->>MCPHandler: Return 5 Tool Schemas (JSON)
+                MCPHandler-->>Agent: 200 OK ListToolsResult
+            else tools/call (compare_compute, compare_storage, compare_network, calculate_workload, get_provider_status)
+                MCPServer->>Svc: Invoke Unified Pricing / Freshness Service
+                Svc-->>MCPServer: Calculated Domain Results + Honesty Attributes
+                MCPServer-->>MCPHandler: CallToolResult (JSON Content)
+                MCPHandler-->>Agent: 200 OK CallToolResult
+            end
+        end
+    end
+```
+
+---
+
+## 5. Key Architectural Invariants
 
 1. **Stampede Protection**: All database fallbacks on cache misses pass through `singleflight.Group.DoChan` using `context.WithoutCancel` so client cancellations do not abort in-flight database population.
 2. **Honesty Contract**: Incomplete provider comparisons set `partial: true`, omit `total_normalized_hourly_usd`, and provide `partial_total_normalized_hourly_usd` to prevent false ranking victories.
 3. **Decimal Arithmetic**: All pricing sums, conversions, and breakdowns strictly use `decimal.Decimal` to eliminate floating-point rounding errors.
 4. **Stateless Tiered Rate Limiting**: The 4-step rate limiter executes before pricing arithmetic, protecting backend database compute and Redis memory.
+5. **Strict MCP Authentication**: MCP tool access requires a valid JWT Bearer token and enforces the 120 req/min Standard Tier quota keyed by `user_id`.
+
