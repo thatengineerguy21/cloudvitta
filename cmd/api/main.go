@@ -15,9 +15,12 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
+	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
+	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
+	"github.com/thatengineerguy21/CloudVitta/internal/transport/mcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
 )
 
@@ -88,7 +91,7 @@ func main() {
 		}
 	}
 
-	// --- Services & Router ---
+	// --- Services ---
 	queries := store.New(dbPool)
 	transactor := store.NewTransactor(dbPool)
 
@@ -115,12 +118,37 @@ func main() {
 		service.WithTransactor(transactor),
 		service.WithAuthTracer(otelProviders.Tracer),
 	)
-	router := rest.NewRouter(pricingSvc, authSvc, freshnessSvc, dbPool, redisClient, cfg)
+
+	// --- REST Transport ---
+	restHandler := rest.NewRouter(pricingSvc, authSvc, freshnessSvc, dbPool, redisClient, cfg)
+
+	// --- MCP Transport (Streamable HTTP, Mandatory JWT Auth & Rate Limited) ---
+	mcpServer := mcp.NewServer(
+		pricingSvc,
+		freshnessSvc,
+		mcp.WithTracer(otelProviders.Tracer),
+		mcp.WithMeter(otelProviders.Meter),
+	)
+	mcpStreamableHandler := mcp.NewStreamableHandler(mcpServer)
+
+	rateCfg := ratelimit.Config{
+		StandardTierRate: cfg.RateLimit.StandardTierRate,
+		FreeTierRate:     cfg.RateLimit.FreeTierRate,
+		IPCeilingRate:    cfg.RateLimit.IPCeilingRate,
+		CookieSecret:     []byte(cfg.Auth.AnonCookieSecret),
+	}
+	limiter := ratelimit.NewRateLimiter(redisClient, rateCfg)
+	authMw := authmw.NewAuthMiddleware([]byte(cfg.Auth.JWTSecret), time.Now)
+
+	// Top-level root mux routing between REST and MCP
+	rootMux := http.NewServeMux()
+	rootMux.Handle("/mcp", authMw(authmw.RequireAuth(limiter.Handler(mcpStreamableHandler))))
+	rootMux.Handle("/", restHandler)
 
 	// --- HTTP Server ---
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      router,
+		Handler:      rootMux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,

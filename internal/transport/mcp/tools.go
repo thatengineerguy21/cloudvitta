@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -11,6 +12,10 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // maxAllowedStorageSizeGB represents the upper bound on single-request storage size (1 PB).
@@ -35,11 +40,40 @@ type ProviderWarning struct {
 	Message  string `json:"message"`
 }
 
-// ComputeComparisonMeta represents metadata in the compute comparison response.
-type ComputeComparisonMeta struct {
-	APIVersion  string                 `json:"api_version"`
-	GeneratedAt time.Time              `json:"generated_at"`
-	Query       map[string]interface{} `json:"query"`
+// ResponseMeta represents standard metadata in comparison and calculation response envelopes.
+type ResponseMeta struct {
+	APIVersion  string    `json:"api_version"`
+	GeneratedAt time.Time `json:"generated_at"`
+	Query       any       `json:"query"`
+}
+
+// ComputeQueryMeta represents strongly-typed query parameters in compute comparison responses.
+type ComputeQueryMeta struct {
+	Category     string   `json:"category"`
+	Region       string   `json:"region"`
+	Currency     string   `json:"currency"`
+	VCPU         *float64 `json:"vcpu,omitempty"`
+	RAMGB        *float64 `json:"ram_gb,omitempty"`
+	Family       string   `json:"family,omitempty"`
+	StrictFamily *bool    `json:"strict_family,omitempty"`
+}
+
+// StorageQueryMeta represents strongly-typed query parameters in storage comparison responses.
+type StorageQueryMeta struct {
+	Category     string           `json:"category"`
+	Region       string           `json:"region"`
+	Currency     string           `json:"currency"`
+	SizeGB       *decimal.Decimal `json:"size_gb,omitempty"`
+	StorageClass string           `json:"storage_class,omitempty"`
+}
+
+// NetworkQueryMeta represents strongly-typed query parameters in network comparison responses.
+type NetworkQueryMeta struct {
+	Category     string           `json:"category"`
+	Region       string           `json:"region"`
+	Currency     string           `json:"currency"`
+	EgressGB     *decimal.Decimal `json:"egress_gb,omitempty"`
+	TransferType string           `json:"transfer_type,omitempty"`
 }
 
 // ComputeResultEntry represents a single provider compute result item.
@@ -58,16 +92,9 @@ type ComputeResultEntry struct {
 
 // ComputeComparisonResponse represents the full compute comparison response envelope.
 type ComputeComparisonResponse struct {
-	Meta     ComputeComparisonMeta `json:"meta"`
-	Results  []ComputeResultEntry  `json:"results"`
-	Warnings []ProviderWarning     `json:"warnings"`
-}
-
-// StorageComparisonMeta represents metadata in the storage comparison response.
-type StorageComparisonMeta struct {
-	APIVersion  string                 `json:"api_version"`
-	GeneratedAt time.Time              `json:"generated_at"`
-	Query       map[string]interface{} `json:"query"`
+	Meta     ResponseMeta         `json:"meta"`
+	Results  []ComputeResultEntry `json:"results"`
+	Warnings []ProviderWarning    `json:"warnings"`
 }
 
 // StorageResultEntry represents a single provider storage result item.
@@ -86,16 +113,9 @@ type StorageResultEntry struct {
 
 // StorageComparisonResponse represents the full storage comparison response envelope.
 type StorageComparisonResponse struct {
-	Meta     StorageComparisonMeta `json:"meta"`
-	Results  []StorageResultEntry  `json:"results"`
-	Warnings []ProviderWarning     `json:"warnings"`
-}
-
-// NetworkComparisonMeta represents metadata in the network comparison response.
-type NetworkComparisonMeta struct {
-	APIVersion  string                 `json:"api_version"`
-	GeneratedAt time.Time              `json:"generated_at"`
-	Query       map[string]interface{} `json:"query"`
+	Meta     ResponseMeta         `json:"meta"`
+	Results  []StorageResultEntry `json:"results"`
+	Warnings []ProviderWarning    `json:"warnings"`
 }
 
 // NetworkResultEntry represents a single provider network result item.
@@ -114,9 +134,9 @@ type NetworkResultEntry struct {
 
 // NetworkComparisonResponse represents the full network comparison response envelope.
 type NetworkComparisonResponse struct {
-	Meta     NetworkComparisonMeta `json:"meta"`
-	Results  []NetworkResultEntry  `json:"results"`
-	Warnings []ProviderWarning     `json:"warnings"`
+	Meta     ResponseMeta         `json:"meta"`
+	Results  []NetworkResultEntry `json:"results"`
+	Warnings []ProviderWarning    `json:"warnings"`
 }
 
 // CalculateCategoryResult represents a single category result inside a provider.
@@ -138,16 +158,9 @@ type CalculateProviderResult struct {
 	Partial                         bool                               `json:"partial"`
 }
 
-// CalculateMeta represents metadata for the calculate response.
-type CalculateMeta struct {
-	APIVersion  string                 `json:"api_version"`
-	GeneratedAt time.Time              `json:"generated_at"`
-	Request     CalculateWorkloadInput `json:"request"`
-}
-
 // CalculateResponse represents the full calculate response envelope.
 type CalculateResponse struct {
-	Meta     CalculateMeta             `json:"meta"`
+	Meta     ResponseMeta              `json:"meta"`
 	Results  []CalculateProviderResult `json:"results"`
 	Warnings []ProviderWarning         `json:"warnings"`
 }
@@ -214,13 +227,58 @@ type GetProviderStatusInput struct {
 	Provider string `json:"provider" jsonschema:"Cloud provider identifier (e.g. aws, azure, gcp, oracle, ibm, alibaba, digitalocean)"`
 }
 
-// defaultStage3Warnings returns the static warnings for providers scheduled for stage 3/4.
+// defaultStage3Warnings returns static warnings for providers scheduled for stage 3/4.
 func defaultStage3Warnings() []ProviderWarning {
 	return []ProviderWarning{
 		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
 		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
 		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
 		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
+	}
+}
+
+// instrumentTool wraps a tool handler with OpenTelemetry tracing spans, metrics recording, and structured slog logging.
+func instrumentTool[T any](toolName string, cfg *serverConfig, handler sdk.ToolHandlerFor[T, any]) sdk.ToolHandlerFor[T, any] {
+	var toolCounter metric.Int64Counter
+	var toolDuration metric.Float64Histogram
+	if cfg != nil && cfg.meter != nil {
+		toolCounter, _ = cfg.meter.Int64Counter("mcp.tool.calls", metric.WithDescription("Total invocations of MCP tools"))
+		toolDuration, _ = cfg.meter.Float64Histogram("mcp.tool.duration_ms", metric.WithDescription("Duration of MCP tool executions in milliseconds"))
+	}
+
+	return func(ctx context.Context, req *sdk.CallToolRequest, input T) (*sdk.CallToolResult, any, error) {
+		start := time.Now()
+		var span trace.Span
+		if cfg != nil && cfg.tracer != nil {
+			ctx, span = cfg.tracer.Start(ctx, "mcp.tool."+toolName, trace.WithAttributes(attribute.String("mcp.tool", toolName)))
+			defer span.End()
+		}
+
+		slog.DebugContext(ctx, "executing MCP tool", "tool", toolName)
+
+		callRes, out, err := handler(ctx, req, input)
+		durationMs := float64(time.Since(start).Microseconds()) / 1000.0
+
+		status := "success"
+		if err != nil {
+			status = "error"
+			if span != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+			}
+			slog.WarnContext(ctx, "MCP tool execution completed with error", "tool", toolName, "error", err, "duration_ms", durationMs)
+		} else {
+			slog.DebugContext(ctx, "MCP tool execution completed successfully", "tool", toolName, "duration_ms", durationMs)
+		}
+
+		if toolCounter != nil {
+			toolCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("tool", toolName), attribute.String("status", status)))
+		}
+		if toolDuration != nil {
+			toolDuration.Record(ctx, durationMs, metric.WithAttributes(attribute.String("tool", toolName), attribute.String("status", status)))
+		}
+
+		return callRes, out, err
 	}
 }
 
@@ -260,7 +318,7 @@ func handleCompareCompute(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 		var reqVCPU float64
 		if input.VCPU != nil {
 			if *input.VCPU <= 0 {
-				return nil, nil, fmt.Errorf("%w: vcpu must be a positive number", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: vcpu must be a positive number", service.ErrInvalidParameters))
 			}
 			reqVCPU = *input.VCPU
 		}
@@ -268,102 +326,68 @@ func handleCompareCompute(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 		var reqRAMGB float64
 		if input.RAMGB != nil {
 			if *input.RAMGB <= 0 {
-				return nil, nil, fmt.Errorf("%w: ram_gb must be a positive number", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: ram_gb must be a positive number", service.ErrInvalidParameters))
 			}
 			reqRAMGB = *input.RAMGB
 		}
 
-		providers := service.SupportedProviders()
-		var results []ComputeResultEntry
-		var providerErrors int
+		target := service.MatchTarget{
+			VCPU:         reqVCPU,
+			RAMGB:        reqRAMGB,
+			Family:       input.Family,
+			StrictFamily: strictFamily,
+			Category:     "compute",
+		}
 
-		for _, prov := range providers {
-			target := service.MatchTarget{
-				VCPU:         reqVCPU,
-				RAMGB:        reqRAMGB,
-				Family:       input.Family,
-				StrictFamily: strictFamily,
-				Category:     "compute",
-			}
+		compRes, err := pricingSvc.Compare(ctx, "compute", region, target)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
 
-			catResult, err := pricingSvc.MatchAndCalculate(ctx, prov, "compute", region, target)
-			if err != nil {
-				switch err {
-				case service.ErrCategoryNotSupported:
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "category_not_supported",
-						Message:  "Compute category is not supported by " + prov,
-					})
-				case service.ErrNoMatchFound:
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "no_match",
-						Message:  "No compute SKU matched the requested spec within acceptable thresholds.",
-					})
-				default:
-					providerErrors++
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "fetch_failed",
-						Message:  err.Error(),
-					})
-				}
-				continue
-			}
-
-			if catResult == nil {
-				warnings = append(warnings, ProviderWarning{
-					Provider: prov,
-					Code:     "no_data_available",
-					Message:  "No compute pricing data available for this region.",
-				})
-				continue
-			}
-
-			obs := catResult.MatchResult.Observation
-			results = append(results, ComputeResultEntry{
-				Provider:          obs.Provider,
-				SkuID:             obs.SkuID,
-				MatchedSpec:       obs.Attributes,
-				MatchQuality:      catResult.MatchResult.MatchQuality,
-				MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
-				MissingAttributes: catResult.MatchResult.MissingAttributes,
-				Price: PriceDetail{
-					Amount:   obs.PriceAmount,
-					Unit:     catResult.Unit,
-					Currency: currency,
-				},
-				NormalizedHourlyUSD: catResult.HourlyCost,
-				FetchedAt:           obs.FetchedAt,
-				Stale:               catResult.Stale,
+		for _, w := range compRes.Warnings {
+			warnings = append(warnings, ProviderWarning{
+				Provider: w.Provider,
+				Code:     w.Code,
+				Message:  w.Message,
 			})
 		}
 
-		if len(results) == 0 && providerErrors == len(providers) {
-			return nil, nil, service.ErrProviderUnavailable
+		var results []ComputeResultEntry
+		for _, item := range compRes.Results {
+			results = append(results, ComputeResultEntry{
+				Provider:          item.Provider,
+				SkuID:             item.SkuID,
+				MatchedSpec:       item.MatchedCompute,
+				MatchQuality:      item.MatchQuality,
+				MatchDeltaPct:     item.MatchDeltaPct,
+				MissingAttributes: item.MissingAttributes,
+				Price: PriceDetail{
+					Amount:   item.PriceAmount,
+					Unit:     item.Unit,
+					Currency: currency,
+				},
+				NormalizedHourlyUSD: item.HourlyCost,
+				FetchedAt:           item.FetchedAt,
+				Stale:               item.Stale,
+			})
 		}
 
-		queryMeta := map[string]interface{}{
-			"category": "compute",
-			"region":   region,
-			"currency": reqCurrency,
+		queryMeta := ComputeQueryMeta{
+			Category:     "compute",
+			Region:       region,
+			Currency:     reqCurrency,
+			Family:       input.Family,
+			StrictFamily: input.StrictFamily,
 		}
 		if reqVCPU > 0 {
-			queryMeta["vcpu"] = reqVCPU
+			queryMeta.VCPU = &reqVCPU
 		}
 		if reqRAMGB > 0 {
-			queryMeta["ram_gb"] = reqRAMGB
-		}
-		if input.Family != "" {
-			queryMeta["family"] = input.Family
-		}
-		if input.StrictFamily != nil {
-			queryMeta["strict_family"] = strictFamily
+			queryMeta.RAMGB = &reqRAMGB
 		}
 
 		resp := &ComputeComparisonResponse{
-			Meta: ComputeComparisonMeta{
+			Meta: ResponseMeta{
 				APIVersion:  "v1",
 				GeneratedAt: time.Now().UTC(),
 				Query:       queryMeta,
@@ -405,100 +429,66 @@ func handleCompareStorage(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 		currency = "USD"
 
 		sizeGB := decimal.NewFromInt(1)
-		hasExplicitSize := false
+		var explicitSize *decimal.Decimal
 		if input.SizeGB != nil {
 			parsed := decimal.NewFromFloat(*input.SizeGB)
 			if parsed.LessThanOrEqual(decimal.Zero) || parsed.GreaterThan(maxAllowedStorageSizeGB) {
-				return nil, nil, fmt.Errorf("%w: size_gb must be a positive number no greater than 1000000", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: size_gb must be a positive number no greater than %s", service.ErrInvalidParameters, maxAllowedStorageSizeGB.String()))
 			}
 			sizeGB = parsed
-			hasExplicitSize = true
+			explicitSize = &sizeGB
 		}
 
-		providers := service.SupportedProviders()
-		var results []StorageResultEntry
-		var providerErrors int
+		sizeF, _ := sizeGB.Float64()
+		target := service.MatchTarget{
+			SizeGB:       sizeF,
+			StorageClass: input.StorageClass,
+			Category:     "storage",
+		}
 
-		for _, prov := range providers {
-			sizeF, _ := sizeGB.Float64()
-			target := service.MatchTarget{
-				SizeGB:       sizeF,
-				StorageClass: input.StorageClass,
-				Category:     "storage",
-			}
+		compRes, err := pricingSvc.Compare(ctx, "storage", region, target)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
 
-			catResult, err := pricingSvc.MatchAndCalculate(ctx, prov, "storage", region, target)
-			if err != nil {
-				switch err {
-				case service.ErrCategoryNotSupported:
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "category_not_supported",
-						Message:  "Storage category is not supported by " + prov,
-					})
-				case service.ErrNoMatchFound:
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "no_match",
-						Message:  "No storage SKU matched the requested spec within acceptable thresholds.",
-					})
-				default:
-					providerErrors++
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "fetch_failed",
-						Message:  err.Error(),
-					})
-				}
-				continue
-			}
-
-			if catResult == nil {
-				warnings = append(warnings, ProviderWarning{
-					Provider: prov,
-					Code:     "no_data_available",
-					Message:  "No storage pricing data available for this region.",
-				})
-				continue
-			}
-
-			obs := catResult.MatchResult.Observation
-			results = append(results, StorageResultEntry{
-				Provider:          obs.Provider,
-				SkuID:             obs.SkuID,
-				MatchedSpec:       obs.StorageAttributes,
-				MatchQuality:      catResult.MatchResult.MatchQuality,
-				MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
-				MissingAttributes: catResult.MatchResult.MissingAttributes,
-				Price: PriceDetail{
-					Amount:   obs.PriceAmount,
-					Unit:     catResult.Unit,
-					Currency: currency,
-				},
-				MonthlyCostUSD: catResult.MonthlyCost,
-				FetchedAt:      obs.FetchedAt,
-				Stale:          catResult.Stale,
+		for _, w := range compRes.Warnings {
+			warnings = append(warnings, ProviderWarning{
+				Provider: w.Provider,
+				Code:     w.Code,
+				Message:  w.Message,
 			})
 		}
 
-		if len(results) == 0 && providerErrors == len(providers) {
-			return nil, nil, service.ErrProviderUnavailable
+		var results []StorageResultEntry
+		for _, item := range compRes.Results {
+			results = append(results, StorageResultEntry{
+				Provider:          item.Provider,
+				SkuID:             item.SkuID,
+				MatchedSpec:       item.MatchedStorage,
+				MatchQuality:      item.MatchQuality,
+				MatchDeltaPct:     item.MatchDeltaPct,
+				MissingAttributes: item.MissingAttributes,
+				Price: PriceDetail{
+					Amount:   item.PriceAmount,
+					Unit:     item.Unit,
+					Currency: currency,
+				},
+				MonthlyCostUSD: item.MonthlyCost,
+				FetchedAt:      item.FetchedAt,
+				Stale:          item.Stale,
+			})
 		}
 
-		queryMeta := map[string]interface{}{
-			"category": "storage",
-			"region":   region,
-			"currency": reqCurrency,
-		}
-		if hasExplicitSize {
-			queryMeta["size_gb"] = sizeGB
-		}
-		if input.StorageClass != "" {
-			queryMeta["storage_class"] = input.StorageClass
+		queryMeta := StorageQueryMeta{
+			Category:     "storage",
+			Region:       region,
+			Currency:     reqCurrency,
+			SizeGB:       explicitSize,
+			StorageClass: input.StorageClass,
 		}
 
 		resp := &StorageComparisonResponse{
-			Meta: StorageComparisonMeta{
+			Meta: ResponseMeta{
 				APIVersion:  "v1",
 				GeneratedAt: time.Now().UTC(),
 				Query:       queryMeta,
@@ -540,100 +530,66 @@ func handleCompareNetwork(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 		currency = "USD"
 
 		egressGB := decimal.NewFromInt(1)
-		hasExplicitEgress := false
+		var explicitEgress *decimal.Decimal
 		if input.EgressGB != nil {
 			parsed := decimal.NewFromFloat(*input.EgressGB)
 			if parsed.LessThanOrEqual(decimal.Zero) || parsed.GreaterThan(maxAllowedNetworkEgressGB) {
-				return nil, nil, fmt.Errorf("%w: egress_gb must be a positive number no greater than 10000000", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: egress_gb must be a positive number no greater than %s", service.ErrInvalidParameters, maxAllowedNetworkEgressGB.String()))
 			}
 			egressGB = parsed
-			hasExplicitEgress = true
+			explicitEgress = &egressGB
 		}
 
-		providers := service.SupportedProviders()
-		var results []NetworkResultEntry
-		var providerErrors int
+		egressF, _ := egressGB.Float64()
+		target := service.MatchTarget{
+			EgressGB:     egressF,
+			TransferType: input.TransferType,
+			Category:     "network",
+		}
 
-		for _, prov := range providers {
-			egressF, _ := egressGB.Float64()
-			target := service.MatchTarget{
-				EgressGB:     egressF,
-				TransferType: input.TransferType,
-				Category:     "network",
-			}
+		compRes, err := pricingSvc.Compare(ctx, "network", region, target)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
 
-			catResult, err := pricingSvc.MatchAndCalculate(ctx, prov, "network", region, target)
-			if err != nil {
-				switch err {
-				case service.ErrCategoryNotSupported:
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "category_not_supported",
-						Message:  "Network category is not supported by " + prov,
-					})
-				case service.ErrNoMatchFound:
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "no_match",
-						Message:  "No network SKU matched the requested spec within acceptable thresholds.",
-					})
-				default:
-					providerErrors++
-					warnings = append(warnings, ProviderWarning{
-						Provider: prov,
-						Code:     "fetch_failed",
-						Message:  err.Error(),
-					})
-				}
-				continue
-			}
-
-			if catResult == nil {
-				warnings = append(warnings, ProviderWarning{
-					Provider: prov,
-					Code:     "no_data_available",
-					Message:  "No network pricing data available for this region.",
-				})
-				continue
-			}
-
-			obs := catResult.MatchResult.Observation
-			results = append(results, NetworkResultEntry{
-				Provider:          obs.Provider,
-				SkuID:             obs.SkuID,
-				MatchedSpec:       obs.NetworkAttributes,
-				MatchQuality:      catResult.MatchResult.MatchQuality,
-				MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
-				MissingAttributes: catResult.MatchResult.MissingAttributes,
-				Price: PriceDetail{
-					Amount:   obs.PriceAmount,
-					Unit:     catResult.Unit,
-					Currency: currency,
-				},
-				MonthlyCostUSD: catResult.MonthlyCost,
-				FetchedAt:      obs.FetchedAt,
-				Stale:          catResult.Stale,
+		for _, w := range compRes.Warnings {
+			warnings = append(warnings, ProviderWarning{
+				Provider: w.Provider,
+				Code:     w.Code,
+				Message:  w.Message,
 			})
 		}
 
-		if len(results) == 0 && providerErrors == len(providers) {
-			return nil, nil, service.ErrProviderUnavailable
+		var results []NetworkResultEntry
+		for _, item := range compRes.Results {
+			results = append(results, NetworkResultEntry{
+				Provider:          item.Provider,
+				SkuID:             item.SkuID,
+				MatchedSpec:       item.MatchedNetwork,
+				MatchQuality:      item.MatchQuality,
+				MatchDeltaPct:     item.MatchDeltaPct,
+				MissingAttributes: item.MissingAttributes,
+				Price: PriceDetail{
+					Amount:   item.PriceAmount,
+					Unit:     item.Unit,
+					Currency: currency,
+				},
+				MonthlyCostUSD: item.MonthlyCost,
+				FetchedAt:      item.FetchedAt,
+				Stale:          item.Stale,
+			})
 		}
 
-		queryMeta := map[string]interface{}{
-			"category": "network",
-			"region":   region,
-			"currency": reqCurrency,
-		}
-		if hasExplicitEgress {
-			queryMeta["egress_gb"] = egressGB
-		}
-		if input.TransferType != "" {
-			queryMeta["transfer_type"] = input.TransferType
+		queryMeta := NetworkQueryMeta{
+			Category:     "network",
+			Region:       region,
+			Currency:     reqCurrency,
+			EgressGB:     explicitEgress,
+			TransferType: input.TransferType,
 		}
 
 		resp := &NetworkComparisonResponse{
-			Meta: NetworkComparisonMeta{
+			Meta: ResponseMeta{
 				APIVersion:  "v1",
 				GeneratedAt: time.Now().UTC(),
 				Query:       queryMeta,
@@ -648,39 +604,42 @@ func handleCompareNetwork(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 
 // handleCalculateWorkload creates the tool handler for calculate_workload.
 func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CalculateWorkloadInput, any] {
+	maxStorageF, _ := maxAllowedStorageSizeGB.Float64()
+	maxNetworkF, _ := maxAllowedNetworkEgressGB.Float64()
+
 	return func(ctx context.Context, req *sdk.CallToolRequest, input CalculateWorkloadInput) (*sdk.CallToolResult, any, error) {
 		if pricingSvc == nil {
 			return nil, nil, errors.New("pricing service unavailable")
 		}
 
 		if input.Compute == nil && input.Storage == nil && input.Network == nil {
-			return nil, nil, service.ErrNoCategoriesRequested
+			return nil, nil, MapServiceError(service.ErrNoCategoriesRequested)
 		}
 
 		if input.Compute != nil {
 			if input.Compute.VCPU <= 0 {
-				return nil, nil, fmt.Errorf("%w: compute.vcpu must be a positive number", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: compute.vcpu must be a positive number", service.ErrInvalidParameters))
 			}
 			if input.Compute.RAMGB <= 0 {
-				return nil, nil, fmt.Errorf("%w: compute.ram_gb must be a positive number", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: compute.ram_gb must be a positive number", service.ErrInvalidParameters))
 			}
 		}
 
 		if input.Storage != nil {
 			if input.Storage.SizeGB <= 0 {
-				return nil, nil, fmt.Errorf("%w: storage.size_gb must be a positive number", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: storage.size_gb must be a positive number", service.ErrInvalidParameters))
 			}
-			if input.Storage.SizeGB > 1000000 {
-				return nil, nil, fmt.Errorf("%w: storage.size_gb exceeds maximum limit of 1,000,000 GB (1 PB)", service.ErrInvalidParameters)
+			if input.Storage.SizeGB > maxStorageF {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: storage.size_gb exceeds maximum limit of %s GB (1 PB)", service.ErrInvalidParameters, maxAllowedStorageSizeGB.String()))
 			}
 		}
 
 		if input.Network != nil {
 			if input.Network.EgressGB < 0 {
-				return nil, nil, fmt.Errorf("%w: network.egress_gb cannot be negative", service.ErrInvalidParameters)
+				return nil, nil, MapServiceError(fmt.Errorf("%w: network.egress_gb cannot be negative", service.ErrInvalidParameters))
 			}
-			if input.Network.EgressGB > 10000000 {
-				return nil, nil, fmt.Errorf("%w: network.egress_gb exceeds maximum limit of 10,000,000 GB (10 PB)", service.ErrInvalidParameters)
+			if input.Network.EgressGB > maxNetworkF {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: network.egress_gb exceeds maximum limit of %s GB (10 PB)", service.ErrInvalidParameters, maxAllowedNetworkEgressGB.String()))
 			}
 		}
 
@@ -779,10 +738,10 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 		}
 
 		resp := &CalculateResponse{
-			Meta: CalculateMeta{
+			Meta: ResponseMeta{
 				APIVersion:  "v1",
 				GeneratedAt: time.Now().UTC(),
-				Request:     input,
+				Query:       input,
 			},
 			Results:  mappedResults,
 			Warnings: warnings,
@@ -801,7 +760,7 @@ func handleGetProviderStatus(freshnessSvc *service.FreshnessService) sdk.ToolHan
 
 		provider := strings.TrimSpace(input.Provider)
 		if provider == "" {
-			return nil, nil, fmt.Errorf("%w: provider parameter is required", service.ErrInvalidParameters)
+			return nil, nil, MapServiceError(fmt.Errorf("%w: provider parameter is required", service.ErrInvalidParameters))
 		}
 
 		status, err := freshnessSvc.GetProviderStatus(ctx, provider)
@@ -814,29 +773,29 @@ func handleGetProviderStatus(freshnessSvc *service.FreshnessService) sdk.ToolHan
 }
 
 // RegisterTools registers all 5 standard CloudVitta comparison and calculation tools on the given MCP server.
-func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, freshnessSvc *service.FreshnessService) {
+func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, freshnessSvc *service.FreshnessService, cfg *serverConfig) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "compare_compute",
 		Description: "Compare compute instance pricing across cloud providers for requested vCPU, RAM, and region requirements.",
-	}, handleCompareCompute(pricingSvc))
+	}, instrumentTool("compare_compute", cfg, handleCompareCompute(pricingSvc)))
 
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "compare_storage",
 		Description: "Compare object and block storage pricing across cloud providers for specified capacity and storage class.",
-	}, handleCompareStorage(pricingSvc))
+	}, instrumentTool("compare_storage", cfg, handleCompareStorage(pricingSvc)))
 
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "compare_network",
 		Description: "Compare outbound network data transfer pricing across cloud providers for specified egress volume.",
-	}, handleCompareNetwork(pricingSvc))
+	}, instrumentTool("compare_network", cfg, handleCompareNetwork(pricingSvc)))
 
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "calculate_workload",
 		Description: "Calculate composite multi-category workload costs across cloud providers with server-computed totals.",
-	}, handleCalculateWorkload(pricingSvc))
+	}, instrumentTool("calculate_workload", cfg, handleCalculateWorkload(pricingSvc)))
 
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "get_provider_status",
 		Description: "Check data freshness, observation counts, staleness, and ingestion health for a cloud provider.",
-	}, handleGetProviderStatus(freshnessSvc))
+	}, instrumentTool("get_provider_status", cfg, handleGetProviderStatus(freshnessSvc)))
 }

@@ -15,11 +15,10 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
-	"github.com/thatengineerguy21/CloudVitta/internal/transport/mcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
 
-// NewRouter constructs a net/http.ServeMux with all API routes, health probes, metrics, and middlewares wired.
+// NewRouter constructs a net/http.ServeMux with all REST API routes, health probes, metrics, and middlewares wired.
 func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, freshnessSvc *service.FreshnessService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 
@@ -78,11 +77,6 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	mux.Handle("POST /api/v1/auth/login", limiter.WithProfile("login", loginLimit)(loginHandler))
 	mux.Handle("POST /api/v1/auth/refresh", limiter.Handler(refreshHandler))
 	mux.Handle("POST /api/v1/auth/logout", limiter.Handler(logoutHandler))
-
-	// MCP Streamable HTTP Transport (auth-guarded + standard-tier rate-limited)
-	mcpServer := mcp.NewServer(pricingSvc, freshnessSvc)
-	mcpStreamableHandler := mcp.NewStreamableHandler(mcpServer)
-	mux.Handle("/mcp", authmw.RequireAuth(limiter.Handler(mcpStreamableHandler)))
 
 	// Global chain: CORS -> AuthContext -> Recovery -> ServeMux
 	handler := authMw(mux)
