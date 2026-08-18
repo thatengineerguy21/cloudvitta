@@ -1,7 +1,7 @@
 # CloudVitta
 
 ## Problem Statement
-Comparing cloud costs today requires visiting each provider's calculator or pricing page separately and manually reconciling different units, currencies, and pricing models. There is no single tool for an apples-to-apples, live-data comparison across all major providers. CloudVitta solves this problem by ingesting live pricing from official cloud provider APIs, normalizing disparate pricing models into canonical units, converting currencies, and serving comparisons through a high-performance, multi-protocol API.
+Comparing cloud costs today requires visiting each provider's calculator or pricing page separately and manually reconciling different units, currencies, and pricing models. There is no single tool for an apples-to-apples, live-data comparison across all major providers. CloudVitta solves this problem by ingesting live pricing from official cloud provider APIs, normalizing disparate pricing models into canonical units, converting currencies, and serving comparisons through a high-performance REST API and Model Context Protocol (MCP) agent tools.
 
 **Live Production API:** [https://cloudvitta-api-pelqqgz3mq-as.a.run.app](https://cloudvitta-api-pelqqgz3mq-as.a.run.app)
 * **Compute Comparison**: `GET /api/v1/prices/compute?vcpu=2&ram_gb=8&region=us-east`
@@ -18,25 +18,25 @@ Comparing cloud costs today requires visiting each provider's calculator or pric
 
 ```mermaid
 flowchart TD
-    Client([Client / Browser / Agent]) --> CORS[CORS Middleware]
-    CORS --> AuthMW[Auth Middleware]
-    AuthMW --> RateLimiter[4-Step Tiered Rate Limiter]
-    RateLimiter --> Router[Standard Lib HTTP Router]
+    Client(["Client / Browser / Agent"]) --> CORS["CORS Middleware"]
+    CORS --> AuthMW["Auth Middleware"]
+    AuthMW --> RateLimiter["4-Step Tiered Rate Limiter"]
+    RateLimiter --> Router["Standard Lib HTTP Router"]
     
     subgraph CoreService["CloudVitta Service Layer"]
-        Router --> PricingSvc[Pricing Service]
-        Router --> CalcSvc[Calculate Service]
-        Router --> AuthSvc[Auth Service]
-        Router --> FreshSvc[Freshness Service]
+        Router --> PricingSvc["Pricing Service"]
+        Router --> CalcSvc["Calculate Service"]
+        Router --> AuthSvc["Auth Service"]
+        Router --> FreshSvc["Freshness Service"]
         
-        PricingSvc --> Matching[SKU Matching Engine]
+        PricingSvc --> Matching["SKU Matching Engine"]
         CalcSvc --> PricingSvc
         CalcSvc --> Matching
     end
     
     subgraph DataCache["Data & Cache Layer"]
         PricingSvc --> Cache[("Redis Cache (Upstash)")]
-        PricingSvc --> Singleflight[singleflight.Group]
+        PricingSvc --> Singleflight["singleflight.Group"]
         Singleflight --> Postgres[("Serverless Postgres (Neon)")]
         AuthSvc --> Postgres
         FreshSvc --> Postgres
@@ -44,10 +44,10 @@ flowchart TD
     end
     
     subgraph IngestionPipeline["Ingestion Pipeline"]
-        Scheduler[Cloud Scheduler] --> IngestJob[cmd/ingest Worker]
-        IngestJob --> Adapters[Provider Adapters (AWS/Azure/GCP)]
+        Scheduler["Cloud Scheduler"] --> IngestJob["cmd/ingest Worker"]
+        IngestJob --> Adapters["Provider Adapters (AWS/Azure/GCP)"]
         Adapters --> GCS[("GCS Raw JSON Archive")]
-        Adapters --> Normalizer[Streaming Parser & Anomaly Detector]
+        Adapters --> Normalizer["Streaming Parser & Anomaly Detector"]
         Normalizer --> Postgres
         Normalizer --> Cache
     end

@@ -18,7 +18,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
 
-// NewRouter constructs a net/http.ServeMux with all API routes, health probes, metrics, and middlewares wired.
+// NewRouter constructs a net/http.ServeMux with all REST API routes, health probes, metrics, and middlewares wired.
 func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, freshnessSvc *service.FreshnessService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 

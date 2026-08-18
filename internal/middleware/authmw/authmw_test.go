@@ -171,3 +171,78 @@ func TestAuthMiddleware_MalformedHeader(t *testing.T) {
 		t.Errorf("expected unauthenticated context, got %+v", capturedCtx)
 	}
 }
+
+func TestRequireAuth_Authenticated(t *testing.T) {
+	userID := uuid.New()
+	fixedTime := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return fixedTime }
+
+	token, err := auth.GenerateAccessToken(userID, "standard", testJWTSecret, fixedTime, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	handlerCalled := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := authmw.NewAuthMiddleware(testJWTSecret, clock)
+	guarded := authmw.RequireAuth(handler)
+	ts := httptest.NewServer(mw(guarded))
+	defer ts.Close()
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/mcp", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+	if !handlerCalled {
+		t.Errorf("expected downstream handler to be called")
+	}
+}
+
+func TestRequireAuth_Unauthenticated(t *testing.T) {
+	handlerCalled := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := authmw.NewAuthMiddleware(testJWTSecret, time.Now)
+	guarded := authmw.RequireAuth(handler)
+	ts := httptest.NewServer(mw(guarded))
+	defer ts.Close()
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/mcp", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected status 401 Unauthorized, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "application/problem+json" {
+		t.Errorf("expected Content-Type application/problem+json, got %s", ct)
+	}
+	if handlerCalled {
+		t.Errorf("expected downstream handler NOT to be called")
+	}
+}

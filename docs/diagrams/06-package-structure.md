@@ -9,9 +9,7 @@ classDiagram
     
     class transport {
         rest
-        grpc
         mcp
-        a2a
     }
 
     class middleware {
