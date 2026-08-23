@@ -54,9 +54,16 @@ type MatchTarget struct {
 	KubernetesTier  domain.KubernetesTier  // canonical: free, standard, extended_support
 	ClusterTopology domain.ClusterTopology // GCP-specific: zonal, regional, autopilot
 
+	// Serverless dimensions
+	ServerlessArchitecture string  // canonical: x86_64, arm64
+	ServerlessTier         string  // canonical: consumption, flex_consumption, 1st_gen, 2nd_gen
+	ExecutionDurationMS    float64 // average execution duration in milliseconds
+	MemoryMB               float64 // allocated memory in MB
+	RequestsPerMonth       float64 // invocation requests per month
+
 	// Cross-category controls
 	StrictFamily bool   // default true — only match within same family tier
-	Category     string // compute, storage, network, database_rdbms, database_nosql, kubernetes
+	Category     string // compute, storage, network, database_rdbms, database_nosql, kubernetes, serverless
 }
 
 // MatchResult holds the outcome of matching one provider's observations.

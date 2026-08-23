@@ -15,6 +15,9 @@ var azureCatalogMap = map[string]string{
 	"Azure Cosmos DB":               "database_nosql",
 	"Cosmos DB":                     "database_nosql",
 	"Azure Kubernetes Service":      "kubernetes",
+	"Functions":                     "serverless",
+	"Azure Functions":               "serverless",
+	"Flex Consumption":              "serverless",
 }
 
 // MapAzureProduct resolves an Azure service name to a normalized service category.

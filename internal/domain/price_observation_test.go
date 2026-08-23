@@ -176,4 +176,28 @@ func TestMarshalUnmarshalOtherCategoryAttributes(t *testing.T) {
 		k8sTarget.KubernetesAttributes.ClusterTopology != domain.ClusterTopologyZonal {
 		t.Errorf("unexpected kubernetes attributes: %+v", k8sTarget.KubernetesAttributes)
 	}
+
+	// Serverless
+	serverless := domain.PriceObservation{
+		ServiceCategory: "serverless",
+		ServerlessRateAttributes: domain.ServerlessRateAttributes{
+			Architecture:  domain.ArchitectureX86_64,
+			Tier:          domain.ServerlessTierConsumption,
+			ComponentType: domain.ComponentTypeRequestFee,
+		},
+	}
+	serverlessBytes, err := domain.MarshalAttributes(serverless)
+	if err != nil {
+		t.Fatalf("MarshalAttributes(serverless) failed: %v", err)
+	}
+	var serverlessTarget domain.PriceObservation
+	serverlessTarget.ServiceCategory = "serverless"
+	if err := domain.UnmarshalAttributes(&serverlessTarget, serverlessBytes); err != nil {
+		t.Fatalf("UnmarshalAttributes(serverless) failed: %v", err)
+	}
+	if serverlessTarget.ServerlessRateAttributes.Architecture != domain.ArchitectureX86_64 ||
+		serverlessTarget.ServerlessRateAttributes.Tier != domain.ServerlessTierConsumption ||
+		serverlessTarget.ServerlessRateAttributes.ComponentType != domain.ComponentTypeRequestFee {
+		t.Errorf("unexpected serverless attributes: %+v", serverlessTarget.ServerlessRateAttributes)
+	}
 }

@@ -216,6 +216,8 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 					skuObs, err = normalizeDatabaseNoSQLSKU(sku, category, fetchedAt, sink)
 				case "kubernetes":
 					skuObs, err = normalizeKubernetesSKU(sku, category, fetchedAt, sink)
+				case "serverless":
+					skuObs, err = normalizeServerlessSKU(sku, category, fetchedAt, sink)
 				}
 				if err != nil {
 					return nil, "", err

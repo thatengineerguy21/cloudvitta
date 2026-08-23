@@ -51,6 +51,12 @@ func TestGCPNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 1, // GKE Cluster Management Fee
 			expectedSKUs: []string{"SKU-GCP-GKE-CLUSTER-MGMT"},
 		},
+		{
+			name:         "GCP Serverless Golden",
+			goldenFile:   "../../../../testdata/golden/gcp/serverless.json",
+			wantObsCount: 2, // Invocations, Execution Time
+			expectedSKUs: []string{"SKU-GCP-CF-INVOCATIONS", "SKU-GCP-CF-EXEC-TIME"},
+		},
 	}
 
 	for _, tt := range tests {

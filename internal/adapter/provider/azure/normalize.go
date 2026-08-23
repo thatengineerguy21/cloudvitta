@@ -541,6 +541,14 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 			if k8sObs != nil {
 				observations = append(observations, *k8sObs)
 			}
+		} else if category == "serverless" {
+			serverlessObs, err := normalizeAzureServerlessItem(item, category, region, regionGroup, skuID, priceAmount, fetchedAt, sink)
+			if err != nil {
+				return nil, "", err
+			}
+			if serverlessObs != nil {
+				observations = append(observations, *serverlessObs)
+			}
 		}
 	}
 

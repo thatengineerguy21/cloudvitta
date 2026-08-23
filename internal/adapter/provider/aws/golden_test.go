@@ -58,6 +58,13 @@ func TestAWSNormalize_GoldenCorpus(t *testing.T) {
 			expectedSKUs:  []string{"SKU-AWS-EKS-STANDARD", "SKU-AWS-EKS-EXTENDED"},
 			expectedPrice: "0.1000000000",
 		},
+		{
+			name:          "AWS Serverless Golden",
+			goldenFile:    "../../../../testdata/golden/aws/serverless.json",
+			wantObsCount:  4, // x86 Request, x86 Duration, ARM Request, ARM Duration
+			expectedSKUs:  []string{"SKU-AWS-LAMBDA-REQ-X86", "SKU-AWS-LAMBDA-DUR-X86", "SKU-AWS-LAMBDA-REQ-ARM", "SKU-AWS-LAMBDA-DUR-ARM"},
+			expectedPrice: "0.2000000000",
+		},
 	}
 
 	for _, tt := range tests {

@@ -49,6 +49,12 @@ func TestMapAWSProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid AWSLambda product",
+			productCode:  "AWSLambda",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped product fails loudly",
 			productCode:  "AmazonNeptune",
 			wantCategory: "",

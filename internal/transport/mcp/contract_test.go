@@ -27,6 +27,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
@@ -186,6 +187,12 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
 						ObservationCount: 20,
 					},
+					{
+						ServiceCategory:  "serverless",
+						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						ObservationCount: 40,
+					},
 				}, nil
 			case "azure":
 				// Stale observations (> 168 hours ago)
@@ -226,6 +233,12 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-200 * time.Hour), Valid: true},
 						ObservationCount: 15,
 					},
+					{
+						ServiceCategory:  "serverless",
+						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-200 * time.Hour), Valid: true},
+						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-200 * time.Hour), Valid: true},
+						ObservationCount: 30,
+					},
 				}, nil
 			case "gcp":
 				return []store.GetProviderCategoryStatusRow{
@@ -264,6 +277,12 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
 						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
 						ObservationCount: 10,
+					},
+					{
+						ServiceCategory:  "serverless",
+						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						ObservationCount: 25,
 					},
 				}, nil
 			default:
@@ -782,6 +801,180 @@ func seedContractKubernetesObservations(ctx context.Context, t *testing.T, rdb *
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "kubernetes", "us-east4"), gcpObs, cache.DefaultTTL)
 }
 
+func seedContractServerlessObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
+	t.Helper()
+
+	awsRegionGroup, err := regionmap.MapRegion("aws", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(aws, us-east-1) failed: %v", err)
+	}
+	azureRegionGroup, err := regionmap.MapRegion("azure", "eastus")
+	if err != nil {
+		t.Fatalf("MapRegion(azure, eastus) failed: %v", err)
+	}
+	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
+	if err != nil {
+		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-REQ-X86",
+			DisplayName:     "AWS Lambda Invocation Requests (x86_64)",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			Unit:            "Requests",
+			PriceAmount:     decimal.RequireFromString("0.2000"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchX86_64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeRequestFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-DUR-X86",
+			DisplayName:     "AWS Lambda Compute Duration (x86_64)",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			Unit:            "Seconds",
+			PriceAmount:     decimal.RequireFromString("0.0000166667"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchX86_64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeDurationFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-REQ-ARM",
+			DisplayName:     "AWS Lambda Invocation Requests (arm64)",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			Unit:            "Requests",
+			PriceAmount:     decimal.RequireFromString("0.2000"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchARM64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeRequestFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-DUR-ARM",
+			DisplayName:     "AWS Lambda Compute Duration (arm64)",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			Unit:            "Seconds",
+			PriceAmount:     decimal.RequireFromString("0.0000133334"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchARM64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeDurationFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	azureObs := []domain.PriceObservation{
+		{
+			Provider:        "azure",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AZURE-FUNCTIONS-REQ",
+			DisplayName:     "Azure Functions Standard Total Executions",
+			Region:          "eastus",
+			RegionGroup:     azureRegionGroup,
+			Unit:            "10",
+			PriceAmount:     decimal.RequireFromString("0.000002"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchX86_64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeRequestFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "azure",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AZURE-FUNCTIONS-DUR",
+			DisplayName:     "Azure Functions Standard Execution Time",
+			Region:          "eastus",
+			RegionGroup:     azureRegionGroup,
+			Unit:            "1 GB Second",
+			PriceAmount:     decimal.RequireFromString("0.000016"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchX86_64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeDurationFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	gcpObs := []domain.PriceObservation{
+		{
+			Provider:        "gcp",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-GCP-CF-INVOCATIONS",
+			DisplayName:     "Cloud Functions Invocations",
+			Region:          "us-east4",
+			RegionGroup:     gcpRegionGroup,
+			Unit:            "Calls",
+			PriceAmount:     decimal.RequireFromString("0.0000004"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchX86_64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeRequestFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-GCP-CF-EXEC-TIME",
+			DisplayName:     "Cloud Functions Execution Time",
+			Region:          "us-east4",
+			RegionGroup:     gcpRegionGroup,
+			Unit:            "s",
+			PriceAmount:     decimal.RequireFromString("0.0000165"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  serverlessarchmap.ArchX86_64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeDurationFee,
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "serverless", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "serverless", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "serverless", "us-east4"), gcpObs, cache.DefaultTTL)
+}
+
 // --- Asymmetric Invocation Helpers ---
 
 func invokeREST[T any](t *testing.T, handler http.Handler, method, target string, body any, bearerToken string) (T, int, string) {
@@ -1102,6 +1295,61 @@ func assertKubernetesParity(t *testing.T, restResp rest.KubernetesComparisonResp
 	}
 
 	assertWarningsParity(t, "kubernetes", restResp.Warnings, mcpResp.Warnings)
+}
+
+func assertServerlessParity(t *testing.T, restResp rest.ServerlessComparisonResponse, mcpResp mcp.ServerlessComparisonResponse) {
+	t.Helper()
+
+	if len(restResp.Results) != len(mcpResp.Results) {
+		t.Fatalf("result count mismatch: REST=%d, MCP=%d", len(restResp.Results), len(mcpResp.Results))
+	}
+
+	for i := range restResp.Results {
+		restItem := restResp.Results[i]
+		mcpItem := mcpResp.Results[i]
+
+		if restItem.Provider != mcpItem.Provider {
+			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, restItem.Provider, mcpItem.Provider)
+		}
+		if restItem.SkuID != mcpItem.SkuID {
+			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.SkuID, mcpItem.SkuID)
+		}
+		if restItem.MatchedSpec != mcpItem.MatchedSpec {
+			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, restItem.Provider, restItem.MatchedSpec, mcpItem.MatchedSpec)
+		}
+		if restItem.MatchQuality != mcpItem.MatchQuality {
+			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MatchQuality, mcpItem.MatchQuality)
+		}
+		if math.Abs(restItem.MatchDeltaPct-mcpItem.MatchDeltaPct) > 0.0001 {
+			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, restItem.Provider, restItem.MatchDeltaPct, mcpItem.MatchDeltaPct)
+		}
+		if !reflect.DeepEqual(restItem.MissingAttributes, mcpItem.MissingAttributes) {
+			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.MissingAttributes, mcpItem.MissingAttributes)
+		}
+		if !restItem.Price.Amount.Equal(mcpItem.Price.Amount) {
+			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Amount, mcpItem.Price.Amount)
+		}
+		if restItem.Price.Unit != mcpItem.Price.Unit {
+			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Unit, mcpItem.Price.Unit)
+		}
+		if restItem.Price.Currency != mcpItem.Price.Currency {
+			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Currency, mcpItem.Price.Currency)
+		}
+		if !restItem.NormalizedHourlyUSD.Equal(mcpItem.NormalizedHourlyUSD) {
+			t.Errorf("item[%d] normalized_hourly_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.NormalizedHourlyUSD, mcpItem.NormalizedHourlyUSD)
+		}
+		if !restItem.NormalizedMonthlyUSD.Equal(mcpItem.NormalizedMonthlyUSD) {
+			t.Errorf("item[%d] normalized_monthly_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.NormalizedMonthlyUSD, mcpItem.NormalizedMonthlyUSD)
+		}
+		if restItem.Stale != mcpItem.Stale {
+			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.Stale, mcpItem.Stale)
+		}
+		if !restItem.FetchedAt.Equal(mcpItem.FetchedAt) {
+			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.FetchedAt, mcpItem.FetchedAt)
+		}
+	}
+
+	assertWarningsParity(t, "serverless", restResp.Warnings, mcpResp.Warnings)
 }
 
 func assertCalculateParity(t *testing.T, restResp rest.CalculateResponse, mcpResp mcp.CalculateResponse) {
@@ -1979,6 +2227,167 @@ func TestContractParity_Kubernetes(t *testing.T) {
 		_, errMCPTopo := invokeMCP[mcp.KubernetesComparisonResponse](ctx, t, harness.mcpClient, "compare_kubernetes", mcp.CompareKubernetesInput{ClusterTopology: "invalid_topology"})
 		if errMCPTopo == nil {
 			t.Error("expected MCP tool error for invalid topology, got nil")
+		}
+	})
+}
+
+// 5.5 Serverless Compute Contract Parity Suite
+func TestContractParity_Serverless(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractServerlessObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	t.Run("X86_64_AllProvidersMatch", func(t *testing.T) {
+		arch := "x86_64"
+		region := "us-east"
+		reqPerMonth := 5000000.0
+		memMB := 512.0
+		durMS := 200.0
+
+		restResp, code, body := invokeREST[rest.ServerlessComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/serverless?architecture=%s&requests_per_month=%.0f&memory_mb=%.0f&execution_duration_ms=%.0f&region=%s", arch, reqPerMonth, memMB, durMS, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.ServerlessComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_serverless",
+			mcp.CompareServerlessInput{
+				Architecture:        arch,
+				RequestsPerMonth:    &reqPerMonth,
+				MemoryMB:            &memMB,
+				ExecutionDurationMS: &durMS,
+				Region:              region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertServerlessParity(t, restResp, mcpResp)
+		if len(mcpResp.Results) != 3 {
+			t.Fatalf("expected 3 results, got %d", len(mcpResp.Results))
+		}
+	})
+
+	t.Run("ARM64_AWSOnly_AzureAndGCPExcluded", func(t *testing.T) {
+		arch := "arm64"
+		region := "us-east"
+		reqPerMonth := 5000000.0
+		memMB := 512.0
+		durMS := 200.0
+
+		restResp, code, body := invokeREST[rest.ServerlessComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/serverless?architecture=%s&requests_per_month=%.0f&memory_mb=%.0f&execution_duration_ms=%.0f&region=%s", arch, reqPerMonth, memMB, durMS, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.ServerlessComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_serverless",
+			mcp.CompareServerlessInput{
+				Architecture:        arch,
+				RequestsPerMonth:    &reqPerMonth,
+				MemoryMB:            &memMB,
+				ExecutionDurationMS: &durMS,
+				Region:              region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertServerlessParity(t, restResp, mcpResp)
+		if len(mcpResp.Results) != 1 {
+			t.Fatalf("expected 1 result for arm64, got %d", len(mcpResp.Results))
+		}
+		if mcpResp.Results[0].Provider != "aws" {
+			t.Errorf("expected AWS result, got %s", mcpResp.Results[0].Provider)
+		}
+	})
+
+	t.Run("NonUSDCurrencyWarning", func(t *testing.T) {
+		arch := "x86_64"
+		currency := "EUR"
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.ServerlessComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/serverless?architecture=%s&currency=%s&region=%s", arch, currency, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.ServerlessComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_serverless",
+			mcp.CompareServerlessInput{
+				Architecture: arch,
+				Currency:     currency,
+				Region:       region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertServerlessParity(t, restResp, mcpResp)
+
+		hasWarnREST := false
+		for _, w := range restResp.Warnings {
+			if w.Code == "currency_conversion_not_yet_supported" {
+				hasWarnREST = true
+				break
+			}
+		}
+		if !hasWarnREST {
+			t.Error("expected currency_conversion_not_yet_supported warning in REST response")
+		}
+	})
+
+	t.Run("ValidationRejection", func(t *testing.T) {
+		// Invalid architecture
+		_, codeREST, _ := invokeREST[rest.ServerlessComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/serverless?architecture=invalid_arch", nil, harness.bearerToken)
+		if codeREST != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for invalid architecture, got %d", codeREST)
+		}
+
+		_, errMCP := invokeMCP[mcp.ServerlessComparisonResponse](ctx, t, harness.mcpClient, "compare_serverless", mcp.CompareServerlessInput{Architecture: "invalid_arch"})
+		if errMCP == nil {
+			t.Error("expected MCP tool error for invalid architecture, got nil")
+		}
+
+		// Invalid memory_mb
+		lowMem := 64.0
+		_, codeMem, _ := invokeREST[rest.ServerlessComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/serverless?memory_mb=64", nil, harness.bearerToken)
+		if codeMem != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for invalid memory_mb, got %d", codeMem)
+		}
+
+		_, errMCPMem := invokeMCP[mcp.ServerlessComparisonResponse](ctx, t, harness.mcpClient, "compare_serverless", mcp.CompareServerlessInput{MemoryMB: &lowMem})
+		if errMCPMem == nil {
+			t.Error("expected MCP tool error for invalid memory_mb, got nil")
+		}
+
+		// Invalid execution_duration_ms
+		zeroDur := 0.0
+		_, codeDur, _ := invokeREST[rest.ServerlessComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/serverless?execution_duration_ms=0", nil, harness.bearerToken)
+		if codeDur != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for invalid execution_duration_ms, got %d", codeDur)
+		}
+
+		_, errMCPDur := invokeMCP[mcp.ServerlessComparisonResponse](ctx, t, harness.mcpClient, "compare_serverless", mcp.CompareServerlessInput{ExecutionDurationMS: &zeroDur})
+		if errMCPDur == nil {
+			t.Error("expected MCP tool error for invalid execution_duration_ms, got nil")
 		}
 	})
 }

@@ -52,6 +52,7 @@ type awsProductMeta struct {
 	databaseAttrs      domain.DatabaseRDBMSAttributes
 	databaseNoSQLAttrs domain.DatabaseNoSQLAttributes
 	kubernetesAttrs    domain.KubernetesAttributes
+	serverlessAttrs    domain.ServerlessRateAttributes
 }
 
 // Normalize parses an AWS Pricing Bulk JSON file stream and returns normalized domain observations.
@@ -537,6 +538,10 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string, fetchedAt time.T
 		return normalizeKubernetesProduct(prod, serviceCode, sku, fetchedAt, sink)
 	}
 
+	if isServerlessProduct(prod, prod.Attributes) {
+		return normalizeServerlessProduct(prod, serviceCode, sku, fetchedAt, sink)
+	}
+
 	if isDatabaseProduct(prod, prod.Attributes) {
 		category, err := catalogmap.MapAWSProduct(serviceCode)
 		if err != nil {
@@ -771,23 +776,24 @@ func parseSKUTerms(skuTerms map[string]awsOfferTerm, sku string, meta awsProduct
 
 func buildObservation(meta awsProductMeta, unit string, price decimal.Decimal, fetchedAt time.Time) domain.PriceObservation {
 	return domain.PriceObservation{
-		Provider:                "aws",
-		ServiceCategory:         meta.category,
-		SkuID:                   meta.sku,
-		DisplayName:             meta.displayName,
-		Region:                  meta.region,
-		RegionGroup:             meta.regionGroup,
-		Unit:                    unit,
-		PriceAmount:             price,
-		PriceCurrency:           "USD",
-		PricingModel:            "OnDemand",
-		Attributes:              meta.computeAttrs,
-		StorageAttributes:       meta.storageAttrs,
-		NetworkAttributes:       meta.networkAttrs,
-		DatabaseRDBMSAttributes: meta.databaseAttrs,
-		DatabaseNoSQLAttributes: meta.databaseNoSQLAttrs,
-		KubernetesAttributes:    meta.kubernetesAttrs,
-		FetchedAt:               fetchedAt,
+		Provider:                 "aws",
+		ServiceCategory:          meta.category,
+		SkuID:                    meta.sku,
+		DisplayName:              meta.displayName,
+		Region:                   meta.region,
+		RegionGroup:              meta.regionGroup,
+		Unit:                     unit,
+		PriceAmount:              price,
+		PriceCurrency:            "USD",
+		PricingModel:             "OnDemand",
+		Attributes:               meta.computeAttrs,
+		StorageAttributes:        meta.storageAttrs,
+		NetworkAttributes:        meta.networkAttrs,
+		DatabaseRDBMSAttributes:  meta.databaseAttrs,
+		DatabaseNoSQLAttributes:  meta.databaseNoSQLAttrs,
+		KubernetesAttributes:     meta.kubernetesAttrs,
+		ServerlessRateAttributes: meta.serverlessAttrs,
+		FetchedAt:                fetchedAt,
 	}
 }
 

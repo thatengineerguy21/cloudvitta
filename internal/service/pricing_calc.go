@@ -179,6 +179,21 @@ func init() {
 			return hourlyCost, monthlyCost, unit, warnings
 		},
 	})
+
+	RegisterCategoryPricingHandler("serverless", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			return MatchServerlessObservations(obsList, target, thresholds)
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			hourlyCost := match.Observation.PriceAmount
+			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "hour"
+			}
+			return hourlyCost, monthlyCost, unit, nil
+		},
+	})
 }
 
 // MatchAndCalculate encapsulates the fetch, matching, and cost calculation for any category.

@@ -1,0 +1,70 @@
+{
+  "skus": [
+    {
+      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-INVOCATIONS",
+      "skuId": "SKU-GCP-CF-INVOCATIONS",
+      "description": "Cloud Functions Invocations",
+      "category": {
+        "serviceDisplayName": "Cloud Functions",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Invocations",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "Calls",
+            "usageUnitDescription": "invocations",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 400000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-EXEC-TIME",
+      "skuId": "SKU-GCP-CF-EXEC-TIME",
+      "description": "Cloud Functions Execution Time",
+      "category": {
+        "serviceDisplayName": "Cloud Functions",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Time",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "s",
+            "usageUnitDescription": "seconds",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 16500
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ]
+}

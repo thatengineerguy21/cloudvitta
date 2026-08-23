@@ -72,6 +72,14 @@ var (
 		CloseCutoff:       0.20,
 		ApproximateCutoff: 0.50,
 	}
+
+	// ServerlessThresholds defines match quality boundaries for serverless compute category.
+	// close: within 20% tier mismatch penalty.
+	// approximate: within 50% combined delta.
+	ServerlessThresholds = CategoryThresholds{
+		CloseCutoff:       0.20,
+		ApproximateCutoff: 0.50,
+	}
 )
 
 // ThresholdsForCategory returns the per-category thresholds for the given category.
@@ -89,6 +97,8 @@ func ThresholdsForCategory(category string) CategoryThresholds {
 		return DatabaseNoSQLThresholds
 	case "kubernetes":
 		return KubernetesThresholds
+	case "serverless":
+		return ServerlessThresholds
 	default:
 		// Fallback to the strictest thresholds for unknown categories.
 		return ComputeThresholds

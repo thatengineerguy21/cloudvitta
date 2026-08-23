@@ -32,23 +32,24 @@ type NetworkAttributes struct {
 
 // PriceObservation represents a single normalized cloud pricing observation.
 type PriceObservation struct {
-	Provider                string                  `json:"provider"`
-	ServiceCategory         string                  `json:"service_category"`
-	SkuID                   string                  `json:"sku_id"`
-	DisplayName             string                  `json:"display_name"`
-	Region                  string                  `json:"region"`
-	RegionGroup             string                  `json:"region_group"`
-	Unit                    string                  `json:"unit"`
-	PriceAmount             decimal.Decimal         `json:"price_amount"`
-	PriceCurrency           string                  `json:"price_currency"`
-	PricingModel            string                  `json:"pricing_model"`
-	Attributes              ComputeAttributes       `json:"attributes,omitempty"`
-	StorageAttributes       StorageAttributes       `json:"storage_attributes,omitempty"`
-	NetworkAttributes       NetworkAttributes       `json:"network_attributes,omitempty"`
-	DatabaseRDBMSAttributes DatabaseRDBMSAttributes `json:"database_rdbms_attributes,omitempty"`
-	DatabaseNoSQLAttributes DatabaseNoSQLAttributes `json:"database_nosql_attributes,omitempty"`
-	KubernetesAttributes    KubernetesAttributes    `json:"kubernetes_attributes,omitempty"`
-	FetchedAt               time.Time               `json:"fetched_at"`
+	Provider                 string                   `json:"provider"`
+	ServiceCategory          string                   `json:"service_category"`
+	SkuID                    string                   `json:"sku_id"`
+	DisplayName              string                   `json:"display_name"`
+	Region                   string                   `json:"region"`
+	RegionGroup              string                   `json:"region_group"`
+	Unit                     string                   `json:"unit"`
+	PriceAmount              decimal.Decimal          `json:"price_amount"`
+	PriceCurrency            string                   `json:"price_currency"`
+	PricingModel             string                   `json:"pricing_model"`
+	Attributes               ComputeAttributes        `json:"attributes,omitempty"`
+	StorageAttributes        StorageAttributes        `json:"storage_attributes,omitempty"`
+	NetworkAttributes        NetworkAttributes        `json:"network_attributes,omitempty"`
+	DatabaseRDBMSAttributes  DatabaseRDBMSAttributes  `json:"database_rdbms_attributes,omitempty"`
+	DatabaseNoSQLAttributes  DatabaseNoSQLAttributes  `json:"database_nosql_attributes,omitempty"`
+	KubernetesAttributes     KubernetesAttributes     `json:"kubernetes_attributes,omitempty"`
+	ServerlessRateAttributes ServerlessRateAttributes `json:"serverless_attributes,omitempty"`
+	FetchedAt                time.Time                `json:"fetched_at"`
 }
 
 // FetchResult bundles a batch of observations, raw storage path, and unmapped count.
@@ -152,6 +153,17 @@ func init() {
 				return nil
 			}
 			return json.Unmarshal(raw, &obs.KubernetesAttributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("serverless",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.ServerlessRateAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.ServerlessRateAttributes)
 		},
 	)
 }

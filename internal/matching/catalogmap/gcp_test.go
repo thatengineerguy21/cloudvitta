@@ -97,6 +97,24 @@ func TestMapGCPProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Cloud Functions service display name",
+			serviceName:  "Cloud Functions",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Cloud Run functions service display name",
+			serviceName:  "Cloud Run functions",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Cloud Functions service ID",
+			serviceName:  "29E7-DA93-CA13",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "Cloud Bigtable",
 			wantCategory: "",

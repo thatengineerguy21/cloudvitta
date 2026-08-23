@@ -55,6 +55,24 @@ func TestMapAzureProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Functions service",
+			serviceName:  "Functions",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Azure Functions service",
+			serviceName:  "Azure Functions",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Flex Consumption service",
+			serviceName:  "Flex Consumption",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "Azure Synapse",
 			wantCategory: "",

@@ -8,6 +8,7 @@ var supportedCategories = map[string]bool{
 	"database_rdbms": true,
 	"database_nosql": true,
 	"kubernetes":     true,
+	"serverless":     true,
 }
 
 // IsCategorySupported reports whether the specified category is supported by the AWS adapter.
@@ -17,5 +18,5 @@ func IsCategorySupported(category string) bool {
 
 // SupportedCategories returns a copy of the supported category names.
 func SupportedCategories() []string {
-	return []string{"compute", "storage", "network", "database_rdbms", "database_nosql", "kubernetes"}
+	return []string{"compute", "storage", "network", "database_rdbms", "database_nosql", "kubernetes", "serverless"}
 }

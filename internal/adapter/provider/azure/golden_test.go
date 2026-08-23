@@ -51,6 +51,12 @@ func TestAzureNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 3, // Free, Standard, Extended Support
 			expectedSKUs: []string{"SKU-AZURE-AKS-FREE", "SKU-AZURE-AKS-STANDARD", "SKU-AZURE-AKS-EXTENDED"},
 		},
+		{
+			name:         "Azure Serverless Golden",
+			goldenFile:   "../../../../testdata/golden/azure/serverless.json",
+			wantObsCount: 4, // Standard Req, Standard Dur, Flex Req, Flex Dur
+			expectedSKUs: []string{"SKU-AZURE-FUNCTIONS-REQ", "SKU-AZURE-FUNCTIONS-DUR", "SKU-AZURE-FLEX-REQ", "SKU-AZURE-FLEX-DUR"},
+		},
 	}
 
 	for _, tt := range tests {

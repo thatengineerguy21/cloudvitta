@@ -12,6 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -170,6 +171,40 @@ type KubernetesComparisonResponse struct {
 	Warnings []ProviderWarning       `json:"warnings"`
 }
 
+// ServerlessResultEntry represents a single provider result item for serverless comparison.
+type ServerlessResultEntry struct {
+	Provider             string                          `json:"provider"`
+	SkuID                string                          `json:"sku_id"`
+	MatchedSpec          domain.ServerlessRateAttributes `json:"matched_spec"`
+	MatchQuality         string                          `json:"match_quality"`
+	MatchDeltaPct        float64                         `json:"match_delta_pct"`
+	MissingAttributes    []string                        `json:"missing_attributes"`
+	Price                PriceDetail                     `json:"price"`
+	NormalizedHourlyUSD  decimal.Decimal                 `json:"normalized_hourly_usd"`
+	NormalizedMonthlyUSD decimal.Decimal                 `json:"normalized_monthly_usd"`
+	FetchedAt            time.Time                       `json:"fetched_at"`
+	Stale                bool                            `json:"stale"`
+}
+
+// ServerlessQueryMeta represents the query parameters echoed back in serverless comparison metadata.
+type ServerlessQueryMeta struct {
+	Category            string   `json:"category"`
+	Region              string   `json:"region"`
+	Currency            string   `json:"currency"`
+	Architecture        string   `json:"architecture"`
+	Tier                string   `json:"tier"`
+	RequestsPerMonth    *float64 `json:"requests_per_month,omitempty"`
+	MemoryMB            *float64 `json:"memory_mb,omitempty"`
+	ExecutionDurationMS *float64 `json:"execution_duration_ms,omitempty"`
+}
+
+// ServerlessComparisonResponse represents the full serverless comparison response envelope.
+type ServerlessComparisonResponse struct {
+	Meta     ResponseMeta            `json:"meta"`
+	Results  []ServerlessResultEntry `json:"results"`
+	Warnings []ProviderWarning       `json:"warnings"`
+}
+
 // CalculateCategoryResult represents a single category result inside a provider.
 type CalculateCategoryResult struct {
 	SkuID               string          `json:"sku_id"`
@@ -230,6 +265,17 @@ type CompareKubernetesInput struct {
 	ClusterTopology string `json:"cluster_topology,omitempty" jsonschema:"GCP cluster topology (zonal, regional, autopilot)"`
 	Region          string `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
 	Currency        string `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
+}
+
+// CompareServerlessInput defines parameters for compare_serverless tool.
+type CompareServerlessInput struct {
+	Architecture        string   `json:"architecture,omitempty" jsonschema:"Requested CPU architecture (x86_64, arm64; default: x86_64)"`
+	Tier                string   `json:"tier,omitempty" jsonschema:"Requested serverless tier (consumption, flex_consumption, 1st_gen, 2nd_gen; default: consumption)"`
+	RequestsPerMonth    *float64 `json:"requests_per_month,omitempty" jsonschema:"Monthly invocation requests (default: 1000000)"`
+	MemoryMB            *float64 `json:"memory_mb,omitempty" jsonschema:"Function allocated memory in MB (128 - 10240, default: 512)"`
+	ExecutionDurationMS *float64 `json:"execution_duration_ms,omitempty" jsonschema:"Average execution duration in ms (1 - 900000, default: 200)"`
+	Region              string   `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
+	Currency            string   `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
 }
 
 // ComputeRequirements defines compute requirements for calculate_workload.
@@ -751,6 +797,141 @@ func handleCompareKubernetes(pricingSvc *service.PricingService) sdk.ToolHandler
 	}
 }
 
+// handleCompareServerless creates the tool handler for compare_serverless.
+func handleCompareServerless(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CompareServerlessInput, any] {
+	return func(ctx context.Context, req *sdk.CallToolRequest, input CompareServerlessInput) (*sdk.CallToolResult, any, error) {
+		if pricingSvc == nil {
+			return nil, nil, errors.New("pricing service unavailable")
+		}
+
+		region := input.Region
+		if region == "" {
+			region = "us-east"
+		}
+
+		warnings := defaultStage3Warnings()
+
+		currency := input.Currency
+		reqCurrency := currency
+		if reqCurrency == "" {
+			reqCurrency = "USD"
+		}
+		if currency != "" && currency != "USD" {
+			warnings = append(warnings, ProviderWarning{
+				Provider: "system",
+				Code:     "currency_conversion_not_yet_supported",
+				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
+			})
+		}
+		currency = "USD"
+
+		rawArch := strings.TrimSpace(input.Architecture)
+		canonicalArch := serverlessarchmap.ArchX86_64
+		if rawArch != "" {
+			resolved, err := serverlessarchmap.ResolveCanonicalArchitecture(rawArch)
+			if err != nil || !serverlessarchmap.IsSupportedStageArchitecture(resolved) {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: architecture must be a supported CPU architecture (x86_64, arm64)", service.ErrInvalidParameters))
+			}
+			canonicalArch = resolved
+		}
+
+		rawTier := strings.ToLower(strings.TrimSpace(input.Tier))
+		if rawTier == "" {
+			rawTier = domain.ServerlessTierConsumption
+		}
+
+		requestsPerMonth := 1_000_000.0
+		if input.RequestsPerMonth != nil {
+			if *input.RequestsPerMonth < 0 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: requests_per_month must be a non-negative number", service.ErrInvalidParameters))
+			}
+			requestsPerMonth = *input.RequestsPerMonth
+		}
+
+		memoryMB := 512.0
+		if input.MemoryMB != nil {
+			if *input.MemoryMB < 128 || *input.MemoryMB > 10240 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: memory_mb must be between 128 and 10240 MB", service.ErrInvalidParameters))
+			}
+			memoryMB = *input.MemoryMB
+		}
+
+		executionDurationMS := 200.0
+		if input.ExecutionDurationMS != nil {
+			if *input.ExecutionDurationMS < 1 || *input.ExecutionDurationMS > 900000 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: execution_duration_ms must be between 1 and 900000 ms", service.ErrInvalidParameters))
+			}
+			executionDurationMS = *input.ExecutionDurationMS
+		}
+
+		target := service.MatchTarget{
+			Category:               "serverless",
+			ServerlessArchitecture: canonicalArch,
+			ServerlessTier:         rawTier,
+			RequestsPerMonth:       requestsPerMonth,
+			MemoryMB:               memoryMB,
+			ExecutionDurationMS:    executionDurationMS,
+		}
+
+		compRes, err := pricingSvc.Compare(ctx, "serverless", region, target)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
+
+		for _, w := range compRes.Warnings {
+			warnings = append(warnings, ProviderWarning{
+				Provider: w.Provider,
+				Code:     w.Code,
+				Message:  w.Message,
+			})
+		}
+
+		var results []ServerlessResultEntry
+		for _, item := range compRes.Results {
+			results = append(results, ServerlessResultEntry{
+				Provider:          item.Provider,
+				SkuID:             item.SkuID,
+				MatchedSpec:       item.MatchedServerless,
+				MatchQuality:      item.MatchQuality,
+				MatchDeltaPct:     item.MatchDeltaPct,
+				MissingAttributes: item.MissingAttributes,
+				Price: PriceDetail{
+					Amount:   item.PriceAmount,
+					Unit:     item.Unit,
+					Currency: currency,
+				},
+				NormalizedHourlyUSD:  item.HourlyCost,
+				NormalizedMonthlyUSD: item.MonthlyCost,
+				FetchedAt:            item.FetchedAt,
+				Stale:                item.Stale,
+			})
+		}
+
+		queryMeta := ServerlessQueryMeta{
+			Category:            "serverless",
+			Region:              region,
+			Currency:            reqCurrency,
+			Architecture:        canonicalArch,
+			Tier:                rawTier,
+			RequestsPerMonth:    input.RequestsPerMonth,
+			MemoryMB:            input.MemoryMB,
+			ExecutionDurationMS: input.ExecutionDurationMS,
+		}
+
+		resp := &ServerlessComparisonResponse{
+			Meta: ResponseMeta{
+				APIVersion:  "v1",
+				GeneratedAt: time.Now().UTC(),
+				Query:       queryMeta,
+			},
+			Results:  results,
+			Warnings: warnings,
+		}
+
+		return nil, resp, nil
+	}
+}
+
 // handleCalculateWorkload creates the tool handler for calculate_workload.
 func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CalculateWorkloadInput, any] {
 	maxStorageF, _ := maxAllowedStorageSizeGB.Float64()
@@ -940,6 +1121,11 @@ func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, fresh
 		Name:        "compare_kubernetes",
 		Description: "Compare managed Kubernetes control plane pricing across cloud providers for requested tier and cluster topology.",
 	}, instrumentTool("compare_kubernetes", cfg, handleCompareKubernetes(pricingSvc)))
+
+	sdk.AddTool(server, &sdk.Tool{
+		Name:        "compare_serverless",
+		Description: "Compare serverless compute (FaaS) pricing across cloud providers for requested workload and architecture.",
+	}, instrumentTool("compare_serverless", cfg, handleCompareServerless(pricingSvc)))
 
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "calculate_workload",

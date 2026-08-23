@@ -19,6 +19,7 @@ type CategoryComparisonItem struct {
 	MatchedDatabase   domain.DatabaseRDBMSAttributes
 	MatchedNoSQL      domain.DatabaseNoSQLAttributes
 	MatchedKubernetes domain.KubernetesAttributes
+	MatchedServerless domain.ServerlessRateAttributes
 	MatchQuality      string
 	MatchDeltaPct     float64
 	MissingAttributes []string
@@ -65,6 +66,12 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 					Code:     "engine_mismatch_excluded",
 					Message:  "Database candidate was excluded due to engine mismatch.",
 				})
+			case errors.Is(err, ErrArchitectureUnsupported):
+				warnings = append(warnings, CalculateWarning{
+					Provider: prov,
+					Code:     "architecture_unsupported_excluded",
+					Message:  "Provider does not offer the requested CPU architecture for serverless compute.",
+				})
 			case errors.Is(err, ErrNoMatchFound):
 				warnings = append(warnings, CalculateWarning{
 					Provider: prov,
@@ -105,6 +112,7 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 			MatchedDatabase:   obs.DatabaseRDBMSAttributes,
 			MatchedNoSQL:      obs.DatabaseNoSQLAttributes,
 			MatchedKubernetes: obs.KubernetesAttributes,
+			MatchedServerless: obs.ServerlessRateAttributes,
 			MatchQuality:      catResult.MatchResult.MatchQuality,
 			MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
 			MissingAttributes: catResult.MatchResult.MissingAttributes,

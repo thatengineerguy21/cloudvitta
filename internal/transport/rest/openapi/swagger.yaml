@@ -1,5 +1,15 @@
 definitions:
-  domain.ComputeAttributes:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.ClusterTopology:
+    enum:
+    - zonal
+    - regional
+    - autopilot
+    type: string
+    x-enum-varnames:
+    - ClusterTopologyZonal
+    - ClusterTopologyRegional
+    - ClusterTopologyAutopilot
+  github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes:
     properties:
       family:
         type: string
@@ -8,7 +18,7 @@ definitions:
       vcpu:
         type: number
     type: object
-  domain.DatabaseNoSQLAttributes:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseNoSQLAttributes:
     properties:
       component_type:
         description: '"throughput", "storage", "request_operations"'
@@ -38,7 +48,7 @@ definitions:
         description: Provisioned writes/sec (WCU/RU/s) or request rate
         type: number
     type: object
-  domain.DatabaseRDBMSAttributes:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseRDBMSAttributes:
     properties:
       component_type:
         description: '"instance" or "storage"'
@@ -68,23 +78,47 @@ definitions:
         description: Number of vCPUs (0 for pure storage rows)
         type: number
     type: object
-  domain.KubernetesAttributes:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesAttributes:
     properties:
       cluster_topology:
+        allOf:
+        - $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ClusterTopology'
         description: '"zonal", "regional", "autopilot" — GCP-specific'
-        type: string
       tier:
+        allOf:
+        - $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesTier'
         description: '"free", "standard", "extended_support"'
-        type: string
     type: object
-  domain.NetworkAttributes:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesTier:
+    enum:
+    - free
+    - standard
+    - extended_support
+    type: string
+    x-enum-varnames:
+    - KubernetesTierFree
+    - KubernetesTierStandard
+    - KubernetesTierExtendedSupport
+  github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes:
     properties:
       egress_gb:
         type: number
       transfer_type:
         type: string
     type: object
-  domain.StorageAttributes:
+  github_com_thatengineerguy21_CloudVitta_internal_domain.ServerlessRateAttributes:
+    properties:
+      architecture:
+        description: '"x86_64", "arm64"'
+        type: string
+      component_type:
+        description: '"request_fee", "duration_fee"'
+        type: string
+      tier:
+        description: '"consumption", "flex_consumption", "1st_gen", "2nd_gen"'
+        type: string
+    type: object
+  github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes:
     properties:
       iops:
         description: |-
@@ -96,7 +130,7 @@ definitions:
       storage_class:
         type: string
     type: object
-  middleware.RFC7807Error:
+  github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error:
     properties:
       detail:
         type: string
@@ -109,7 +143,7 @@ definitions:
       type:
         type: string
     type: object
-  rest.CalculateCategoryResult:
+  internal_transport_rest.CalculateCategoryResult:
     properties:
       match_delta_pct:
         type: number
@@ -126,20 +160,20 @@ definitions:
       stale:
         type: boolean
     type: object
-  rest.CalculateMeta:
+  internal_transport_rest.CalculateMeta:
     properties:
       api_version:
         type: string
       generated_at:
         type: string
       request:
-        $ref: '#/definitions/rest.CalculateRequestBody'
+        $ref: '#/definitions/internal_transport_rest.CalculateRequestBody'
     type: object
-  rest.CalculateProviderResult:
+  internal_transport_rest.CalculateProviderResult:
     properties:
       categories:
         additionalProperties:
-          $ref: '#/definitions/rest.CalculateCategoryResult'
+          $ref: '#/definitions/internal_transport_rest.CalculateCategoryResult'
         type: object
       partial:
         type: boolean
@@ -150,41 +184,41 @@ definitions:
       total_normalized_hourly_usd:
         type: number
     type: object
-  rest.CalculateRequestBody:
+  internal_transport_rest.CalculateRequestBody:
     properties:
       compute:
-        $ref: '#/definitions/domain.ComputeAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes'
       currency:
         type: string
       network:
-        $ref: '#/definitions/domain.NetworkAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes'
       region:
         type: string
       storage:
-        $ref: '#/definitions/domain.StorageAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes'
       strict_family:
         type: boolean
     type: object
-  rest.CalculateResponse:
+  internal_transport_rest.CalculateResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.CalculateMeta'
+        $ref: '#/definitions/internal_transport_rest.CalculateMeta'
       results:
         items:
-          $ref: '#/definitions/rest.CalculateProviderResult'
+          $ref: '#/definitions/internal_transport_rest.CalculateProviderResult'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.CategoryStatusResponse:
+  internal_transport_rest.CategoryStatusResponse:
     properties:
       category:
         example: compute
         type: string
       dlq:
-        $ref: '#/definitions/rest.DLQStatusResponse'
+        $ref: '#/definitions/internal_transport_rest.DLQStatusResponse'
       last_fetched_at:
         type: string
       last_seen_at:
@@ -202,7 +236,7 @@ definitions:
         example: true
         type: boolean
     type: object
-  rest.ComputeComparisonMeta:
+  internal_transport_rest.ComputeComparisonMeta:
     properties:
       api_version:
         type: string
@@ -212,20 +246,20 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  rest.ComputeComparisonResponse:
+  internal_transport_rest.ComputeComparisonResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.ComputeComparisonMeta'
+        $ref: '#/definitions/internal_transport_rest.ComputeComparisonMeta'
       results:
         items:
-          $ref: '#/definitions/rest.ComputeResultEntry'
+          $ref: '#/definitions/internal_transport_rest.ComputeResultEntry'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.ComputeResultEntry:
+  internal_transport_rest.ComputeResultEntry:
     properties:
       fetched_at:
         type: string
@@ -234,7 +268,7 @@ definitions:
       match_quality:
         type: string
       matched_spec:
-        $ref: '#/definitions/domain.ComputeAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes'
       missing_attributes:
         items:
           type: string
@@ -242,7 +276,7 @@ definitions:
       normalized_hourly_usd:
         type: number
       price:
-        $ref: '#/definitions/rest.PriceDetail'
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
       provider:
         type: string
       sku_id:
@@ -250,7 +284,7 @@ definitions:
       stale:
         type: boolean
     type: object
-  rest.DLQStatusResponse:
+  internal_transport_rest.DLQStatusResponse:
     properties:
       consecutive_failures:
         example: 3
@@ -264,7 +298,7 @@ definitions:
       timestamp:
         type: string
     type: object
-  rest.DatabaseComparisonMeta:
+  internal_transport_rest.DatabaseComparisonMeta:
     properties:
       api_version:
         type: string
@@ -274,20 +308,20 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  rest.DatabaseComparisonResponse:
+  internal_transport_rest.DatabaseComparisonResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.DatabaseComparisonMeta'
+        $ref: '#/definitions/internal_transport_rest.DatabaseComparisonMeta'
       results:
         items:
-          $ref: '#/definitions/rest.DatabaseResultEntry'
+          $ref: '#/definitions/internal_transport_rest.DatabaseResultEntry'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.DatabaseNoSQLComparisonMeta:
+  internal_transport_rest.DatabaseNoSQLComparisonMeta:
     properties:
       api_version:
         type: string
@@ -297,20 +331,20 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  rest.DatabaseNoSQLComparisonResponse:
+  internal_transport_rest.DatabaseNoSQLComparisonResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.DatabaseNoSQLComparisonMeta'
+        $ref: '#/definitions/internal_transport_rest.DatabaseNoSQLComparisonMeta'
       results:
         items:
-          $ref: '#/definitions/rest.DatabaseNoSQLResultEntry'
+          $ref: '#/definitions/internal_transport_rest.DatabaseNoSQLResultEntry'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.DatabaseNoSQLResultEntry:
+  internal_transport_rest.DatabaseNoSQLResultEntry:
     properties:
       fetched_at:
         type: string
@@ -319,7 +353,7 @@ definitions:
       match_quality:
         type: string
       matched_spec:
-        $ref: '#/definitions/domain.DatabaseNoSQLAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseNoSQLAttributes'
       missing_attributes:
         items:
           type: string
@@ -327,7 +361,7 @@ definitions:
       normalized_hourly_usd:
         type: number
       price:
-        $ref: '#/definitions/rest.PriceDetail'
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
       provider:
         type: string
       sku_id:
@@ -335,7 +369,7 @@ definitions:
       stale:
         type: boolean
     type: object
-  rest.DatabaseResultEntry:
+  internal_transport_rest.DatabaseResultEntry:
     properties:
       fetched_at:
         type: string
@@ -344,7 +378,7 @@ definitions:
       match_quality:
         type: string
       matched_spec:
-        $ref: '#/definitions/domain.DatabaseRDBMSAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseRDBMSAttributes'
       missing_attributes:
         items:
           type: string
@@ -352,7 +386,7 @@ definitions:
       normalized_hourly_usd:
         type: number
       price:
-        $ref: '#/definitions/rest.PriceDetail'
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
       provider:
         type: string
       sku_id:
@@ -360,7 +394,7 @@ definitions:
       stale:
         type: boolean
     type: object
-  rest.KubernetesComparisonMeta:
+  internal_transport_rest.KubernetesComparisonMeta:
     properties:
       api_version:
         type: string
@@ -370,20 +404,20 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  rest.KubernetesComparisonResponse:
+  internal_transport_rest.KubernetesComparisonResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.KubernetesComparisonMeta'
+        $ref: '#/definitions/internal_transport_rest.KubernetesComparisonMeta'
       results:
         items:
-          $ref: '#/definitions/rest.KubernetesResultEntry'
+          $ref: '#/definitions/internal_transport_rest.KubernetesResultEntry'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.KubernetesResultEntry:
+  internal_transport_rest.KubernetesResultEntry:
     properties:
       fetched_at:
         type: string
@@ -392,7 +426,7 @@ definitions:
       match_quality:
         type: string
       matched_spec:
-        $ref: '#/definitions/domain.KubernetesAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesAttributes'
       missing_attributes:
         items:
           type: string
@@ -400,7 +434,7 @@ definitions:
       normalized_hourly_usd:
         type: number
       price:
-        $ref: '#/definitions/rest.PriceDetail'
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
       provider:
         type: string
       sku_id:
@@ -408,14 +442,14 @@ definitions:
       stale:
         type: boolean
     type: object
-  rest.LoginRequest:
+  internal_transport_rest.LoginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  rest.LoginResponse:
+  internal_transport_rest.LoginResponse:
     properties:
       access_token:
         type: string
@@ -426,17 +460,17 @@ definitions:
       token_type:
         type: string
     type: object
-  rest.LogoutRequest:
+  internal_transport_rest.LogoutRequest:
     properties:
       refresh_token:
         type: string
     type: object
-  rest.LogoutResponse:
+  internal_transport_rest.LogoutResponse:
     properties:
       message:
         type: string
     type: object
-  rest.NetworkComparisonMeta:
+  internal_transport_rest.NetworkComparisonMeta:
     properties:
       api_version:
         type: string
@@ -446,20 +480,20 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  rest.NetworkComparisonResponse:
+  internal_transport_rest.NetworkComparisonResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.NetworkComparisonMeta'
+        $ref: '#/definitions/internal_transport_rest.NetworkComparisonMeta'
       results:
         items:
-          $ref: '#/definitions/rest.NetworkResultEntry'
+          $ref: '#/definitions/internal_transport_rest.NetworkResultEntry'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.NetworkResultEntry:
+  internal_transport_rest.NetworkResultEntry:
     properties:
       fetched_at:
         type: string
@@ -468,7 +502,7 @@ definitions:
       match_quality:
         type: string
       matched_spec:
-        $ref: '#/definitions/domain.NetworkAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes'
       missing_attributes:
         items:
           type: string
@@ -476,7 +510,7 @@ definitions:
       monthly_cost_usd:
         type: number
       price:
-        $ref: '#/definitions/rest.PriceDetail'
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
       provider:
         type: string
       sku_id:
@@ -484,7 +518,7 @@ definitions:
       stale:
         type: boolean
     type: object
-  rest.PriceDetail:
+  internal_transport_rest.PriceDetail:
     properties:
       amount:
         type: number
@@ -493,11 +527,11 @@ definitions:
       unit:
         type: string
     type: object
-  rest.ProviderStatusResponse:
+  internal_transport_rest.ProviderStatusResponse:
     properties:
       categories:
         additionalProperties:
-          $ref: '#/definitions/rest.CategoryStatusResponse'
+          $ref: '#/definitions/internal_transport_rest.CategoryStatusResponse'
         type: object
       last_successful_fetch:
         type: string
@@ -512,10 +546,10 @@ definitions:
         type: string
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderStatusWarningResponse'
+          $ref: '#/definitions/internal_transport_rest.ProviderStatusWarningResponse'
         type: array
     type: object
-  rest.ProviderStatusWarningResponse:
+  internal_transport_rest.ProviderStatusWarningResponse:
     properties:
       code:
         example: not_yet_ingested
@@ -527,7 +561,7 @@ definitions:
         example: oracle
         type: string
     type: object
-  rest.ProviderWarning:
+  internal_transport_rest.ProviderWarning:
     properties:
       code:
         type: string
@@ -536,14 +570,14 @@ definitions:
       provider:
         type: string
     type: object
-  rest.RefreshRequest:
+  internal_transport_rest.RefreshRequest:
     properties:
       idempotency_key:
         type: string
       refresh_token:
         type: string
     type: object
-  rest.RefreshResponse:
+  internal_transport_rest.RefreshResponse:
     properties:
       access_token:
         type: string
@@ -554,23 +588,7 @@ definitions:
       token_type:
         type: string
     type: object
-  rest.SignupRequest:
-    properties:
-      email:
-        type: string
-      password:
-        type: string
-    type: object
-  rest.SignupResponse:
-    properties:
-      created_at:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-    type: object
-  rest.StorageComparisonMeta:
+  internal_transport_rest.ServerlessComparisonMeta:
     properties:
       api_version:
         type: string
@@ -580,20 +598,20 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  rest.StorageComparisonResponse:
+  internal_transport_rest.ServerlessComparisonResponse:
     properties:
       meta:
-        $ref: '#/definitions/rest.StorageComparisonMeta'
+        $ref: '#/definitions/internal_transport_rest.ServerlessComparisonMeta'
       results:
         items:
-          $ref: '#/definitions/rest.StorageResultEntry'
+          $ref: '#/definitions/internal_transport_rest.ServerlessResultEntry'
         type: array
       warnings:
         items:
-          $ref: '#/definitions/rest.ProviderWarning'
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
         type: array
     type: object
-  rest.StorageResultEntry:
+  internal_transport_rest.ServerlessResultEntry:
     properties:
       fetched_at:
         type: string
@@ -602,7 +620,73 @@ definitions:
       match_quality:
         type: string
       matched_spec:
-        $ref: '#/definitions/domain.StorageAttributes'
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ServerlessRateAttributes'
+      missing_attributes:
+        items:
+          type: string
+        type: array
+      normalized_hourly_usd:
+        type: number
+      normalized_monthly_usd:
+        type: number
+      price:
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
+      provider:
+        type: string
+      sku_id:
+        type: string
+      stale:
+        type: boolean
+    type: object
+  internal_transport_rest.SignupRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_transport_rest.SignupResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+    type: object
+  internal_transport_rest.StorageComparisonMeta:
+    properties:
+      api_version:
+        type: string
+      generated_at:
+        type: string
+      query:
+        additionalProperties: true
+        type: object
+    type: object
+  internal_transport_rest.StorageComparisonResponse:
+    properties:
+      meta:
+        $ref: '#/definitions/internal_transport_rest.StorageComparisonMeta'
+      results:
+        items:
+          $ref: '#/definitions/internal_transport_rest.StorageResultEntry'
+        type: array
+      warnings:
+        items:
+          $ref: '#/definitions/internal_transport_rest.ProviderWarning'
+        type: array
+    type: object
+  internal_transport_rest.StorageResultEntry:
+    properties:
+      fetched_at:
+        type: string
+      match_delta_pct:
+        type: number
+      match_quality:
+        type: string
+      matched_spec:
+        $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes'
       missing_attributes:
         items:
           type: string
@@ -610,7 +694,7 @@ definitions:
       monthly_cost_usd:
         type: number
       price:
-        $ref: '#/definitions/rest.PriceDetail'
+        $ref: '#/definitions/internal_transport_rest.PriceDetail'
       provider:
         type: string
       sku_id:
@@ -633,7 +717,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/rest.LoginRequest'
+          $ref: '#/definitions/internal_transport_rest.LoginRequest'
       produces:
       - application/json
       - application/problem+json
@@ -641,27 +725,27 @@ paths:
         "200":
           description: Authentication successful
           schema:
-            $ref: '#/definitions/rest.LoginResponse'
+            $ref: '#/definitions/internal_transport_rest.LoginResponse'
         "400":
           description: Malformed JSON request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "401":
           description: Invalid email or password
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "405":
           description: Method Not Allowed
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Rate limit exceeded
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Authenticate user and issue tokens
       tags:
       - Auth
@@ -677,7 +761,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/rest.LogoutRequest'
+          $ref: '#/definitions/internal_transport_rest.LogoutRequest'
       produces:
       - application/json
       - application/problem+json
@@ -685,19 +769,19 @@ paths:
         "200":
           description: Session revoked successfully
           schema:
-            $ref: '#/definitions/rest.LogoutResponse'
+            $ref: '#/definitions/internal_transport_rest.LogoutResponse'
         "400":
           description: Invalid or missing refresh_token
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "405":
           description: Method Not Allowed
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Revoke session / Logout
       tags:
       - Auth
@@ -713,7 +797,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/rest.RefreshRequest'
+          $ref: '#/definitions/internal_transport_rest.RefreshRequest'
       produces:
       - application/json
       - application/problem+json
@@ -721,23 +805,23 @@ paths:
         "200":
           description: Tokens rotated successfully
           schema:
-            $ref: '#/definitions/rest.RefreshResponse'
+            $ref: '#/definitions/internal_transport_rest.RefreshResponse'
         "400":
           description: Invalid or missing refresh_token or idempotency_key
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "401":
           description: Invalid, expired, revoked, or compromised token family
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "405":
           description: Method Not Allowed
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Rotate refresh token
       tags:
       - Auth
@@ -752,7 +836,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/rest.SignupRequest'
+          $ref: '#/definitions/internal_transport_rest.SignupRequest'
       produces:
       - application/json
       - application/problem+json
@@ -760,23 +844,23 @@ paths:
         "201":
           description: User registered successfully
           schema:
-            $ref: '#/definitions/rest.SignupResponse'
+            $ref: '#/definitions/internal_transport_rest.SignupResponse'
         "400":
           description: Invalid email or password format
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "405":
           description: Method Not Allowed
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "409":
           description: User with this email already exists
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Register a new user
       tags:
       - Auth
@@ -792,26 +876,26 @@ paths:
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/rest.CalculateRequestBody'
+          $ref: '#/definitions/internal_transport_rest.CalculateRequestBody'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.CalculateResponse'
+            $ref: '#/definitions/internal_transport_rest.CalculateResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get composite pricing calculation
       tags:
       - calculator
@@ -850,19 +934,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.ComputeComparisonResponse'
+            $ref: '#/definitions/internal_transport_rest.ComputeComparisonResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get compute pricing comparison
       tags:
       - prices
@@ -913,19 +997,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.DatabaseComparisonResponse'
+            $ref: '#/definitions/internal_transport_rest.DatabaseComparisonResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get relational database pricing comparison
       tags:
       - prices
@@ -978,19 +1062,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.DatabaseNoSQLComparisonResponse'
+            $ref: '#/definitions/internal_transport_rest.DatabaseNoSQLComparisonResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get NoSQL database pricing comparison
       tags:
       - prices
@@ -1023,19 +1107,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.KubernetesComparisonResponse'
+            $ref: '#/definitions/internal_transport_rest.KubernetesComparisonResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get Kubernetes control-plane pricing comparison
       tags:
       - prices
@@ -1066,20 +1150,77 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.NetworkComparisonResponse'
+            $ref: '#/definitions/internal_transport_rest.NetworkComparisonResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get network pricing comparison
+      tags:
+      - prices
+  /api/v1/prices/serverless:
+    get:
+      description: Returns normalized Serverless compute (FaaS) pricing across cloud
+        providers (AWS Lambda, Azure Functions, GCP Cloud Functions) for requested
+        workload.
+      parameters:
+      - description: 'Requested CPU architecture (x86_64, arm64; default: x86_64)'
+        in: query
+        name: architecture
+        type: string
+      - description: 'Requested serverless tier (consumption, flex_consumption, 1st_gen,
+          2nd_gen; default: consumption)'
+        in: query
+        name: tier
+        type: string
+      - description: 'Monthly invocation requests (default: 1000000)'
+        in: query
+        name: requests_per_month
+        type: number
+      - description: 'Function allocated memory in MB (128 - 10240, default: 512)'
+        in: query
+        name: memory_mb
+        type: number
+      - description: 'Average execution duration in ms (1 - 900000, default: 200)'
+        in: query
+        name: execution_duration_ms
+        type: number
+      - description: 'Canonical region group (default: us-east)'
+        in: query
+        name: region
+        type: string
+      - description: 'Target currency code (default: USD)'
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_transport_rest.ServerlessComparisonResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
+      summary: Get Serverless compute pricing comparison
       tags:
       - prices
   /api/v1/prices/storage:
@@ -1110,19 +1251,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.StorageComparisonResponse'
+            $ref: '#/definitions/internal_transport_rest.StorageComparisonResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get storage pricing comparison
       tags:
       - prices
@@ -1144,19 +1285,19 @@ paths:
         "200":
           description: Provider status and category freshness details
           schema:
-            $ref: '#/definitions/rest.ProviderStatusResponse'
+            $ref: '#/definitions/internal_transport_rest.ProviderStatusResponse'
         "400":
           description: Invalid Parameters
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "404":
           description: Provider Not Found
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/middleware.RFC7807Error'
+            $ref: '#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error'
       summary: Get cloud provider operational status and data freshness
       tags:
       - providers
