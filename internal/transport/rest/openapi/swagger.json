@@ -25,7 +25,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.LoginRequest"
+                            "$ref": "#/definitions/rest.LoginRequest"
                         }
                     }
                 ],
@@ -33,37 +33,37 @@
                     "200": {
                         "description": "Authentication successful",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.LoginResponse"
+                            "$ref": "#/definitions/rest.LoginResponse"
                         }
                     },
                     "400": {
                         "description": "Malformed JSON request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "401": {
                         "description": "Invalid email or password",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "405": {
                         "description": "Method Not Allowed",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Rate limit exceeded",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -90,7 +90,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.LogoutRequest"
+                            "$ref": "#/definitions/rest.LogoutRequest"
                         }
                     }
                 ],
@@ -98,25 +98,25 @@
                     "200": {
                         "description": "Session revoked successfully",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.LogoutResponse"
+                            "$ref": "#/definitions/rest.LogoutResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid or missing refresh_token",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "405": {
                         "description": "Method Not Allowed",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -143,7 +143,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.RefreshRequest"
+                            "$ref": "#/definitions/rest.RefreshRequest"
                         }
                     }
                 ],
@@ -151,31 +151,31 @@
                     "200": {
                         "description": "Tokens rotated successfully",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.RefreshResponse"
+                            "$ref": "#/definitions/rest.RefreshResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid or missing refresh_token or idempotency_key",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "401": {
                         "description": "Invalid, expired, revoked, or compromised token family",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "405": {
                         "description": "Method Not Allowed",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -202,7 +202,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.SignupRequest"
+                            "$ref": "#/definitions/rest.SignupRequest"
                         }
                     }
                 ],
@@ -210,31 +210,31 @@
                     "201": {
                         "description": "User registered successfully",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.SignupResponse"
+                            "$ref": "#/definitions/rest.SignupResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid email or password format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "405": {
                         "description": "Method Not Allowed",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "409": {
                         "description": "User with this email already exists",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -260,7 +260,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.CalculateRequestBody"
+                            "$ref": "#/definitions/rest.CalculateRequestBody"
                         }
                     }
                 ],
@@ -268,25 +268,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.CalculateResponse"
+                            "$ref": "#/definitions/rest.CalculateResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -344,25 +344,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.ComputeComparisonResponse"
+                            "$ref": "#/definitions/rest.ComputeComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -438,25 +438,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.DatabaseComparisonResponse"
+                            "$ref": "#/definitions/rest.DatabaseComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -532,25 +532,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.DatabaseNoSQLComparisonResponse"
+                            "$ref": "#/definitions/rest.DatabaseNoSQLComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -596,25 +596,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.KubernetesComparisonResponse"
+                            "$ref": "#/definitions/rest.KubernetesComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -660,25 +660,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.NetworkComparisonResponse"
+                            "$ref": "#/definitions/rest.NetworkComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -742,25 +742,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.ServerlessComparisonResponse"
+                            "$ref": "#/definitions/rest.ServerlessComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -806,25 +806,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.StorageComparisonResponse"
+                            "$ref": "#/definitions/rest.StorageComparisonResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "429": {
                         "description": "Too Many Requests",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -853,25 +853,25 @@
                     "200": {
                         "description": "Provider status and category freshness details",
                         "schema": {
-                            "$ref": "#/definitions/internal_transport_rest.ProviderStatusResponse"
+                            "$ref": "#/definitions/rest.ProviderStatusResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid Parameters",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "404": {
                         "description": "Provider Not Found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error"
+                            "$ref": "#/definitions/middleware.RFC7807Error"
                         }
                     }
                 }
@@ -879,20 +879,7 @@
         }
     },
     "definitions": {
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.ClusterTopology": {
-            "type": "string",
-            "enum": [
-                "zonal",
-                "regional",
-                "autopilot"
-            ],
-            "x-enum-varnames": [
-                "ClusterTopologyZonal",
-                "ClusterTopologyRegional",
-                "ClusterTopologyAutopilot"
-            ]
-        },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes": {
+        "domain.ComputeAttributes": {
             "type": "object",
             "properties": {
                 "family": {
@@ -906,7 +893,7 @@
                 }
             }
         },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseNoSQLAttributes": {
+        "domain.DatabaseNoSQLAttributes": {
             "type": "object",
             "properties": {
                 "component_type": {
@@ -947,7 +934,7 @@
                 }
             }
         },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseRDBMSAttributes": {
+        "domain.DatabaseRDBMSAttributes": {
             "type": "object",
             "properties": {
                 "component_type": {
@@ -988,41 +975,20 @@
                 }
             }
         },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesAttributes": {
+        "domain.KubernetesAttributes": {
             "type": "object",
             "properties": {
                 "cluster_topology": {
                     "description": "\"zonal\", \"regional\", \"autopilot\" — GCP-specific",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ClusterTopology"
-                        }
-                    ]
+                    "type": "string"
                 },
                 "tier": {
                     "description": "\"free\", \"standard\", \"extended_support\"",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesTier"
-                        }
-                    ]
+                    "type": "string"
                 }
             }
         },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesTier": {
-            "type": "string",
-            "enum": [
-                "free",
-                "standard",
-                "extended_support"
-            ],
-            "x-enum-varnames": [
-                "KubernetesTierFree",
-                "KubernetesTierStandard",
-                "KubernetesTierExtendedSupport"
-            ]
-        },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes": {
+        "domain.NetworkAttributes": {
             "type": "object",
             "properties": {
                 "egress_gb": {
@@ -1033,7 +999,7 @@
                 }
             }
         },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.ServerlessRateAttributes": {
+        "domain.ServerlessRateAttributes": {
             "type": "object",
             "properties": {
                 "architecture": {
@@ -1041,16 +1007,20 @@
                     "type": "string"
                 },
                 "component_type": {
-                    "description": "\"request_fee\", \"duration_fee\"",
+                    "description": "\"request_fee\", \"duration_fee\", \"duration_fee_cpu\", \"duration_fee_memory\"",
                     "type": "string"
                 },
                 "tier": {
                     "description": "\"consumption\", \"flex_consumption\", \"1st_gen\", \"2nd_gen\"",
                     "type": "string"
+                },
+                "unit": {
+                    "description": "\"per_million_requests\", \"per_request\", \"per_10_requests\", \"per_gb_second\", etc.",
+                    "type": "string"
                 }
             }
         },
-        "github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes": {
+        "domain.StorageAttributes": {
             "type": "object",
             "properties": {
                 "iops": {
@@ -1065,7 +1035,7 @@
                 }
             }
         },
-        "github_com_thatengineerguy21_CloudVitta_internal_transport_rest_middleware.RFC7807Error": {
+        "middleware.RFC7807Error": {
             "type": "object",
             "properties": {
                 "detail": {
@@ -1085,7 +1055,7 @@
                 }
             }
         },
-        "internal_transport_rest.CalculateCategoryResult": {
+        "rest.CalculateCategoryResult": {
             "type": "object",
             "properties": {
                 "match_delta_pct": {
@@ -1111,7 +1081,7 @@
                 }
             }
         },
-        "internal_transport_rest.CalculateMeta": {
+        "rest.CalculateMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1121,17 +1091,17 @@
                     "type": "string"
                 },
                 "request": {
-                    "$ref": "#/definitions/internal_transport_rest.CalculateRequestBody"
+                    "$ref": "#/definitions/rest.CalculateRequestBody"
                 }
             }
         },
-        "internal_transport_rest.CalculateProviderResult": {
+        "rest.CalculateProviderResult": {
             "type": "object",
             "properties": {
                 "categories": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/internal_transport_rest.CalculateCategoryResult"
+                        "$ref": "#/definitions/rest.CalculateCategoryResult"
                     }
                 },
                 "partial": {
@@ -1148,50 +1118,50 @@
                 }
             }
         },
-        "internal_transport_rest.CalculateRequestBody": {
+        "rest.CalculateRequestBody": {
             "type": "object",
             "properties": {
                 "compute": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes"
+                    "$ref": "#/definitions/domain.ComputeAttributes"
                 },
                 "currency": {
                     "type": "string"
                 },
                 "network": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes"
+                    "$ref": "#/definitions/domain.NetworkAttributes"
                 },
                 "region": {
                     "type": "string"
                 },
                 "storage": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes"
+                    "$ref": "#/definitions/domain.StorageAttributes"
                 },
                 "strict_family": {
                     "type": "boolean"
                 }
             }
         },
-        "internal_transport_rest.CalculateResponse": {
+        "rest.CalculateResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.CalculateMeta"
+                    "$ref": "#/definitions/rest.CalculateMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.CalculateProviderResult"
+                        "$ref": "#/definitions/rest.CalculateProviderResult"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.CategoryStatusResponse": {
+        "rest.CategoryStatusResponse": {
             "type": "object",
             "properties": {
                 "category": {
@@ -1199,7 +1169,7 @@
                     "example": "compute"
                 },
                 "dlq": {
-                    "$ref": "#/definitions/internal_transport_rest.DLQStatusResponse"
+                    "$ref": "#/definitions/rest.DLQStatusResponse"
                 },
                 "last_fetched_at": {
                     "type": "string"
@@ -1225,7 +1195,7 @@
                 }
             }
         },
-        "internal_transport_rest.ComputeComparisonMeta": {
+        "rest.ComputeComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1240,27 +1210,27 @@
                 }
             }
         },
-        "internal_transport_rest.ComputeComparisonResponse": {
+        "rest.ComputeComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.ComputeComparisonMeta"
+                    "$ref": "#/definitions/rest.ComputeComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ComputeResultEntry"
+                        "$ref": "#/definitions/rest.ComputeResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.ComputeResultEntry": {
+        "rest.ComputeResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -1273,7 +1243,7 @@
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ComputeAttributes"
+                    "$ref": "#/definitions/domain.ComputeAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -1285,7 +1255,7 @@
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                    "$ref": "#/definitions/rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -1298,7 +1268,7 @@
                 }
             }
         },
-        "internal_transport_rest.DLQStatusResponse": {
+        "rest.DLQStatusResponse": {
             "type": "object",
             "properties": {
                 "consecutive_failures": {
@@ -1318,7 +1288,7 @@
                 }
             }
         },
-        "internal_transport_rest.DatabaseComparisonMeta": {
+        "rest.DatabaseComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1333,27 +1303,27 @@
                 }
             }
         },
-        "internal_transport_rest.DatabaseComparisonResponse": {
+        "rest.DatabaseComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.DatabaseComparisonMeta"
+                    "$ref": "#/definitions/rest.DatabaseComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.DatabaseResultEntry"
+                        "$ref": "#/definitions/rest.DatabaseResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.DatabaseNoSQLComparisonMeta": {
+        "rest.DatabaseNoSQLComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1368,27 +1338,27 @@
                 }
             }
         },
-        "internal_transport_rest.DatabaseNoSQLComparisonResponse": {
+        "rest.DatabaseNoSQLComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.DatabaseNoSQLComparisonMeta"
+                    "$ref": "#/definitions/rest.DatabaseNoSQLComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.DatabaseNoSQLResultEntry"
+                        "$ref": "#/definitions/rest.DatabaseNoSQLResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.DatabaseNoSQLResultEntry": {
+        "rest.DatabaseNoSQLResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -1401,7 +1371,7 @@
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseNoSQLAttributes"
+                    "$ref": "#/definitions/domain.DatabaseNoSQLAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -1413,7 +1383,7 @@
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                    "$ref": "#/definitions/rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -1426,7 +1396,7 @@
                 }
             }
         },
-        "internal_transport_rest.DatabaseResultEntry": {
+        "rest.DatabaseResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -1439,7 +1409,7 @@
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.DatabaseRDBMSAttributes"
+                    "$ref": "#/definitions/domain.DatabaseRDBMSAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -1451,7 +1421,7 @@
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                    "$ref": "#/definitions/rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -1464,7 +1434,7 @@
                 }
             }
         },
-        "internal_transport_rest.KubernetesComparisonMeta": {
+        "rest.KubernetesComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1479,27 +1449,27 @@
                 }
             }
         },
-        "internal_transport_rest.KubernetesComparisonResponse": {
+        "rest.KubernetesComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.KubernetesComparisonMeta"
+                    "$ref": "#/definitions/rest.KubernetesComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.KubernetesResultEntry"
+                        "$ref": "#/definitions/rest.KubernetesResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.KubernetesResultEntry": {
+        "rest.KubernetesResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -1512,7 +1482,7 @@
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.KubernetesAttributes"
+                    "$ref": "#/definitions/domain.KubernetesAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -1524,7 +1494,7 @@
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                    "$ref": "#/definitions/rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -1537,7 +1507,7 @@
                 }
             }
         },
-        "internal_transport_rest.LoginRequest": {
+        "rest.LoginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -1548,7 +1518,7 @@
                 }
             }
         },
-        "internal_transport_rest.LoginResponse": {
+        "rest.LoginResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -1565,7 +1535,7 @@
                 }
             }
         },
-        "internal_transport_rest.LogoutRequest": {
+        "rest.LogoutRequest": {
             "type": "object",
             "properties": {
                 "refresh_token": {
@@ -1573,7 +1543,7 @@
                 }
             }
         },
-        "internal_transport_rest.LogoutResponse": {
+        "rest.LogoutResponse": {
             "type": "object",
             "properties": {
                 "message": {
@@ -1581,7 +1551,7 @@
                 }
             }
         },
-        "internal_transport_rest.NetworkComparisonMeta": {
+        "rest.NetworkComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1596,27 +1566,27 @@
                 }
             }
         },
-        "internal_transport_rest.NetworkComparisonResponse": {
+        "rest.NetworkComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.NetworkComparisonMeta"
+                    "$ref": "#/definitions/rest.NetworkComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.NetworkResultEntry"
+                        "$ref": "#/definitions/rest.NetworkResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.NetworkResultEntry": {
+        "rest.NetworkResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -1629,7 +1599,7 @@
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.NetworkAttributes"
+                    "$ref": "#/definitions/domain.NetworkAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -1641,7 +1611,7 @@
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                    "$ref": "#/definitions/rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -1654,7 +1624,7 @@
                 }
             }
         },
-        "internal_transport_rest.PriceDetail": {
+        "rest.PriceDetail": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1668,13 +1638,13 @@
                 }
             }
         },
-        "internal_transport_rest.ProviderStatusResponse": {
+        "rest.ProviderStatusResponse": {
             "type": "object",
             "properties": {
                 "categories": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/internal_transport_rest.CategoryStatusResponse"
+                        "$ref": "#/definitions/rest.CategoryStatusResponse"
                     }
                 },
                 "last_successful_fetch": {
@@ -1695,12 +1665,12 @@
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderStatusWarningResponse"
+                        "$ref": "#/definitions/rest.ProviderStatusWarningResponse"
                     }
                 }
             }
         },
-        "internal_transport_rest.ProviderStatusWarningResponse": {
+        "rest.ProviderStatusWarningResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -1717,7 +1687,7 @@
                 }
             }
         },
-        "internal_transport_rest.ProviderWarning": {
+        "rest.ProviderWarning": {
             "type": "object",
             "properties": {
                 "code": {
@@ -1731,7 +1701,7 @@
                 }
             }
         },
-        "internal_transport_rest.RefreshRequest": {
+        "rest.RefreshRequest": {
             "type": "object",
             "properties": {
                 "idempotency_key": {
@@ -1742,7 +1712,7 @@
                 }
             }
         },
-        "internal_transport_rest.RefreshResponse": {
+        "rest.RefreshResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -1759,7 +1729,7 @@
                 }
             }
         },
-        "internal_transport_rest.ServerlessComparisonMeta": {
+        "rest.ServerlessComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1774,27 +1744,27 @@
                 }
             }
         },
-        "internal_transport_rest.ServerlessComparisonResponse": {
+        "rest.ServerlessComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.ServerlessComparisonMeta"
+                    "$ref": "#/definitions/rest.ServerlessComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ServerlessResultEntry"
+                        "$ref": "#/definitions/rest.ServerlessResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.ServerlessResultEntry": {
+        "rest.ServerlessResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -1807,7 +1777,7 @@
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.ServerlessRateAttributes"
+                    "$ref": "#/definitions/domain.ServerlessRateAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -1822,7 +1792,7 @@
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                    "$ref": "#/definitions/rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
@@ -1835,7 +1805,7 @@
                 }
             }
         },
-        "internal_transport_rest.SignupRequest": {
+        "rest.SignupRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -1846,7 +1816,7 @@
                 }
             }
         },
-        "internal_transport_rest.SignupResponse": {
+        "rest.SignupResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1860,7 +1830,7 @@
                 }
             }
         },
-        "internal_transport_rest.StorageComparisonMeta": {
+        "rest.StorageComparisonMeta": {
             "type": "object",
             "properties": {
                 "api_version": {
@@ -1875,27 +1845,27 @@
                 }
             }
         },
-        "internal_transport_rest.StorageComparisonResponse": {
+        "rest.StorageComparisonResponse": {
             "type": "object",
             "properties": {
                 "meta": {
-                    "$ref": "#/definitions/internal_transport_rest.StorageComparisonMeta"
+                    "$ref": "#/definitions/rest.StorageComparisonMeta"
                 },
                 "results": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.StorageResultEntry"
+                        "$ref": "#/definitions/rest.StorageResultEntry"
                     }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_transport_rest.ProviderWarning"
+                        "$ref": "#/definitions/rest.ProviderWarning"
                     }
                 }
             }
         },
-        "internal_transport_rest.StorageResultEntry": {
+        "rest.StorageResultEntry": {
             "type": "object",
             "properties": {
                 "fetched_at": {
@@ -1908,7 +1878,7 @@
                     "type": "string"
                 },
                 "matched_spec": {
-                    "$ref": "#/definitions/github_com_thatengineerguy21_CloudVitta_internal_domain.StorageAttributes"
+                    "$ref": "#/definitions/domain.StorageAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
@@ -1920,7 +1890,7 @@
                     "type": "number"
                 },
                 "price": {
-                    "$ref": "#/definitions/internal_transport_rest.PriceDetail"
+                    "$ref": "#/definitions/rest.PriceDetail"
                 },
                 "provider": {
                     "type": "string"
