@@ -11,20 +11,23 @@ definitions:
   domain.DatabaseNoSQLAttributes:
     properties:
       component_type:
-        description: '"throughput", "request_operations", "storage", "composite"'
+        description: '"throughput", "storage", "request_operations"'
         type: string
       data_model:
         description: '"document", "key_value", "wide_column", "graph", "multi_model"'
         type: string
       multi_region:
-        description: Multi-region global replication
+        description: Multi-region replication / global distribution
         type: boolean
       pricing_mode:
         description: '"provisioned", "on_demand", "serverless"'
         type: string
       read_units:
-        description: Read throughput capacity (reads/sec or RCU)
+        description: Provisioned reads/sec (RCU/RU/s) or request rate
         type: number
+      replication_zones:
+        description: 'Number of replica regions (default: 1)'
+        type: integer
       storage_class:
         description: '"standard", "infrequent_access", "analytical"'
         type: string
@@ -32,7 +35,7 @@ definitions:
         description: Storage capacity in GiB
         type: number
       write_units:
-        description: Write throughput capacity (writes/sec or WCU)
+        description: Provisioned writes/sec (WCU/RU/s) or request rate
         type: number
     type: object
   domain.DatabaseRDBMSAttributes:
@@ -275,31 +278,6 @@ definitions:
           $ref: '#/definitions/rest.ProviderWarning'
         type: array
     type: object
-  rest.DatabaseResultEntry:
-    properties:
-      fetched_at:
-        type: string
-      match_delta_pct:
-        type: number
-      match_quality:
-        type: string
-      matched_spec:
-        $ref: '#/definitions/domain.DatabaseRDBMSAttributes'
-      missing_attributes:
-        items:
-          type: string
-        type: array
-      normalized_hourly_usd:
-        type: number
-      price:
-        $ref: '#/definitions/rest.PriceDetail'
-      provider:
-        type: string
-      sku_id:
-        type: string
-      stale:
-        type: boolean
-    type: object
   rest.DatabaseNoSQLComparisonMeta:
     properties:
       api_version:
@@ -333,6 +311,31 @@ definitions:
         type: string
       matched_spec:
         $ref: '#/definitions/domain.DatabaseNoSQLAttributes'
+      missing_attributes:
+        items:
+          type: string
+        type: array
+      normalized_hourly_usd:
+        type: number
+      price:
+        $ref: '#/definitions/rest.PriceDetail'
+      provider:
+        type: string
+      sku_id:
+        type: string
+      stale:
+        type: boolean
+    type: object
+  rest.DatabaseResultEntry:
+    properties:
+      fetched_at:
+        type: string
+      match_delta_pct:
+        type: number
+      match_quality:
+        type: string
+      matched_spec:
+        $ref: '#/definitions/domain.DatabaseRDBMSAttributes'
       missing_attributes:
         items:
           type: string
@@ -874,11 +877,13 @@ paths:
       description: Returns normalized NoSQL database pricing across cloud providers
         (AWS DynamoDB, Azure Cosmos DB, GCP Firestore) for requested specs.
       parameters:
-      - description: Requested NoSQL data model (e.g. document, key_value, wide_column, graph)
+      - description: Requested NoSQL data model (e.g. document, key_value, wide_column,
+          graph)
         in: query
         name: data_model
         type: string
-      - description: 'Requested pricing mode (provisioned, on_demand, serverless; default: provisioned)'
+      - description: 'Requested pricing mode (provisioned, on_demand, serverless;
+          default: provisioned)'
         in: query
         name: pricing_mode
         type: string

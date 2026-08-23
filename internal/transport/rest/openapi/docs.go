@@ -763,7 +763,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "component_type": {
-                    "description": "\"throughput\", \"request_operations\", \"storage\", \"composite\"",
+                    "description": "\"throughput\", \"storage\", \"request_operations\"",
                     "type": "string"
                 },
                 "data_model": {
@@ -771,7 +771,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "multi_region": {
-                    "description": "Multi-region global replication",
+                    "description": "Multi-region replication / global distribution",
                     "type": "boolean"
                 },
                 "pricing_mode": {
@@ -779,8 +779,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "read_units": {
-                    "description": "Read throughput capacity (reads/sec or RCU)",
+                    "description": "Provisioned reads/sec (RCU/RU/s) or request rate",
                     "type": "number"
+                },
+                "replication_zones": {
+                    "description": "Number of replica regions (default: 1)",
+                    "type": "integer"
                 },
                 "storage_class": {
                     "description": "\"standard\", \"infrequent_access\", \"analytical\"",
@@ -791,7 +795,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "write_units": {
-                    "description": "Write throughput capacity (writes/sec or WCU)",
+                    "description": "Provisioned writes/sec (WCU/RU/s) or request rate",
                     "type": "number"
                 }
             }
@@ -1151,44 +1155,6 @@ const docTemplate = `{
                 }
             }
         },
-        "rest.DatabaseResultEntry": {
-            "type": "object",
-            "properties": {
-                "fetched_at": {
-                    "type": "string"
-                },
-                "match_delta_pct": {
-                    "type": "number"
-                },
-                "match_quality": {
-                    "type": "string"
-                },
-                "matched_spec": {
-                    "$ref": "#/definitions/domain.DatabaseRDBMSAttributes"
-                },
-                "missing_attributes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "normalized_hourly_usd": {
-                    "type": "number"
-                },
-                "price": {
-                    "$ref": "#/definitions/rest.PriceDetail"
-                },
-                "provider": {
-                    "type": "string"
-                },
-                "sku_id": {
-                    "type": "string"
-                },
-                "stale": {
-                    "type": "boolean"
-                }
-            }
-        },
         "rest.DatabaseNoSQLComparisonMeta": {
             "type": "object",
             "properties": {
@@ -1238,6 +1204,44 @@ const docTemplate = `{
                 },
                 "matched_spec": {
                     "$ref": "#/definitions/domain.DatabaseNoSQLAttributes"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
+                "price": {
+                    "$ref": "#/definitions/rest.PriceDetail"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "rest.DatabaseResultEntry": {
+            "type": "object",
+            "properties": {
+                "fetched_at": {
+                    "type": "string"
+                },
+                "match_delta_pct": {
+                    "type": "number"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "matched_spec": {
+                    "$ref": "#/definitions/domain.DatabaseRDBMSAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",
