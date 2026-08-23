@@ -10,12 +10,26 @@ This guide provides step-by-step instructions to provision required external ser
 Before starting, ensure the following tools are installed on your development machine:
 - **Go**: Version `1.26+` installed and available in `$PATH`.
 - **Git**: Installed for version control.
+- **Task Runner (`task`)**: Version `3+` for running project commands.
 - **Tern Migration Tool**: Install via Go:
   ```bash
   go install github.com/jackc/tern/v2@latest
   ```
 - **Google Cloud SDK (`gcloud`)**: Installed for local GCS authentication.
 - **golangci-lint**: Installed for static code analysis.
+
+### Common Task Commands
+- `task`: List all available project commands.
+- `task build`: Build all binaries (`api`, `ingest`, `migrate`, `quarantine-digest`).
+- `task dev:api`: Start API server locally.
+- `task dev:ingest`: Run ingestion job once locally.
+- `task test`: Run test suite with race detector (`go test -race ./...`).
+- `task test:fast`: Run test suite quickly without race detector.
+- `task lint`: Run formatting check and `go vet`.
+- `task fmt`: Auto-format all Go source files.
+- `task swagger`: Regenerate OpenAPI Swagger documentation.
+- `task sqlc`: Regenerate type-safe SQL store queries via SQLC.
+- `task db:migrate`: Run database migrations forward.
 
 ---
 
@@ -162,6 +176,8 @@ The orchestrator concurrently fetches pricing data from all registered provider/
 | `/api/v1/prices/compute` | `GET` | Compute pricing lookup & SKU comparison endpoint |
 | `/api/v1/prices/storage` | `GET` | Storage pricing lookup & cost comparison endpoint |
 | `/api/v1/prices/network` | `GET` | Network pricing lookup & egress cost comparison endpoint |
+| `/api/v1/prices/database` | `GET` | Relational database (RDBMS) pricing comparison endpoint |
+| `/api/v1/prices/database-nosql` | `GET` | NoSQL database pricing comparison endpoint |
 | `/api/v1/calculate` | `POST` | Composite multi-category workload total, server-computed |
 | `/api/v1/providers/{provider}/status` | `GET` | Provider operational status, category data age, and DLQ state |
 | `/api/v1/auth/signup` | `POST` | User registration endpoint (returns user details) |
