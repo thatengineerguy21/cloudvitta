@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,10 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/mcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
 )
+
+func ptrDecimal(d decimal.Decimal) *decimal.Decimal {
+	return &d
+}
 
 // --- Mock Querier & DLQ Harness ---
 
@@ -1001,6 +1006,339 @@ func seedContractServerlessObservations(ctx context.Context, t *testing.T, rdb *
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "serverless", "us-east4"), gcpObs, cache.DefaultTTL)
 }
 
+func seedContractDatabaseObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
+	t.Helper()
+
+	awsRegionGroup, err := regionmap.MapRegion("aws", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(aws, us-east-1) failed: %v", err)
+	}
+	azureRegionGroup, err := regionmap.MapRegion("azure", "eastus")
+	if err != nil {
+		t.Fatalf("MapRegion(azure, eastus) failed: %v", err)
+	}
+	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
+	if err != nil {
+		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-AWS-RDS-PG-4VCORE",
+			DisplayName:     "db.m5.xlarge PostgreSQL",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.2600"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			PricingModel:    "OnDemand",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-AWS-RDS-STORAGE-GP3",
+			DisplayName:     "General Purpose SSD (gp3)",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.1150"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			PricingModel:    "OnDemand",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "any",
+				StorageGB:     1,
+				StorageFamily: "gp3",
+				ComponentType: "storage",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	azureObs := []domain.PriceObservation{
+		{
+			Provider:        "azure",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-AZ-PG-FLEX-4VCORE",
+			DisplayName:     "Standard_D4ds_v5 PostgreSQL",
+			Region:          "eastus",
+			RegionGroup:     azureRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.2800"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			PricingModel:    "OnDemand",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "azure",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-AZ-PG-STORAGE-SSD",
+			DisplayName:     "Managed Disk SSD",
+			Region:          "eastus",
+			RegionGroup:     azureRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.1150"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			PricingModel:    "OnDemand",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "any",
+				StorageGB:     1,
+				StorageFamily: "ssd",
+				ComponentType: "storage",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	gcpObs := []domain.PriceObservation{
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-GCP-SQL-PG-4VCORE",
+			DisplayName:     "Cloud SQL PostgreSQL Custom 4 vCPU 16GB",
+			Region:          "us-east4",
+			RegionGroup:     gcpRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.3000"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			PricingModel:    "OnDemand",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-GCP-SQL-STORAGE-SSD",
+			DisplayName:     "Cloud SQL Storage SSD",
+			Region:          "us-east4",
+			RegionGroup:     gcpRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.1700"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			PricingModel:    "OnDemand",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "any",
+				StorageGB:     1,
+				StorageFamily: "ssd",
+				ComponentType: "storage",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_rdbms", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "database_rdbms", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "database_rdbms", "us-east4"), gcpObs, cache.DefaultTTL)
+}
+
+func seedContractDatabaseNoSQLObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
+	t.Helper()
+
+	awsRegionGroup, err := regionmap.MapRegion("aws", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(aws, us-east-1) failed: %v", err)
+	}
+	azureRegionGroup, err := regionmap.MapRegion("azure", "eastus")
+	if err != nil {
+		t.Fatalf("MapRegion(azure, eastus) failed: %v", err)
+	}
+	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
+	if err != nil {
+		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-READ",
+			DisplayName:     "DynamoDB Read Capacity Unit",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.00013"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				ReadUnits:     1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-WRITE",
+			DisplayName:     "DynamoDB Write Capacity Unit",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.00065"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				WriteUnits:    1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-STORAGE",
+			DisplayName:     "DynamoDB Standard Storage",
+			Region:          "us-east-1",
+			RegionGroup:     awsRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.2500"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				StorageGB:     1,
+				StorageClass:  "standard",
+				ComponentType: "storage",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	azureObs := []domain.PriceObservation{
+		{
+			Provider:        "azure",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AZ-COSMOS-RU",
+			DisplayName:     "Cosmos DB 100 RU/s",
+			Region:          "eastus",
+			RegionGroup:     azureRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.0080"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				ReadUnits:     100,
+				WriteUnits:    100,
+				ComponentType: "throughput",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "azure",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AZ-COSMOS-STORAGE",
+			DisplayName:     "Cosmos DB Standard Storage",
+			Region:          "eastus",
+			RegionGroup:     azureRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.2500"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				StorageGB:     1,
+				StorageClass:  "standard",
+				ComponentType: "storage",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	gcpObs := []domain.PriceObservation{
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-GCP-FIRESTORE-READ",
+			DisplayName:     "Firestore Document Reads",
+			Region:          "us-east4",
+			RegionGroup:     gcpRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.0300"),
+			PriceCurrency:   "USD",
+			Unit:            "100k-ops",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "on_demand",
+				ReadUnits:     100000,
+				ComponentType: "throughput",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-GCP-FIRESTORE-WRITE",
+			DisplayName:     "Firestore Document Writes",
+			Region:          "us-east4",
+			RegionGroup:     gcpRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.0900"),
+			PriceCurrency:   "USD",
+			Unit:            "100k-ops",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "on_demand",
+				WriteUnits:    100000,
+				ComponentType: "throughput",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-GCP-FIRESTORE-STORAGE",
+			DisplayName:     "Firestore Storage",
+			Region:          "us-east4",
+			RegionGroup:     gcpRegionGroup,
+			PriceAmount:     decimal.RequireFromString("0.1800"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			PricingModel:    "OnDemand",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "on_demand",
+				StorageGB:     1,
+				StorageClass:  "standard",
+				ComponentType: "storage",
+			},
+			FetchedAt: baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_nosql", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "database_nosql", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "database_nosql", "us-east4"), gcpObs, cache.DefaultTTL)
+}
+
 // --- Asymmetric Invocation Helpers ---
 
 func invokeREST[T any](t *testing.T, handler http.Handler, method, target string, body any, bearerToken string) (T, int, string) {
@@ -1269,6 +1607,116 @@ func assertNetworkParity(t *testing.T, restResp rest.NetworkComparisonResponse, 
 	}
 
 	assertWarningsParity(t, "network", restResp.Warnings, mcpResp.Warnings)
+}
+
+func assertDatabaseParity(t *testing.T, restResp rest.DatabaseComparisonResponse, mcpResp mcp.DatabaseComparisonResponse) {
+	t.Helper()
+
+	if len(restResp.Results) != len(mcpResp.Results) {
+		t.Fatalf("result count mismatch: REST=%d, MCP=%d", len(restResp.Results), len(mcpResp.Results))
+	}
+
+	for i := range restResp.Results {
+		restItem := restResp.Results[i]
+		mcpItem := mcpResp.Results[i]
+
+		if restItem.Provider != mcpItem.Provider {
+			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, restItem.Provider, mcpItem.Provider)
+		}
+		if restItem.SkuID != mcpItem.SkuID {
+			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.SkuID, mcpItem.SkuID)
+		}
+		if restItem.MatchedSpec != mcpItem.MatchedSpec {
+			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, restItem.Provider, restItem.MatchedSpec, mcpItem.MatchedSpec)
+		}
+		if restItem.MatchQuality != mcpItem.MatchQuality {
+			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MatchQuality, mcpItem.MatchQuality)
+		}
+		if math.Abs(restItem.MatchDeltaPct-mcpItem.MatchDeltaPct) > 0.0001 {
+			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, restItem.Provider, restItem.MatchDeltaPct, mcpItem.MatchDeltaPct)
+		}
+		if !reflect.DeepEqual(restItem.MissingAttributes, mcpItem.MissingAttributes) {
+			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.MissingAttributes, mcpItem.MissingAttributes)
+		}
+		if !restItem.Price.Amount.Equal(mcpItem.Price.Amount) {
+			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Amount, mcpItem.Price.Amount)
+		}
+		if restItem.Price.Unit != mcpItem.Price.Unit {
+			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Unit, mcpItem.Price.Unit)
+		}
+		if restItem.Price.Currency != mcpItem.Price.Currency {
+			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Currency, mcpItem.Price.Currency)
+		}
+		if !restItem.NormalizedHourlyUSD.Equal(mcpItem.NormalizedHourlyUSD) {
+			t.Errorf("item[%d] normalized_hourly_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.NormalizedHourlyUSD, mcpItem.NormalizedHourlyUSD)
+		}
+		if restItem.NormalizedHourlyUSD.IsZero() {
+			t.Errorf("item[%d] normalized_hourly_usd is zero for %s (loud typo guard)", i, restItem.Provider)
+		}
+		if restItem.Stale != mcpItem.Stale {
+			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.Stale, mcpItem.Stale)
+		}
+		if !restItem.FetchedAt.Equal(mcpItem.FetchedAt) {
+			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.FetchedAt, mcpItem.FetchedAt)
+		}
+	}
+
+	assertWarningsParity(t, "database_rdbms", restResp.Warnings, mcpResp.Warnings)
+}
+
+func assertDatabaseNoSQLParity(t *testing.T, restResp rest.DatabaseNoSQLComparisonResponse, mcpResp mcp.DatabaseNoSQLComparisonResponse) {
+	t.Helper()
+
+	if len(restResp.Results) != len(mcpResp.Results) {
+		t.Fatalf("result count mismatch: REST=%d, MCP=%d", len(restResp.Results), len(mcpResp.Results))
+	}
+
+	for i := range restResp.Results {
+		restItem := restResp.Results[i]
+		mcpItem := mcpResp.Results[i]
+
+		if restItem.Provider != mcpItem.Provider {
+			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, restItem.Provider, mcpItem.Provider)
+		}
+		if restItem.SkuID != mcpItem.SkuID {
+			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.SkuID, mcpItem.SkuID)
+		}
+		if restItem.MatchedSpec != mcpItem.MatchedSpec {
+			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, restItem.Provider, restItem.MatchedSpec, mcpItem.MatchedSpec)
+		}
+		if restItem.MatchQuality != mcpItem.MatchQuality {
+			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MatchQuality, mcpItem.MatchQuality)
+		}
+		if math.Abs(restItem.MatchDeltaPct-mcpItem.MatchDeltaPct) > 0.0001 {
+			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, restItem.Provider, restItem.MatchDeltaPct, mcpItem.MatchDeltaPct)
+		}
+		if !reflect.DeepEqual(restItem.MissingAttributes, mcpItem.MissingAttributes) {
+			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.MissingAttributes, mcpItem.MissingAttributes)
+		}
+		if !restItem.Price.Amount.Equal(mcpItem.Price.Amount) {
+			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Amount, mcpItem.Price.Amount)
+		}
+		if restItem.Price.Unit != mcpItem.Price.Unit {
+			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Unit, mcpItem.Price.Unit)
+		}
+		if restItem.Price.Currency != mcpItem.Price.Currency {
+			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Currency, mcpItem.Price.Currency)
+		}
+		if !restItem.NormalizedHourlyUSD.Equal(mcpItem.NormalizedHourlyUSD) {
+			t.Errorf("item[%d] normalized_hourly_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.NormalizedHourlyUSD, mcpItem.NormalizedHourlyUSD)
+		}
+		if restItem.NormalizedHourlyUSD.IsZero() {
+			t.Errorf("item[%d] normalized_hourly_usd is zero for %s (loud typo guard)", i, restItem.Provider)
+		}
+		if restItem.Stale != mcpItem.Stale {
+			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.Stale, mcpItem.Stale)
+		}
+		if !restItem.FetchedAt.Equal(mcpItem.FetchedAt) {
+			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.FetchedAt, mcpItem.FetchedAt)
+		}
+	}
+
+	assertWarningsParity(t, "database_nosql", restResp.Warnings, mcpResp.Warnings)
 }
 
 func assertKubernetesParity(t *testing.T, restResp rest.KubernetesComparisonResponse, mcpResp mcp.KubernetesComparisonResponse) {
@@ -2036,6 +2484,255 @@ func TestContractParity_Network(t *testing.T) {
 	})
 }
 
+// Database (RDBMS) Contract Parity Suite
+func TestContractParity_Database(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractDatabaseObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	t.Run("PostgreSQLMatch", func(t *testing.T) {
+		engine := "postgresql"
+		vcpu := 4.0
+		ramGB := 16.0
+		storageGB := 100.0
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.DatabaseComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/database?engine=%s&vcpu=%.0f&ram_gb=%.0f&storage_gb=%.0f&region=%s", engine, vcpu, ramGB, storageGB, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.DatabaseComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_database",
+			mcp.CompareDatabaseInput{
+				Engine:    engine,
+				VCPU:      &vcpu,
+				RAMGB:     &ramGB,
+				StorageGB: &storageGB,
+				Region:    region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertDatabaseParity(t, restResp, mcpResp)
+	})
+
+	t.Run("MultiAZDeployment", func(t *testing.T) {
+		engine := "postgresql"
+		vcpu := 4.0
+		ramGB := 16.0
+		storageGB := 100.0
+		multiAZ := true
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.DatabaseComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/database?engine=%s&vcpu=%.0f&ram_gb=%.0f&storage_gb=%.0f&multi_az=true&region=%s", engine, vcpu, ramGB, storageGB, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.DatabaseComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_database",
+			mcp.CompareDatabaseInput{
+				Engine:    engine,
+				VCPU:      &vcpu,
+				RAMGB:     &ramGB,
+				StorageGB: &storageGB,
+				MultiAZ:   &multiAZ,
+				Region:    region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertDatabaseParity(t, restResp, mcpResp)
+	})
+
+	t.Run("EngineMismatchExclusions", func(t *testing.T) {
+		engine := "mysql"
+		vcpu := 4.0
+		ramGB := 16.0
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.DatabaseComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/database?engine=%s&vcpu=%.0f&ram_gb=%.0f&region=%s", engine, vcpu, ramGB, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.DatabaseComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_database",
+			mcp.CompareDatabaseInput{
+				Engine: engine,
+				VCPU:   &vcpu,
+				RAMGB:  &ramGB,
+				Region: region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertDatabaseParity(t, restResp, mcpResp)
+
+		// Assert engine mismatch warning exists on both
+		hasEngineMismatch := false
+		for _, w := range restResp.Warnings {
+			if w.Code == "engine_mismatch_excluded" {
+				hasEngineMismatch = true
+				break
+			}
+		}
+		if !hasEngineMismatch {
+			t.Error("expected engine_mismatch_excluded warning in response")
+		}
+	})
+
+	t.Run("ValidationRejection", func(t *testing.T) {
+		// Invalid engine
+		_, codeEngine, _ := invokeREST[rest.DatabaseComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/database?engine=unsupported_engine", nil, harness.bearerToken)
+		if codeEngine != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for unsupported engine, got %d", codeEngine)
+		}
+
+		_, errMCPEngine := invokeMCP[mcp.DatabaseComparisonResponse](ctx, t, harness.mcpClient, "compare_database", mcp.CompareDatabaseInput{Engine: "unsupported_engine"})
+		if errMCPEngine == nil {
+			t.Error("expected MCP error for unsupported engine, got nil")
+		}
+
+		// Negative vCPU
+		_, codeVCPU, _ := invokeREST[rest.DatabaseComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/database?vcpu=-2", nil, harness.bearerToken)
+		if codeVCPU != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for negative vCPU, got %d", codeVCPU)
+		}
+
+		negVCPU := -2.0
+		_, errMCPVCPU := invokeMCP[mcp.DatabaseComparisonResponse](ctx, t, harness.mcpClient, "compare_database", mcp.CompareDatabaseInput{VCPU: &negVCPU})
+		if errMCPVCPU == nil {
+			t.Error("expected MCP error for negative vCPU, got nil")
+		}
+	})
+}
+
+// Database NoSQL Contract Parity Suite
+func TestContractParity_DatabaseNoSQL(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractDatabaseNoSQLObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	t.Run("DocumentModelProvisioned", func(t *testing.T) {
+		model := "document"
+		mode := "provisioned"
+		readUnits := 100.0
+		writeUnits := 20.0
+		storageGB := 50.0
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.DatabaseNoSQLComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/database-nosql?data_model=%s&pricing_mode=%s&read_units=%.0f&write_units=%.0f&storage_gb=%.0f&region=%s", model, mode, readUnits, writeUnits, storageGB, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.DatabaseNoSQLComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_database_nosql",
+			mcp.CompareDatabaseNoSQLInput{
+				DataModel:   model,
+				PricingMode: mode,
+				ReadUnits:   &readUnits,
+				WriteUnits:  &writeUnits,
+				StorageGB:   &storageGB,
+				Region:      region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertDatabaseNoSQLParity(t, restResp, mcpResp)
+	})
+
+	t.Run("FirestoreOnDemandThroughput", func(t *testing.T) {
+		model := "document"
+		mode := "on_demand"
+		readUnits := 50000.0
+		writeUnits := 10000.0
+		storageGB := 20.0
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.DatabaseNoSQLComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/database-nosql?data_model=%s&pricing_mode=%s&read_units=%.0f&write_units=%.0f&storage_gb=%.0f&region=%s", model, mode, readUnits, writeUnits, storageGB, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.DatabaseNoSQLComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_database_nosql",
+			mcp.CompareDatabaseNoSQLInput{
+				DataModel:   model,
+				PricingMode: mode,
+				ReadUnits:   &readUnits,
+				WriteUnits:  &writeUnits,
+				StorageGB:   &storageGB,
+				Region:      region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertDatabaseNoSQLParity(t, restResp, mcpResp)
+	})
+
+	t.Run("ValidationRejection", func(t *testing.T) {
+		// Invalid data model
+		_, codeModel, _ := invokeREST[rest.DatabaseNoSQLComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/database-nosql?data_model=unsupported_model", nil, harness.bearerToken)
+		if codeModel != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for unsupported data model, got %d", codeModel)
+		}
+
+		_, errMCPModel := invokeMCP[mcp.DatabaseNoSQLComparisonResponse](ctx, t, harness.mcpClient, "compare_database_nosql", mcp.CompareDatabaseNoSQLInput{DataModel: "unsupported_model"})
+		if errMCPModel == nil {
+			t.Error("expected MCP error for unsupported data model, got nil")
+		}
+
+		// Negative read units
+		_, codeReads, _ := invokeREST[rest.DatabaseNoSQLComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/database-nosql?read_units=-5", nil, harness.bearerToken)
+		if codeReads != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for negative read_units, got %d", codeReads)
+		}
+
+		negReads := -5.0
+		_, errMCPReads := invokeMCP[mcp.DatabaseNoSQLComparisonResponse](ctx, t, harness.mcpClient, "compare_database_nosql", mcp.CompareDatabaseNoSQLInput{ReadUnits: &negReads})
+		if errMCPReads == nil {
+			t.Error("expected MCP error for negative read_units, got nil")
+		}
+	})
+}
+
 // 5. Kubernetes Contract Parity Suite
 func TestContractParity_Kubernetes(t *testing.T) {
 	harness := setupContractParityTest(t)
@@ -2427,8 +3124,16 @@ func TestContractParity_Calculate(t *testing.T) {
 	seedContractComputeObservations(ctx, t, harness.rdb, harness.fixedNow)
 	seedContractStorageObservations(ctx, t, harness.rdb, harness.fixedNow)
 	seedContractNetworkObservations(ctx, t, harness.rdb, harness.fixedNow)
+	seedContractDatabaseObservations(ctx, t, harness.rdb, harness.fixedNow)
+	seedContractDatabaseNoSQLObservations(ctx, t, harness.rdb, harness.fixedNow)
+	seedContractKubernetesObservations(ctx, t, harness.rdb, harness.fixedNow)
+	seedContractServerlessObservations(ctx, t, harness.rdb, harness.fixedNow)
 
 	t.Run("CompleteWorkloadAllCategories", func(t *testing.T) {
+		reqPerMonth := 5000000.0
+		memMB := 512.0
+		durMS := 200.0
+
 		restReq := rest.CalculateRequestBody{
 			Region: "us-east",
 			Compute: &domain.ComputeAttributes{
@@ -2443,6 +3148,29 @@ func TestContractParity_Calculate(t *testing.T) {
 			Network: &domain.NetworkAttributes{
 				EgressGB:     50,
 				TransferType: "internet_egress",
+			},
+			DatabaseRDBMS: &domain.DatabaseRDBMSAttributes{
+				Engine:    "postgresql",
+				VCPU:      4,
+				RAMGB:     16,
+				StorageGB: 100,
+			},
+			DatabaseNoSQL: &domain.DatabaseNoSQLAttributes{
+				DataModel:   "document",
+				PricingMode: "provisioned",
+				ReadUnits:   100,
+				WriteUnits:  20,
+				StorageGB:   50,
+			},
+			Kubernetes: &domain.KubernetesAttributes{
+				Tier: domain.KubernetesTierStandard,
+			},
+			Serverless: &rest.ServerlessWorkloadPayload{
+				Architecture:        "x86_64",
+				Tier:                "consumption",
+				RequestsPerMonth:    ptrDecimal(decimal.NewFromFloat(reqPerMonth)),
+				MemoryMB:            ptrDecimal(decimal.NewFromFloat(memMB)),
+				ExecutionDurationMS: ptrDecimal(decimal.NewFromFloat(durMS)),
 			},
 		}
 
@@ -2468,6 +3196,29 @@ func TestContractParity_Calculate(t *testing.T) {
 				EgressGB:     50,
 				TransferType: "internet_egress",
 			},
+			DatabaseRDBMS: &mcp.DatabaseRequirements{
+				Engine:    "postgresql",
+				VCPU:      4,
+				RAMGB:     16,
+				StorageGB: 100,
+			},
+			DatabaseNoSQL: &mcp.DatabaseNoSQLRequirements{
+				DataModel:   "document",
+				PricingMode: "provisioned",
+				ReadUnits:   100,
+				WriteUnits:  20,
+				StorageGB:   50,
+			},
+			Kubernetes: &mcp.KubernetesRequirements{
+				Tier: "standard",
+			},
+			Serverless: &mcp.ServerlessRequirements{
+				Architecture:        "x86_64",
+				Tier:                "consumption",
+				RequestsPerMonth:    &reqPerMonth,
+				MemoryMB:            &memMB,
+				ExecutionDurationMS: &durMS,
+			},
 		}
 
 		mcpResp, err := invokeMCP[mcp.CalculateResponse](
@@ -2478,6 +3229,16 @@ func TestContractParity_Calculate(t *testing.T) {
 		}
 
 		assertCalculateParity(t, restResp, mcpResp)
+
+		// Assert all 7 categories are returned for each provider
+		for _, pr := range restResp.Results {
+			if len(pr.Categories) != 7 {
+				t.Errorf("provider %s: expected 7 categories in complete workload, got %d", pr.Provider, len(pr.Categories))
+			}
+			if pr.Partial {
+				t.Errorf("provider %s: expected partial=false, got partial=true", pr.Provider)
+			}
+		}
 	})
 
 	t.Run("ADR0022PartialWorkloadHonesty", func(t *testing.T) {
@@ -2574,6 +3335,36 @@ func TestContractParity_Calculate(t *testing.T) {
 		assertCalculateParity(t, restResp, mcpResp)
 	})
 
+	t.Run("AliasConflictValidation", func(t *testing.T) {
+		conflictREST := rest.CalculateRequestBody{
+			Region: "us-east",
+			Database: &domain.DatabaseRDBMSAttributes{
+				Engine: "postgresql", VCPU: 2, RAMGB: 4, StorageGB: 100,
+			},
+			DatabaseRDBMS: &domain.DatabaseRDBMSAttributes{
+				Engine: "mysql", VCPU: 4, RAMGB: 16, StorageGB: 200,
+			},
+		}
+		_, codeConflictREST, bodyConflictREST := invokeREST[rest.CalculateResponse](t, harness.restRouter, http.MethodPost, "/api/v1/calculate", conflictREST, harness.bearerToken)
+		if codeConflictREST != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for conflicting database aliases, got %d: %s", codeConflictREST, bodyConflictREST)
+		}
+
+		conflictMCP := mcp.CalculateWorkloadInput{
+			Region: "us-east",
+			Database: &mcp.DatabaseRequirements{
+				Engine: "postgresql", VCPU: 2, RAMGB: 4, StorageGB: 100,
+			},
+			DatabaseRDBMS: &mcp.DatabaseRequirements{
+				Engine: "mysql", VCPU: 4, RAMGB: 16, StorageGB: 200,
+			},
+		}
+		_, errConflictMCP := invokeMCP[mcp.CalculateResponse](ctx, t, harness.mcpClient, "calculate_workload", conflictMCP)
+		if errConflictMCP == nil {
+			t.Error("expected MCP error for conflicting database aliases, got nil")
+		}
+	})
+
 	t.Run("EmptyRequestRejection", func(t *testing.T) {
 		emptyRest := rest.CalculateRequestBody{Region: "us-east"}
 		_, codeREST, _ := invokeREST[rest.CalculateResponse](t, harness.restRouter, http.MethodPost, "/api/v1/calculate", emptyRest, harness.bearerToken)
@@ -2587,6 +3378,288 @@ func TestContractParity_Calculate(t *testing.T) {
 			t.Error("expected MCP tool error for empty calculate request, got nil")
 		}
 	})
+}
+
+// 7. Standalone vs Composite Parity Tests
+func TestContractParity_StandaloneVsComposite_RDBMSMismatchWarning(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractDatabaseObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	// Standalone compare query for mysql (only postgresql is seeded)
+	standaloneResp, code, body := invokeREST[rest.DatabaseComparisonResponse](
+		t, harness.restRouter, http.MethodGet,
+		"/api/v1/prices/database?engine=mysql&vcpu=4&ram_gb=16&storage_gb=100&region=us-east",
+		nil, harness.bearerToken,
+	)
+	if code != http.StatusOK {
+		t.Fatalf("standalone database compare failed: %d: %s", code, body)
+	}
+
+	// Composite calculate query with mysql
+	calcReq := rest.CalculateRequestBody{
+		Region: "us-east",
+		DatabaseRDBMS: &domain.DatabaseRDBMSAttributes{
+			Engine:    "mysql",
+			VCPU:      4,
+			RAMGB:     16,
+			StorageGB: 100,
+		},
+	}
+	calcResp, codeCalc, bodyCalc := invokeREST[rest.CalculateResponse](
+		t, harness.restRouter, http.MethodPost, "/api/v1/calculate", calcReq, harness.bearerToken,
+	)
+	if codeCalc != http.StatusOK {
+		t.Fatalf("composite calculate failed: %d: %s", codeCalc, bodyCalc)
+	}
+
+	// Assert standalone emitted engine_mismatch_excluded
+	var standaloneWarningCodes []string
+	for _, w := range standaloneResp.Warnings {
+		standaloneWarningCodes = append(standaloneWarningCodes, w.Code)
+	}
+
+	var compositeWarningCodes []string
+	for _, w := range calcResp.Warnings {
+		compositeWarningCodes = append(compositeWarningCodes, w.Code)
+	}
+
+	hasMismatchStandalone := false
+	for _, c := range standaloneWarningCodes {
+		if c == "engine_mismatch_excluded" {
+			hasMismatchStandalone = true
+			break
+		}
+	}
+	if !hasMismatchStandalone {
+		t.Errorf("standalone database expected engine_mismatch_excluded warning, got: %v", standaloneWarningCodes)
+	}
+
+	hasMismatchComposite := false
+	for _, c := range compositeWarningCodes {
+		if c == "engine_mismatch_excluded" {
+			hasMismatchComposite = true
+			break
+		}
+	}
+	if !hasMismatchComposite {
+		t.Errorf("composite calculate expected engine_mismatch_excluded warning, got: %v", compositeWarningCodes)
+	}
+}
+
+func TestContractParity_StandaloneVsComposite_NoSQLThroughputAndStorage(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractDatabaseNoSQLObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	// Standalone compare NoSQL query
+	standaloneResp, code, body := invokeREST[rest.DatabaseNoSQLComparisonResponse](
+		t, harness.restRouter, http.MethodGet,
+		"/api/v1/prices/database-nosql?data_model=document&pricing_mode=provisioned&read_units=100&write_units=20&storage_gb=50&region=us-east",
+		nil, harness.bearerToken,
+	)
+	if code != http.StatusOK {
+		t.Fatalf("standalone database-nosql compare failed: %d: %s", code, body)
+	}
+
+	// Composite calculate query
+	calcReq := rest.CalculateRequestBody{
+		Region: "us-east",
+		DatabaseNoSQL: &domain.DatabaseNoSQLAttributes{
+			DataModel:   "document",
+			PricingMode: "provisioned",
+			ReadUnits:   100,
+			WriteUnits:  20,
+			StorageGB:   50,
+		},
+	}
+	calcResp, codeCalc, bodyCalc := invokeREST[rest.CalculateResponse](
+		t, harness.restRouter, http.MethodPost, "/api/v1/calculate", calcReq, harness.bearerToken,
+	)
+	if codeCalc != http.StatusOK {
+		t.Fatalf("composite calculate failed: %d: %s", codeCalc, bodyCalc)
+	}
+
+	standaloneMap := make(map[string]rest.DatabaseNoSQLResultEntry)
+	for _, r := range standaloneResp.Results {
+		standaloneMap[r.Provider] = r
+	}
+
+	for _, cr := range calcResp.Results {
+		stResult, ok := standaloneMap[cr.Provider]
+		if !ok {
+			t.Fatalf("provider %s in composite calculate missing from standalone", cr.Provider)
+		}
+		catRes, hasCat := cr.Categories["database_nosql"]
+		if !hasCat {
+			t.Fatalf("provider %s missing database_nosql in composite calculate", cr.Provider)
+		}
+
+		if catRes.SkuID != stResult.SkuID {
+			t.Errorf("provider %s sku_id mismatch: composite=%s, standalone=%s", cr.Provider, catRes.SkuID, stResult.SkuID)
+		}
+		if !catRes.NormalizedHourlyUSD.Equal(stResult.NormalizedHourlyUSD) {
+			t.Errorf("provider %s cost mismatch: composite=%s, standalone=%s", cr.Provider, catRes.NormalizedHourlyUSD, stResult.NormalizedHourlyUSD)
+		}
+	}
+}
+
+func TestContractParity_StandaloneVsComposite_KubernetesUnspecifiedTopologyWarning(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractKubernetesObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	// Standalone compare with omitted cluster_topology
+	standaloneResp, code, body := invokeREST[rest.KubernetesComparisonResponse](
+		t, harness.restRouter, http.MethodGet,
+		"/api/v1/prices/kubernetes?tier=standard&region=us-east",
+		nil, harness.bearerToken,
+	)
+	if code != http.StatusOK {
+		t.Fatalf("standalone kubernetes compare failed: %d: %s", code, body)
+	}
+
+	// Composite calculate with omitted cluster_topology
+	calcReq := rest.CalculateRequestBody{
+		Region: "us-east",
+		Kubernetes: &domain.KubernetesAttributes{
+			Tier: domain.KubernetesTierStandard,
+		},
+	}
+	calcResp, codeCalc, bodyCalc := invokeREST[rest.CalculateResponse](
+		t, harness.restRouter, http.MethodPost, "/api/v1/calculate", calcReq, harness.bearerToken,
+	)
+	if codeCalc != http.StatusOK {
+		t.Fatalf("composite calculate failed: %d: %s", codeCalc, bodyCalc)
+	}
+
+	hasWarnStandalone := false
+	for _, w := range standaloneResp.Warnings {
+		if w.Code == "cluster_topology_unspecified" {
+			hasWarnStandalone = true
+			break
+		}
+	}
+	if !hasWarnStandalone {
+		t.Errorf("expected cluster_topology_unspecified in standalone kubernetes warnings")
+	}
+
+	hasWarnComposite := false
+	for _, w := range calcResp.Warnings {
+		if w.Code == "cluster_topology_unspecified" {
+			hasWarnComposite = true
+			break
+		}
+	}
+	if !hasWarnComposite {
+		t.Errorf("expected cluster_topology_unspecified in composite calculate warnings")
+	}
+}
+
+func TestContractParity_StandaloneVsComposite_ServerlessDualDurationPrecision(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractServerlessObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	reqPerMonth := 10000000.0
+	memMB := 1024.0
+	durMS := 300.0
+
+	// Standalone compare query
+	standaloneResp, code, body := invokeREST[rest.ServerlessComparisonResponse](
+		t, harness.restRouter, http.MethodGet,
+		fmt.Sprintf("/api/v1/prices/serverless?architecture=x86_64&requests_per_month=%.0f&memory_mb=%.0f&execution_duration_ms=%.0f&region=us-east", reqPerMonth, memMB, durMS),
+		nil, harness.bearerToken,
+	)
+	if code != http.StatusOK {
+		t.Fatalf("standalone serverless compare failed: %d: %s", code, body)
+	}
+
+	// Composite calculate query
+	calcReq := rest.CalculateRequestBody{
+		Region: "us-east",
+		Serverless: &rest.ServerlessWorkloadPayload{
+			Architecture:        "x86_64",
+			Tier:                "consumption",
+			RequestsPerMonth:    ptrDecimal(decimal.NewFromFloat(reqPerMonth)),
+			MemoryMB:            ptrDecimal(decimal.NewFromFloat(memMB)),
+			ExecutionDurationMS: ptrDecimal(decimal.NewFromFloat(durMS)),
+		},
+	}
+	calcResp, codeCalc, bodyCalc := invokeREST[rest.CalculateResponse](
+		t, harness.restRouter, http.MethodPost, "/api/v1/calculate", calcReq, harness.bearerToken,
+	)
+	if codeCalc != http.StatusOK {
+		t.Fatalf("composite calculate failed: %d: %s", codeCalc, bodyCalc)
+	}
+
+	standaloneMap := make(map[string]rest.ServerlessResultEntry)
+	for _, r := range standaloneResp.Results {
+		standaloneMap[r.Provider] = r
+	}
+
+	for _, cr := range calcResp.Results {
+		stResult, ok := standaloneMap[cr.Provider]
+		if !ok {
+			t.Fatalf("provider %s missing in standalone response", cr.Provider)
+		}
+		catRes, hasCat := cr.Categories["serverless"]
+		if !hasCat {
+			t.Fatalf("provider %s missing serverless in composite calculate", cr.Provider)
+		}
+
+		if !catRes.NormalizedHourlyUSD.Equal(stResult.NormalizedHourlyUSD) {
+			t.Errorf("provider %s normalized_hourly_usd precision mismatch: composite=%s, standalone=%s", cr.Provider, catRes.NormalizedHourlyUSD, stResult.NormalizedHourlyUSD)
+		}
+	}
+}
+
+func TestContractParity_AllProvidersUnavailable(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	// Deliberately DO NOT seed any observations
+
+	// 1. REST calculate with no cached data and no DB -> 502 Bad Gateway
+	calcReq := rest.CalculateRequestBody{
+		Region: "us-east",
+		Compute: &domain.ComputeAttributes{
+			VCPU:   2,
+			RAMGB:  4,
+			Family: "general_purpose",
+		},
+	}
+	_, codeREST, bodyREST := invokeREST[rest.CalculateResponse](
+		t, harness.restRouter, http.MethodPost, "/api/v1/calculate", calcReq, harness.bearerToken,
+	)
+	if codeREST != http.StatusBadGateway {
+		t.Errorf("expected REST 502 Bad Gateway when all providers unavailable, got %d: %s", codeREST, bodyREST)
+	}
+
+	// 2. MCP calculate_workload with no cached data and no DB -> structured error
+	mcpReq := mcp.CalculateWorkloadInput{
+		Region: "us-east",
+		Compute: &mcp.ComputeRequirements{
+			VCPU:   2,
+			RAMGB:  4,
+			Family: "general_purpose",
+		},
+	}
+	_, errMCP := invokeMCP[mcp.CalculateResponse](ctx, t, harness.mcpClient, "calculate_workload", mcpReq)
+	if errMCP == nil {
+		t.Error("expected MCP tool error when all providers unavailable, got nil")
+	} else if !strings.Contains(errMCP.Error(), "all cloud providers failed to retrieve pricing data") {
+		t.Errorf("expected MCP error 'all cloud providers failed to retrieve pricing data', got: %v", errMCP)
+	}
 }
 
 // 6. Provider Status & Freshness Contract Parity Suite

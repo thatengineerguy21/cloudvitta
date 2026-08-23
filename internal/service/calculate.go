@@ -10,12 +10,16 @@ import (
 
 // CalculateRequest specifies the input parameters for a composite workload calculation.
 type CalculateRequest struct {
-	Region       string
-	Currency     string
-	StrictFamily bool
-	Compute      *domain.ComputeAttributes
-	Storage      *domain.StorageAttributes
-	Network      *domain.NetworkAttributes
+	Region        string
+	Currency      string
+	StrictFamily  bool
+	Compute       *domain.ComputeAttributes
+	Storage       *domain.StorageAttributes
+	Network       *domain.NetworkAttributes
+	DatabaseRDBMS *domain.DatabaseRDBMSAttributes
+	DatabaseNoSQL *domain.DatabaseNoSQLAttributes
+	Kubernetes    *domain.KubernetesAttributes
+	Serverless    *ServerlessWorkload
 }
 
 // CalculateCategoryResult contains the matched SKU and normalized hourly cost for a single category.
@@ -63,6 +67,18 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 	}
 	if req.Network != nil {
 		requestedCategories = append(requestedCategories, "network")
+	}
+	if req.DatabaseRDBMS != nil {
+		requestedCategories = append(requestedCategories, "database_rdbms")
+	}
+	if req.DatabaseNoSQL != nil {
+		requestedCategories = append(requestedCategories, "database_nosql")
+	}
+	if req.Kubernetes != nil {
+		requestedCategories = append(requestedCategories, "kubernetes")
+	}
+	if req.Serverless != nil {
+		requestedCategories = append(requestedCategories, "serverless")
 	}
 
 	if len(requestedCategories) == 0 {
@@ -117,6 +133,39 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 					TransferType: req.Network.TransferType,
 					Category:     "network",
 				}
+			case "database_rdbms":
+				target = MatchTarget{
+					Engine:            req.DatabaseRDBMS.Engine,
+					VCPU:              req.DatabaseRDBMS.VCPU,
+					RAMGB:             req.DatabaseRDBMS.RAMGB,
+					DatabaseStorageGB: req.DatabaseRDBMS.StorageGB,
+					DatabaseIOPS:      req.DatabaseRDBMS.IOPS,
+					MultiAZ:           req.DatabaseRDBMS.MultiAZ,
+					StorageFamily:     req.DatabaseRDBMS.StorageFamily,
+					Category:          "database_rdbms",
+				}
+			case "database_nosql":
+				target = MatchTarget{
+					DataModel:        req.DatabaseNoSQL.DataModel,
+					PricingMode:      req.DatabaseNoSQL.PricingMode,
+					ReadUnits:        req.DatabaseNoSQL.ReadUnits,
+					WriteUnits:       req.DatabaseNoSQL.WriteUnits,
+					NoSQLStorageGB:   req.DatabaseNoSQL.StorageGB,
+					StorageClass:     req.DatabaseNoSQL.StorageClass,
+					NoSQLMultiRegion: req.DatabaseNoSQL.MultiRegion,
+					Category:         "database_nosql",
+				}
+			case "kubernetes":
+				target = MatchTarget{
+					KubernetesTier:  req.Kubernetes.Tier,
+					ClusterTopology: req.Kubernetes.ClusterTopology,
+					Category:        "kubernetes",
+				}
+			case "serverless":
+				target = MatchTarget{
+					ServerlessWorkload: *req.Serverless,
+					Category:           "serverless",
+				}
 			}
 
 			catResult, err := s.MatchAndCalculate(ctx, prov, category, region, target)
@@ -133,6 +182,12 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 						Provider: prov,
 						Code:     "engine_mismatch_excluded",
 						Message:  "Database candidate was excluded due to engine mismatch.",
+					})
+				case errors.Is(err, ErrArchitectureUnsupported):
+					warnings = append(warnings, CalculateWarning{
+						Provider: prov,
+						Code:     "architecture_unsupported_excluded",
+						Message:  "Provider does not offer the requested CPU architecture for serverless compute.",
 					})
 				case errors.Is(err, ErrNoMatchFound):
 					warnings = append(warnings, CalculateWarning{

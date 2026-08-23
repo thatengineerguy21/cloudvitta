@@ -254,7 +254,7 @@ const docTemplate = `{
         },
         "/api/v1/calculate": {
             "post": {
-                "description": "Calculates composite pricing across cloud providers for requested compute, storage, and network specs.",
+                "description": "Calculates composite pricing across cloud providers for requested compute, storage, network, database, NoSQL, Kubernetes, and serverless specs.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1139,11 +1139,27 @@ const docTemplate = `{
                 "currency": {
                     "type": "string"
                 },
+                "database": {
+                    "description": "alias for database_rdbms",
+                    "$ref": "#/definitions/domain.DatabaseRDBMSAttributes"
+                },
+                "database_nosql": {
+                    "$ref": "#/definitions/domain.DatabaseNoSQLAttributes"
+                },
+                "database_rdbms": {
+                    "$ref": "#/definitions/domain.DatabaseRDBMSAttributes"
+                },
+                "kubernetes": {
+                    "$ref": "#/definitions/domain.KubernetesAttributes"
+                },
                 "network": {
                     "$ref": "#/definitions/domain.NetworkAttributes"
                 },
                 "region": {
                     "type": "string"
+                },
+                "serverless": {
+                    "$ref": "#/definitions/rest.ServerlessWorkloadPayload"
                 },
                 "storage": {
                     "$ref": "#/definitions/domain.StorageAttributes"
@@ -1814,6 +1830,26 @@ const docTemplate = `{
                 },
                 "stale": {
                     "type": "boolean"
+                }
+            }
+        },
+        "rest.ServerlessWorkloadPayload": {
+            "type": "object",
+            "properties": {
+                "architecture": {
+                    "type": "string"
+                },
+                "execution_duration_ms": {
+                    "type": "number"
+                },
+                "memory_mb": {
+                    "type": "number"
+                },
+                "requests_per_month": {
+                    "type": "number"
+                },
+                "tier": {
+                    "type": "string"
                 }
             }
         },

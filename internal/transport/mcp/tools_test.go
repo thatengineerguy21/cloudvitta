@@ -222,6 +222,109 @@ func seedNetworkObservations(ctx context.Context, t *testing.T, rdb *redis.Clien
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east4"), gcpObs, cache.DefaultTTL)
 }
 
+func seedDatabaseObservations(ctx context.Context, t *testing.T, rdb *redis.Client) {
+	t.Helper()
+	now := time.Now().UTC()
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-PG-4VCORE",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.26"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-STORAGE-GP3",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.115"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "any",
+				StorageGB:     1,
+				StorageFamily: "gp3",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+	}
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_rdbms", "us-east-1"), awsObs, cache.DefaultTTL)
+}
+
+func seedDatabaseNoSQLObservations(ctx context.Context, t *testing.T, rdb *redis.Client) {
+	t.Helper()
+	now := time.Now().UTC()
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-READ",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.00013"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				ReadUnits:     1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-WRITE",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.00065"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				WriteUnits:    1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-STORAGE",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.25"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				StorageGB:     1,
+				StorageClass:  "standard",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+	}
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_nosql", "us-east-1"), awsObs, cache.DefaultTTL)
+}
+
 func TestMCP_ToolsList(t *testing.T) {
 	pricingSvc, freshnessSvc, mr, rdb := setupTestServices(t)
 	defer mr.Close()
@@ -238,11 +341,15 @@ func TestMCP_ToolsList(t *testing.T) {
 	}
 
 	expectedTools := map[string]bool{
-		"compare_compute":     false,
-		"compare_storage":     false,
-		"compare_network":     false,
-		"calculate_workload":  false,
-		"get_provider_status": false,
+		"compare_compute":        false,
+		"compare_storage":        false,
+		"compare_network":        false,
+		"compare_database":       false,
+		"compare_database_nosql": false,
+		"compare_kubernetes":     false,
+		"compare_serverless":     false,
+		"calculate_workload":     false,
+		"get_provider_status":    false,
 	}
 
 	for _, tool := range toolsList.Tools {
@@ -255,6 +362,9 @@ func TestMCP_ToolsList(t *testing.T) {
 		if !found {
 			t.Errorf("expected tool %q in tools list, but not found", name)
 		}
+	}
+	if len(toolsList.Tools) != 9 {
+		t.Errorf("expected exactly 9 tools in tools list, got %d", len(toolsList.Tools))
 	}
 }
 
@@ -645,5 +755,306 @@ func TestMCP_GetProviderStatus_NotFound(t *testing.T) {
 	})
 	if err == nil && !res.IsError {
 		t.Errorf("expected error for unknown provider, got: %+v", res)
+	}
+}
+
+func TestMCP_CompareDatabase_Success(t *testing.T) {
+	pricingSvc, freshnessSvc, mr, rdb := setupTestServices(t)
+	defer mr.Close()
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	seedDatabaseObservations(ctx, t, rdb)
+
+	server := mcp.NewServer(pricingSvc, freshnessSvc)
+	clientSession, cleanup := connectTestClient(ctx, t, server)
+	defer cleanup()
+
+	res, err := clientSession.CallTool(ctx, &sdk.CallToolParams{
+		Name: "compare_database",
+		Arguments: map[string]any{
+			"engine":     "postgresql",
+			"vcpu":       4,
+			"ram_gb":     16,
+			"storage_gb": 100,
+			"region":     "us-east",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool compare_database failed: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("expected success, got error: %+v", res)
+	}
+
+	text, ok := res.Content[0].(*sdk.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", res.Content[0])
+	}
+
+	var resp mcp.DatabaseComparisonResponse
+	if err := json.Unmarshal([]byte(text.Text), &resp); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v", err)
+	}
+	if len(resp.Results) != 1 {
+		t.Fatalf("got %d results, want 1 (aws)", len(resp.Results))
+	}
+	if resp.Results[0].Provider != "aws" {
+		t.Errorf("Provider = %q, want aws", resp.Results[0].Provider)
+	}
+}
+
+func TestMCP_CompareDatabaseNoSQL_Success(t *testing.T) {
+	pricingSvc, freshnessSvc, mr, rdb := setupTestServices(t)
+	defer mr.Close()
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	seedDatabaseNoSQLObservations(ctx, t, rdb)
+
+	server := mcp.NewServer(pricingSvc, freshnessSvc)
+	clientSession, cleanup := connectTestClient(ctx, t, server)
+	defer cleanup()
+
+	res, err := clientSession.CallTool(ctx, &sdk.CallToolParams{
+		Name: "compare_database_nosql",
+		Arguments: map[string]any{
+			"data_model":   "document",
+			"pricing_mode": "provisioned",
+			"read_units":   100,
+			"write_units":  20,
+			"storage_gb":   50,
+			"region":       "us-east",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool compare_database_nosql failed: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("expected success, got error: %+v", res)
+	}
+
+	text, ok := res.Content[0].(*sdk.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", res.Content[0])
+	}
+
+	var resp mcp.DatabaseNoSQLComparisonResponse
+	if err := json.Unmarshal([]byte(text.Text), &resp); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v", err)
+	}
+	if len(resp.Results) != 1 {
+		t.Fatalf("got %d results, want 1 (aws)", len(resp.Results))
+	}
+	if resp.Results[0].Provider != "aws" {
+		t.Errorf("Provider = %q, want aws", resp.Results[0].Provider)
+	}
+}
+
+func TestMCP_CalculateWorkload_AliasConflictValidation(t *testing.T) {
+	pricingSvc, freshnessSvc, mr, rdb := setupTestServices(t)
+	defer mr.Close()
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	seedDatabaseObservations(ctx, t, rdb)
+	server := mcp.NewServer(pricingSvc, freshnessSvc)
+	clientSession, cleanup := connectTestClient(ctx, t, server)
+	defer cleanup()
+
+	t.Run("DifferingValues_FailsWithConflictError", func(t *testing.T) {
+		res, err := clientSession.CallTool(ctx, &sdk.CallToolParams{
+			Name: "calculate_workload",
+			Arguments: map[string]any{
+				"region": "us-east",
+				"database": map[string]any{
+					"engine": "postgresql", "vcpu": 2, "ram_gb": 4, "storage_gb": 100,
+				},
+				"database_rdbms": map[string]any{
+					"engine": "mysql", "vcpu": 4, "ram_gb": 16, "storage_gb": 200,
+				},
+			},
+		})
+		if err == nil && !res.IsError {
+			t.Fatal("expected error for conflicting database and database_rdbms fields")
+		}
+	})
+
+	t.Run("IdenticalValues_Succeeds", func(t *testing.T) {
+		res, err := clientSession.CallTool(ctx, &sdk.CallToolParams{
+			Name: "calculate_workload",
+			Arguments: map[string]any{
+				"region": "us-east",
+				"database": map[string]any{
+					"engine": "postgresql", "vcpu": 4, "ram_gb": 16, "storage_gb": 100,
+				},
+				"database_rdbms": map[string]any{
+					"engine": "postgresql", "vcpu": 4, "ram_gb": 16, "storage_gb": 100,
+				},
+			},
+		})
+		// Empty miniredis returns empty results without error
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.IsError {
+			t.Fatalf("unexpected tool error: %+v", res)
+		}
+	})
+}
+
+func TestMCP_CalculateWorkload_SevenCategories(t *testing.T) {
+	pricingSvc, freshnessSvc, mr, rdb := setupTestServices(t)
+	defer mr.Close()
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	seedComputeObservations(ctx, t, rdb)
+	seedStorageObservations(ctx, t, rdb)
+	seedNetworkObservations(ctx, t, rdb)
+	seedDatabaseObservations(ctx, t, rdb)
+	seedDatabaseNoSQLObservations(ctx, t, rdb)
+
+	now := time.Now().UTC()
+	// Seed Kubernetes
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "kubernetes", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "kubernetes",
+			SkuID:           "SKU-AWS-EKS-STANDARD",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.100"),
+			PriceCurrency:   "USD",
+			Unit:            "hour",
+			KubernetesAttributes: domain.KubernetesAttributes{
+				Tier: domain.KubernetesTierStandard,
+			},
+			FetchedAt: now,
+		},
+	}, cache.DefaultTTL)
+
+	// Seed Serverless
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "serverless", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-LAMBDA-REQ-X86",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.20"),
+			PriceCurrency:   "USD",
+			Unit:            "per_million_requests",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  "x86_64",
+				Tier:          "consumption",
+				ComponentType: "request_fee",
+				Unit:          "per_million_requests",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-LAMBDA-DUR-X86",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.0000166667"),
+			PriceCurrency:   "USD",
+			Unit:            "per_gb_second",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  "x86_64",
+				Tier:          "consumption",
+				ComponentType: "duration_fee",
+				Unit:          "per_gb_second",
+			},
+			FetchedAt: now,
+		},
+	}, cache.DefaultTTL)
+
+	server := mcp.NewServer(pricingSvc, freshnessSvc)
+	clientSession, cleanup := connectTestClient(ctx, t, server)
+	defer cleanup()
+
+	reqArgs := map[string]any{
+		"region": "us-east",
+		"compute": map[string]any{
+			"vcpu":   2,
+			"ram_gb": 4,
+			"family": "general_purpose",
+		},
+		"storage": map[string]any{
+			"size_gb":       100,
+			"storage_class": "standard",
+		},
+		"network": map[string]any{
+			"egress_gb":     50,
+			"transfer_type": "internet_egress",
+		},
+		"database_rdbms": map[string]any{
+			"engine":     "postgresql",
+			"vcpu":       4,
+			"ram_gb":     16,
+			"storage_gb": 100,
+		},
+		"database_nosql": map[string]any{
+			"data_model":   "document",
+			"pricing_mode": "provisioned",
+			"read_units":   100,
+			"write_units":  20,
+			"storage_gb":   50,
+		},
+		"kubernetes": map[string]any{
+			"tier": "standard",
+		},
+		"serverless": map[string]any{
+			"architecture":          "x86_64",
+			"tier":                  "consumption",
+			"requests_per_month":    10000000,
+			"memory_mb":             512,
+			"execution_duration_ms": 200,
+		},
+	}
+
+	res, err := clientSession.CallTool(ctx, &sdk.CallToolParams{
+		Name:      "calculate_workload",
+		Arguments: reqArgs,
+	})
+	if err != nil {
+		t.Fatalf("CallTool calculate_workload failed: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("expected success, got error: %+v", res)
+	}
+
+	text, ok := res.Content[0].(*sdk.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", res.Content[0])
+	}
+
+	var resp mcp.CalculateResponse
+	if err := json.Unmarshal([]byte(text.Text), &resp); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v", err)
+	}
+
+	var awsRes *mcp.CalculateProviderResult
+	for i := range resp.Results {
+		if resp.Results[i].Provider == "aws" {
+			awsRes = &resp.Results[i]
+			break
+		}
+	}
+
+	if awsRes == nil {
+		t.Fatalf("expected AWS in calculate_workload results: %+v", resp.Results)
+	}
+	if awsRes.Partial {
+		t.Errorf("expected AWS to have partial=false, got partial=true")
+	}
+	if awsRes.TotalNormalizedHourlyUSD == nil {
+		t.Errorf("expected AWS to have total_normalized_hourly_usd populated")
+	}
+	if len(awsRes.Categories) != 7 {
+		t.Errorf("expected 7 categories for AWS, got %d", len(awsRes.Categories))
 	}
 }

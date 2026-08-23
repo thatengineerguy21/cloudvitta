@@ -28,7 +28,7 @@ func TestMapServiceError(t *testing.T) {
 		{
 			name:     "no categories requested",
 			input:    service.ErrNoCategoriesRequested,
-			expected: "at least one category ('compute', 'storage', or 'network') must be specified",
+			expected: "at least one category ('compute', 'storage', 'network', 'database_rdbms', 'database_nosql', 'kubernetes', or 'serverless') must be specified",
 		},
 		{
 			name:     "provider unavailable",

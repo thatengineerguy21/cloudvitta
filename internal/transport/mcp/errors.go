@@ -17,7 +17,7 @@ func MapServiceError(err error) error {
 	case errors.Is(err, service.ErrInvalidParameters):
 		return fmt.Errorf("invalid parameters: %w", err)
 	case errors.Is(err, service.ErrNoCategoriesRequested):
-		return errors.New("at least one category ('compute', 'storage', or 'network') must be specified")
+		return errors.New("at least one category ('compute', 'storage', 'network', 'database_rdbms', 'database_nosql', 'kubernetes', or 'serverless') must be specified")
 	case errors.Is(err, service.ErrProviderUnavailable):
 		return errors.New("all cloud providers failed to retrieve pricing data")
 	case errors.Is(err, service.ErrProviderNotFound):

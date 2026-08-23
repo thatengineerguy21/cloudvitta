@@ -172,10 +172,21 @@ definitions:
         $ref: '#/definitions/domain.ComputeAttributes'
       currency:
         type: string
+      database:
+        $ref: '#/definitions/domain.DatabaseRDBMSAttributes'
+        description: alias for database_rdbms
+      database_nosql:
+        $ref: '#/definitions/domain.DatabaseNoSQLAttributes'
+      database_rdbms:
+        $ref: '#/definitions/domain.DatabaseRDBMSAttributes'
+      kubernetes:
+        $ref: '#/definitions/domain.KubernetesAttributes'
       network:
         $ref: '#/definitions/domain.NetworkAttributes'
       region:
         type: string
+      serverless:
+        $ref: '#/definitions/rest.ServerlessWorkloadPayload'
       storage:
         $ref: '#/definitions/domain.StorageAttributes'
       strict_family:
@@ -620,6 +631,19 @@ definitions:
       stale:
         type: boolean
     type: object
+  rest.ServerlessWorkloadPayload:
+    properties:
+      architecture:
+        type: string
+      execution_duration_ms:
+        type: number
+      memory_mb:
+        type: number
+      requests_per_month:
+        type: number
+      tier:
+        type: string
+    type: object
   rest.SignupRequest:
     properties:
       email:
@@ -851,7 +875,7 @@ paths:
       consumes:
       - application/json
       description: Calculates composite pricing across cloud providers for requested
-        compute, storage, and network specs.
+        compute, storage, network, database, NoSQL, Kubernetes, and serverless specs.
       parameters:
       - description: Composite workload request payload
         in: body

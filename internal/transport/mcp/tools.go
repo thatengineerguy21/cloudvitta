@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +13,9 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/databaseenginemap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/nosqldatamodelmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -25,6 +28,13 @@ var maxAllowedStorageSizeGB = decimal.NewFromInt(1_000_000)
 
 // maxAllowedNetworkEgressGB represents the upper bound on single-request egress size (10 PB).
 var maxAllowedNetworkEgressGB = decimal.NewFromInt(10_000_000)
+
+// Bounds for database and NoSQL parameters.
+const (
+	maxAllowedDatabaseStorageGB = 1_000_000.0
+	maxAllowedNoSQLStorageGB    = 1_000_000.0
+	maxAllowedNoSQLThroughput   = 10_000_000.0
+)
 
 // --- Shared Output Types ---
 
@@ -139,6 +149,76 @@ type NetworkComparisonResponse struct {
 	Meta     ResponseMeta         `json:"meta"`
 	Results  []NetworkResultEntry `json:"results"`
 	Warnings []ProviderWarning    `json:"warnings"`
+}
+
+// DatabaseQueryMeta represents strongly-typed query parameters in database comparison responses.
+type DatabaseQueryMeta struct {
+	Category      string   `json:"category"`
+	Region        string   `json:"region"`
+	Currency      string   `json:"currency"`
+	Engine        string   `json:"engine,omitempty"`
+	VCPU          *float64 `json:"vcpu,omitempty"`
+	RAMGB         *float64 `json:"ram_gb,omitempty"`
+	StorageGB     *float64 `json:"storage_gb,omitempty"`
+	IOPS          *int     `json:"iops,omitempty"`
+	MultiAZ       *bool    `json:"multi_az,omitempty"`
+	StorageFamily string   `json:"storage_family,omitempty"`
+}
+
+// DatabaseResultEntry represents a single provider database result item.
+type DatabaseResultEntry struct {
+	Provider            string                         `json:"provider"`
+	SkuID               string                         `json:"sku_id"`
+	MatchedSpec         domain.DatabaseRDBMSAttributes `json:"matched_spec"`
+	MatchQuality        string                         `json:"match_quality"`
+	MatchDeltaPct       float64                        `json:"match_delta_pct"`
+	MissingAttributes   []string                       `json:"missing_attributes"`
+	Price               PriceDetail                    `json:"price"`
+	NormalizedHourlyUSD decimal.Decimal                `json:"normalized_hourly_usd"`
+	FetchedAt           time.Time                      `json:"fetched_at"`
+	Stale               bool                           `json:"stale"`
+}
+
+// DatabaseComparisonResponse represents the full database comparison response envelope.
+type DatabaseComparisonResponse struct {
+	Meta     ResponseMeta          `json:"meta"`
+	Results  []DatabaseResultEntry `json:"results"`
+	Warnings []ProviderWarning     `json:"warnings"`
+}
+
+// DatabaseNoSQLQueryMeta represents strongly-typed query parameters in NoSQL database comparison responses.
+type DatabaseNoSQLQueryMeta struct {
+	Category     string   `json:"category"`
+	Region       string   `json:"region"`
+	Currency     string   `json:"currency"`
+	DataModel    string   `json:"data_model,omitempty"`
+	PricingMode  string   `json:"pricing_mode,omitempty"`
+	ReadUnits    *float64 `json:"read_units,omitempty"`
+	WriteUnits   *float64 `json:"write_units,omitempty"`
+	StorageGB    *float64 `json:"storage_gb,omitempty"`
+	StorageClass string   `json:"storage_class,omitempty"`
+	MultiRegion  *bool    `json:"multi_region,omitempty"`
+}
+
+// DatabaseNoSQLResultEntry represents a single provider NoSQL database result item.
+type DatabaseNoSQLResultEntry struct {
+	Provider            string                         `json:"provider"`
+	SkuID               string                         `json:"sku_id"`
+	MatchedSpec         domain.DatabaseNoSQLAttributes `json:"matched_spec"`
+	MatchQuality        string                         `json:"match_quality"`
+	MatchDeltaPct       float64                        `json:"match_delta_pct"`
+	MissingAttributes   []string                       `json:"missing_attributes"`
+	Price               PriceDetail                    `json:"price"`
+	NormalizedHourlyUSD decimal.Decimal                `json:"normalized_hourly_usd"`
+	FetchedAt           time.Time                      `json:"fetched_at"`
+	Stale               bool                           `json:"stale"`
+}
+
+// DatabaseNoSQLComparisonResponse represents the full NoSQL database comparison response envelope.
+type DatabaseNoSQLComparisonResponse struct {
+	Meta     ResponseMeta               `json:"meta"`
+	Results  []DatabaseNoSQLResultEntry `json:"results"`
+	Warnings []ProviderWarning          `json:"warnings"`
 }
 
 // KubernetesQueryMeta represents strongly-typed query parameters in kubernetes comparison responses.
@@ -259,6 +339,32 @@ type CompareNetworkInput struct {
 	Currency     string   `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
 }
 
+// CompareDatabaseInput defines parameters for compare_database tool.
+type CompareDatabaseInput struct {
+	Engine        string   `json:"engine,omitempty" jsonschema:"Requested database engine (postgresql, mysql, sqlserver)"`
+	VCPU          *float64 `json:"vcpu,omitempty" jsonschema:"Requested vCPU count (e.g. 2, 4, 8)"`
+	RAMGB         *float64 `json:"ram_gb,omitempty" jsonschema:"Requested RAM in gigabytes (e.g. 8, 16, 32)"`
+	StorageGB     *float64 `json:"storage_gb,omitempty" jsonschema:"Requested database storage size in GB (max 1000000)"`
+	IOPS          *int     `json:"iops,omitempty" jsonschema:"Requested provisioned IOPS (e.g. 3000)"`
+	MultiAZ       *bool    `json:"multi_az,omitempty" jsonschema:"High Availability / Multi-AZ deployment (default: false)"`
+	StorageFamily string   `json:"storage_family,omitempty" jsonschema:"Storage family preference (e.g. gp3, ssd, io1)"`
+	Region        string   `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
+	Currency      string   `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
+}
+
+// CompareDatabaseNoSQLInput defines parameters for compare_database_nosql tool.
+type CompareDatabaseNoSQLInput struct {
+	DataModel    string   `json:"data_model,omitempty" jsonschema:"Requested NoSQL data model (document, key_value, wide_column, graph, multi_model)"`
+	PricingMode  string   `json:"pricing_mode,omitempty" jsonschema:"Requested pricing mode (provisioned, on_demand, serverless; default: provisioned)"`
+	ReadUnits    *float64 `json:"read_units,omitempty" jsonschema:"Requested reads per second (RCU/RU/s, max 10000000)"`
+	WriteUnits   *float64 `json:"write_units,omitempty" jsonschema:"Requested writes per second (WCU/RU/s, max 10000000)"`
+	StorageGB    *float64 `json:"storage_gb,omitempty" jsonschema:"Requested storage in GB (max 1000000)"`
+	StorageClass string   `json:"storage_class,omitempty" jsonschema:"Storage class preference (standard, infrequent_access, analytical)"`
+	MultiRegion  *bool    `json:"multi_region,omitempty" jsonschema:"High Availability / Multi-Region replication (default: false)"`
+	Region       string   `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
+	Currency     string   `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
+}
+
 // CompareKubernetesInput defines parameters for compare_kubernetes tool.
 type CompareKubernetesInput struct {
 	Tier            string `json:"tier,omitempty" jsonschema:"Requested Kubernetes control plane tier (free, standard, extended_support)"`
@@ -297,14 +403,56 @@ type NetworkRequirements struct {
 	TransferType string  `json:"transfer_type,omitempty" jsonschema:"Requested transfer type (e.g. internet_egress, intra_region)"`
 }
 
+// DatabaseRequirements defines relational database requirements for calculate_workload.
+type DatabaseRequirements struct {
+	Engine        string  `json:"engine,omitempty" jsonschema:"Requested database engine (e.g. postgresql, mysql, sqlserver)"`
+	VCPU          float64 `json:"vcpu,omitempty" jsonschema:"Requested vCPU count (e.g. 2, 4, 8)"`
+	RAMGB         float64 `json:"ram_gb,omitempty" jsonschema:"Requested RAM in gigabytes (e.g. 8, 16, 32)"`
+	StorageGB     float64 `json:"storage_gb,omitempty" jsonschema:"Requested database storage capacity in GB (e.g. 100)"`
+	IOPS          *int    `json:"iops,omitempty" jsonschema:"Requested provisioned IOPS (e.g. 3000)"`
+	MultiAZ       bool    `json:"multi_az,omitempty" jsonschema:"High Availability / Multi-AZ deployment (default: false)"`
+	StorageFamily string  `json:"storage_family,omitempty" jsonschema:"Storage family preference (e.g. gp3, ssd)"`
+}
+
+// DatabaseNoSQLRequirements defines NoSQL database requirements for calculate_workload.
+type DatabaseNoSQLRequirements struct {
+	DataModel    string  `json:"data_model,omitempty" jsonschema:"Requested NoSQL data model (e.g. document, key_value)"`
+	PricingMode  string  `json:"pricing_mode,omitempty" jsonschema:"Requested pricing mode (provisioned, on_demand, serverless; default: provisioned)"`
+	ReadUnits    float64 `json:"read_units,omitempty" jsonschema:"Requested reads per second (e.g. 100)"`
+	WriteUnits   float64 `json:"write_units,omitempty" jsonschema:"Requested writes per second (e.g. 50)"`
+	StorageGB    float64 `json:"storage_gb,omitempty" jsonschema:"Requested storage in GB (e.g. 50)"`
+	StorageClass string  `json:"storage_class,omitempty" jsonschema:"Storage class preference (e.g. standard)"`
+	MultiRegion  bool    `json:"multi_region,omitempty" jsonschema:"Multi-Region replication requested (default: false)"`
+}
+
+// KubernetesRequirements defines Kubernetes control plane requirements for calculate_workload.
+type KubernetesRequirements struct {
+	Tier            string `json:"tier,omitempty" jsonschema:"Requested Kubernetes control plane tier (free, standard, extended_support)"`
+	ClusterTopology string `json:"cluster_topology,omitempty" jsonschema:"GCP cluster topology (zonal, regional, autopilot)"`
+}
+
+// ServerlessRequirements defines serverless compute requirements for calculate_workload.
+type ServerlessRequirements struct {
+	Architecture        string   `json:"architecture,omitempty" jsonschema:"Requested CPU architecture (x86_64, arm64; default: x86_64)"`
+	Tier                string   `json:"tier,omitempty" jsonschema:"Requested serverless tier (consumption, flex_consumption, 1st_gen, 2nd_gen; default: consumption)"`
+	RequestsPerMonth    *float64 `json:"requests_per_month,omitempty" jsonschema:"Monthly invocation requests (default: 1000000)"`
+	MemoryMB            *float64 `json:"memory_mb,omitempty" jsonschema:"Function allocated memory in MB (128 - 10240, default: 512)"`
+	ExecutionDurationMS *float64 `json:"execution_duration_ms,omitempty" jsonschema:"Average execution duration in ms (1 - 900000, default: 200)"`
+}
+
 // CalculateWorkloadInput defines parameters for calculate_workload tool.
 type CalculateWorkloadInput struct {
-	Region       string               `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
-	Currency     string               `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
-	StrictFamily *bool                `json:"strict_family,omitempty" jsonschema:"Strict instance family matching (default: true)"`
-	Compute      *ComputeRequirements `json:"compute,omitempty" jsonschema:"Compute requirements (vcpu, ram_gb, family)"`
-	Storage      *StorageRequirements `json:"storage,omitempty" jsonschema:"Storage requirements (size_gb, storage_class)"`
-	Network      *NetworkRequirements `json:"network,omitempty" jsonschema:"Network requirements (egress_gb, transfer_type)"`
+	Region        string                     `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
+	Currency      string                     `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
+	StrictFamily  *bool                      `json:"strict_family,omitempty" jsonschema:"Strict instance family matching (default: true)"`
+	Compute       *ComputeRequirements       `json:"compute,omitempty" jsonschema:"Compute requirements (vcpu, ram_gb, family)"`
+	Storage       *StorageRequirements       `json:"storage,omitempty" jsonschema:"Storage requirements (size_gb, storage_class)"`
+	Network       *NetworkRequirements       `json:"network,omitempty" jsonschema:"Network requirements (egress_gb, transfer_type)"`
+	DatabaseRDBMS *DatabaseRequirements      `json:"database_rdbms,omitempty" jsonschema:"Relational database requirements (engine, vcpu, ram_gb, storage_gb, iops, multi_az, storage_family)"`
+	Database      *DatabaseRequirements      `json:"database,omitempty" jsonschema:"Alias for database_rdbms"`
+	DatabaseNoSQL *DatabaseNoSQLRequirements `json:"database_nosql,omitempty" jsonschema:"NoSQL database requirements (data_model, pricing_mode, read_units, write_units, storage_gb, storage_class, multi_region)"`
+	Kubernetes    *KubernetesRequirements    `json:"kubernetes,omitempty" jsonschema:"Kubernetes requirements (tier, cluster_topology)"`
+	Serverless    *ServerlessRequirements    `json:"serverless,omitempty" jsonschema:"Serverless requirements (architecture, tier, requests_per_month, memory_mb, execution_duration_ms)"`
 }
 
 // GetProviderStatusInput defines parameters for get_provider_status tool.
@@ -687,6 +835,315 @@ func handleCompareNetwork(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 	}
 }
 
+// handleCompareDatabase creates the tool handler for compare_database.
+func handleCompareDatabase(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CompareDatabaseInput, any] {
+	return func(ctx context.Context, req *sdk.CallToolRequest, input CompareDatabaseInput) (*sdk.CallToolResult, any, error) {
+		if pricingSvc == nil {
+			return nil, nil, errors.New("pricing service unavailable")
+		}
+
+		region := input.Region
+		if region == "" {
+			region = "us-east"
+		}
+
+		warnings := defaultStage3Warnings()
+
+		currency := input.Currency
+		reqCurrency := currency
+		if reqCurrency == "" {
+			reqCurrency = "USD"
+		}
+		if currency != "" && currency != "USD" {
+			warnings = append(warnings, ProviderWarning{
+				Provider: "system",
+				Code:     "currency_conversion_not_yet_supported",
+				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
+			})
+		}
+		currency = "USD"
+
+		rawEngine := strings.TrimSpace(input.Engine)
+		var canonicalEngine string
+		if rawEngine != "" {
+			canonical, err := databaseenginemap.ResolveCanonicalEngine(rawEngine)
+			if err != nil || !databaseenginemap.IsSupportedStageEngine(canonical) {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: engine must be a supported database engine (postgresql, mysql, sqlserver)", service.ErrInvalidParameters))
+			}
+			canonicalEngine = canonical
+		}
+
+		var reqVCPU float64
+		if input.VCPU != nil {
+			if *input.VCPU <= 0 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: vcpu must be a positive number", service.ErrInvalidParameters))
+			}
+			reqVCPU = *input.VCPU
+		}
+
+		var reqRAMGB float64
+		if input.RAMGB != nil {
+			if *input.RAMGB <= 0 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: ram_gb must be a positive number", service.ErrInvalidParameters))
+			}
+			reqRAMGB = *input.RAMGB
+		}
+
+		var reqStorageGB float64
+		if input.StorageGB != nil {
+			if *input.StorageGB <= 0 || *input.StorageGB > maxAllowedDatabaseStorageGB {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: storage_gb must be a positive number up to 1000000", service.ErrInvalidParameters))
+			}
+			reqStorageGB = *input.StorageGB
+		}
+
+		if input.IOPS != nil && *input.IOPS <= 0 {
+			return nil, nil, MapServiceError(fmt.Errorf("%w: iops must be a positive integer", service.ErrInvalidParameters))
+		}
+
+		var multiAZ bool
+		if input.MultiAZ != nil {
+			multiAZ = *input.MultiAZ
+		}
+
+		target := service.MatchTarget{
+			Engine:            canonicalEngine,
+			VCPU:              reqVCPU,
+			RAMGB:             reqRAMGB,
+			DatabaseStorageGB: reqStorageGB,
+			DatabaseIOPS:      input.IOPS,
+			MultiAZ:           multiAZ,
+			StorageFamily:     input.StorageFamily,
+			Category:          "database_rdbms",
+		}
+
+		compRes, err := pricingSvc.Compare(ctx, "database_rdbms", region, target)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
+
+		for _, w := range compRes.Warnings {
+			warnings = append(warnings, ProviderWarning{
+				Provider: w.Provider,
+				Code:     w.Code,
+				Message:  w.Message,
+			})
+		}
+
+		var results []DatabaseResultEntry
+		for _, item := range compRes.Results {
+			results = append(results, DatabaseResultEntry{
+				Provider:          item.Provider,
+				SkuID:             item.SkuID,
+				MatchedSpec:       item.MatchedDatabase,
+				MatchQuality:      item.MatchQuality,
+				MatchDeltaPct:     item.MatchDeltaPct,
+				MissingAttributes: item.MissingAttributes,
+				Price: PriceDetail{
+					Amount:   item.HourlyCost,
+					Unit:     item.Unit,
+					Currency: currency,
+				},
+				NormalizedHourlyUSD: item.HourlyCost,
+				FetchedAt:           item.FetchedAt,
+				Stale:               item.Stale,
+			})
+		}
+
+		queryMeta := DatabaseQueryMeta{
+			Category:      "database_rdbms",
+			Region:        region,
+			Currency:      reqCurrency,
+			Engine:        canonicalEngine,
+			StorageFamily: input.StorageFamily,
+		}
+		if reqVCPU > 0 {
+			queryMeta.VCPU = &reqVCPU
+		}
+		if reqRAMGB > 0 {
+			queryMeta.RAMGB = &reqRAMGB
+		}
+		if reqStorageGB > 0 {
+			queryMeta.StorageGB = &reqStorageGB
+		}
+		if input.IOPS != nil {
+			queryMeta.IOPS = input.IOPS
+		}
+		if input.MultiAZ != nil {
+			queryMeta.MultiAZ = input.MultiAZ
+		}
+
+		resp := &DatabaseComparisonResponse{
+			Meta: ResponseMeta{
+				APIVersion:  "v1",
+				GeneratedAt: time.Now().UTC(),
+				Query:       queryMeta,
+			},
+			Results:  results,
+			Warnings: warnings,
+		}
+
+		return nil, resp, nil
+	}
+}
+
+// handleCompareDatabaseNoSQL creates the tool handler for compare_database_nosql.
+func handleCompareDatabaseNoSQL(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CompareDatabaseNoSQLInput, any] {
+	return func(ctx context.Context, req *sdk.CallToolRequest, input CompareDatabaseNoSQLInput) (*sdk.CallToolResult, any, error) {
+		if pricingSvc == nil {
+			return nil, nil, errors.New("pricing service unavailable")
+		}
+
+		region := input.Region
+		if region == "" {
+			region = "us-east"
+		}
+
+		warnings := defaultStage3Warnings()
+
+		currency := input.Currency
+		reqCurrency := currency
+		if reqCurrency == "" {
+			reqCurrency = "USD"
+		}
+		if currency != "" && currency != "USD" {
+			warnings = append(warnings, ProviderWarning{
+				Provider: "system",
+				Code:     "currency_conversion_not_yet_supported",
+				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
+			})
+		}
+		currency = "USD"
+
+		rawModel := strings.TrimSpace(input.DataModel)
+		var canonicalModel string
+		if rawModel != "" {
+			canonical, err := nosqldatamodelmap.ResolveCanonicalDataModel(rawModel)
+			if err != nil || !nosqldatamodelmap.IsSupportedStageDataModel(canonical) {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: data_model must be a supported NoSQL data model (document, key_value, wide_column, graph, multi_model)", service.ErrInvalidParameters))
+			}
+			canonicalModel = canonical
+		}
+
+		rawPricingMode := strings.ToLower(strings.TrimSpace(input.PricingMode))
+		if rawPricingMode == "" {
+			rawPricingMode = "provisioned"
+		}
+		if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" && rawPricingMode != "ondemand" {
+			return nil, nil, MapServiceError(fmt.Errorf("%w: pricing_mode must be provisioned, on_demand, or serverless", service.ErrInvalidParameters))
+		}
+		if rawPricingMode == "ondemand" {
+			rawPricingMode = "on_demand"
+		}
+
+		var reqReads float64
+		if input.ReadUnits != nil {
+			if *input.ReadUnits < 0 || *input.ReadUnits > maxAllowedNoSQLThroughput {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: read_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
+			}
+			reqReads = *input.ReadUnits
+		}
+
+		var reqWrites float64
+		if input.WriteUnits != nil {
+			if *input.WriteUnits < 0 || *input.WriteUnits > maxAllowedNoSQLThroughput {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: write_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
+			}
+			reqWrites = *input.WriteUnits
+		}
+
+		var reqStorageGB float64
+		if input.StorageGB != nil {
+			if *input.StorageGB < 0 || *input.StorageGB > maxAllowedNoSQLStorageGB {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: storage_gb must be a non-negative number up to 1000000", service.ErrInvalidParameters))
+			}
+			reqStorageGB = *input.StorageGB
+		}
+
+		var multiRegion bool
+		if input.MultiRegion != nil {
+			multiRegion = *input.MultiRegion
+		}
+
+		target := service.MatchTarget{
+			DataModel:        canonicalModel,
+			PricingMode:      rawPricingMode,
+			ReadUnits:        reqReads,
+			WriteUnits:       reqWrites,
+			NoSQLStorageGB:   reqStorageGB,
+			StorageClass:     input.StorageClass,
+			NoSQLMultiRegion: multiRegion,
+			Category:         "database_nosql",
+		}
+
+		compRes, err := pricingSvc.Compare(ctx, "database_nosql", region, target)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
+
+		for _, w := range compRes.Warnings {
+			warnings = append(warnings, ProviderWarning{
+				Provider: w.Provider,
+				Code:     w.Code,
+				Message:  w.Message,
+			})
+		}
+
+		var results []DatabaseNoSQLResultEntry
+		for _, item := range compRes.Results {
+			results = append(results, DatabaseNoSQLResultEntry{
+				Provider:          item.Provider,
+				SkuID:             item.SkuID,
+				MatchedSpec:       item.MatchedNoSQL,
+				MatchQuality:      item.MatchQuality,
+				MatchDeltaPct:     item.MatchDeltaPct,
+				MissingAttributes: item.MissingAttributes,
+				Price: PriceDetail{
+					Amount:   item.HourlyCost,
+					Unit:     item.Unit,
+					Currency: currency,
+				},
+				NormalizedHourlyUSD: item.HourlyCost,
+				FetchedAt:           item.FetchedAt,
+				Stale:               item.Stale,
+			})
+		}
+
+		queryMeta := DatabaseNoSQLQueryMeta{
+			Category:     "database_nosql",
+			Region:       region,
+			Currency:     reqCurrency,
+			DataModel:    canonicalModel,
+			PricingMode:  rawPricingMode,
+			StorageClass: input.StorageClass,
+		}
+		if input.ReadUnits != nil {
+			queryMeta.ReadUnits = input.ReadUnits
+		}
+		if input.WriteUnits != nil {
+			queryMeta.WriteUnits = input.WriteUnits
+		}
+		if input.StorageGB != nil {
+			queryMeta.StorageGB = input.StorageGB
+		}
+		if input.MultiRegion != nil {
+			queryMeta.MultiRegion = input.MultiRegion
+		}
+
+		resp := &DatabaseNoSQLComparisonResponse{
+			Meta: ResponseMeta{
+				APIVersion:  "v1",
+				GeneratedAt: time.Now().UTC(),
+				Query:       queryMeta,
+			},
+			Results:  results,
+			Warnings: warnings,
+		}
+
+		return nil, resp, nil
+	}
+}
+
 // handleCompareKubernetes creates the tool handler for compare_kubernetes.
 func handleCompareKubernetes(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CompareKubernetesInput, any] {
 	return func(ctx context.Context, req *sdk.CallToolRequest, input CompareKubernetesInput) (*sdk.CallToolResult, any, error) {
@@ -915,10 +1372,23 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 			return nil, nil, errors.New("pricing service unavailable")
 		}
 
-		if input.Compute == nil && input.Storage == nil && input.Network == nil {
+		// Alias-conflict validation: Database vs DatabaseRDBMS
+		dbReq := input.DatabaseRDBMS
+		if input.Database != nil {
+			if dbReq != nil {
+				if !reflect.DeepEqual(input.Database, input.DatabaseRDBMS) {
+					return nil, nil, MapServiceError(fmt.Errorf("%w: both 'database' and 'database_rdbms' were provided with conflicting values; provide only one when values differ", service.ErrInvalidParameters))
+				}
+			} else {
+				dbReq = input.Database
+			}
+		}
+
+		if input.Compute == nil && input.Storage == nil && input.Network == nil && dbReq == nil && input.DatabaseNoSQL == nil && input.Kubernetes == nil && input.Serverless == nil {
 			return nil, nil, MapServiceError(service.ErrNoCategoriesRequested)
 		}
 
+		var computeAttr *domain.ComputeAttributes
 		if input.Compute != nil {
 			if input.Compute.VCPU <= 0 {
 				return nil, nil, MapServiceError(fmt.Errorf("%w: compute.vcpu must be a positive number", service.ErrInvalidParameters))
@@ -926,8 +1396,14 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 			if input.Compute.RAMGB <= 0 {
 				return nil, nil, MapServiceError(fmt.Errorf("%w: compute.ram_gb must be a positive number", service.ErrInvalidParameters))
 			}
+			computeAttr = &domain.ComputeAttributes{
+				VCPU:   input.Compute.VCPU,
+				RAMGB:  input.Compute.RAMGB,
+				Family: input.Compute.Family,
+			}
 		}
 
+		var storageAttr *domain.StorageAttributes
 		if input.Storage != nil {
 			if input.Storage.SizeGB <= 0 {
 				return nil, nil, MapServiceError(fmt.Errorf("%w: storage.size_gb must be a positive number", service.ErrInvalidParameters))
@@ -935,8 +1411,13 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 			if input.Storage.SizeGB > maxStorageF {
 				return nil, nil, MapServiceError(fmt.Errorf("%w: storage.size_gb exceeds maximum limit of %s GB (1 PB)", service.ErrInvalidParameters, maxAllowedStorageSizeGB.String()))
 			}
+			storageAttr = &domain.StorageAttributes{
+				SizeGB:       input.Storage.SizeGB,
+				StorageClass: input.Storage.StorageClass,
+			}
 		}
 
+		var networkAttr *domain.NetworkAttributes
 		if input.Network != nil {
 			if input.Network.EgressGB < 0 {
 				return nil, nil, MapServiceError(fmt.Errorf("%w: network.egress_gb cannot be negative", service.ErrInvalidParameters))
@@ -944,6 +1425,138 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 			if input.Network.EgressGB > maxNetworkF {
 				return nil, nil, MapServiceError(fmt.Errorf("%w: network.egress_gb exceeds maximum limit of %s GB (10 PB)", service.ErrInvalidParameters, maxAllowedNetworkEgressGB.String()))
 			}
+			networkAttr = &domain.NetworkAttributes{
+				EgressGB:     input.Network.EgressGB,
+				TransferType: input.Network.TransferType,
+			}
+		}
+
+		var dbAttr *domain.DatabaseRDBMSAttributes
+		if dbReq != nil {
+			rawEngine := strings.TrimSpace(dbReq.Engine)
+			canonicalEngine := ""
+			if rawEngine != "" {
+				canonical, err := databaseenginemap.ResolveCanonicalEngine(rawEngine)
+				if err != nil || !databaseenginemap.IsSupportedStageEngine(canonical) {
+					return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.engine must be a supported database engine (postgresql, mysql, sqlserver)", service.ErrInvalidParameters))
+				}
+				canonicalEngine = canonical
+			}
+			if dbReq.VCPU <= 0 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.vcpu must be a positive number", service.ErrInvalidParameters))
+			}
+			if dbReq.RAMGB <= 0 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.ram_gb must be a positive number", service.ErrInvalidParameters))
+			}
+			if dbReq.StorageGB <= 0 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.storage_gb must be a positive number", service.ErrInvalidParameters))
+			}
+			if dbReq.StorageGB > maxAllowedDatabaseStorageGB {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.storage_gb exceeds maximum limit of 1,000,000 GB (1 PB)", service.ErrInvalidParameters))
+			}
+			if dbReq.IOPS != nil && *dbReq.IOPS <= 0 {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.iops must be a positive integer", service.ErrInvalidParameters))
+			}
+			dbAttr = &domain.DatabaseRDBMSAttributes{
+				Engine:        canonicalEngine,
+				VCPU:          dbReq.VCPU,
+				RAMGB:         dbReq.RAMGB,
+				StorageGB:     dbReq.StorageGB,
+				IOPS:          dbReq.IOPS,
+				MultiAZ:       dbReq.MultiAZ,
+				StorageFamily: dbReq.StorageFamily,
+			}
+		}
+
+		var nosqlAttr *domain.DatabaseNoSQLAttributes
+		if input.DatabaseNoSQL != nil {
+			rawModel := strings.TrimSpace(input.DatabaseNoSQL.DataModel)
+			canonicalModel := ""
+			if rawModel != "" {
+				canonical, err := nosqldatamodelmap.ResolveCanonicalDataModel(rawModel)
+				if err != nil || !nosqldatamodelmap.IsSupportedStageDataModel(canonical) {
+					return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.data_model must be a supported NoSQL data model (document, key_value, wide_column, graph, multi_model)", service.ErrInvalidParameters))
+				}
+				canonicalModel = canonical
+			}
+
+			rawPricingMode := strings.ToLower(strings.TrimSpace(input.DatabaseNoSQL.PricingMode))
+			if rawPricingMode == "" {
+				rawPricingMode = "provisioned"
+			}
+			if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" && rawPricingMode != "ondemand" {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.pricing_mode must be provisioned, on_demand, or serverless", service.ErrInvalidParameters))
+			}
+			if rawPricingMode == "ondemand" {
+				rawPricingMode = "on_demand"
+			}
+
+			if input.DatabaseNoSQL.ReadUnits < 0 || input.DatabaseNoSQL.ReadUnits > maxAllowedNoSQLThroughput {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.read_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
+			}
+			if input.DatabaseNoSQL.WriteUnits < 0 || input.DatabaseNoSQL.WriteUnits > maxAllowedNoSQLThroughput {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.write_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
+			}
+			if input.DatabaseNoSQL.StorageGB < 0 || input.DatabaseNoSQL.StorageGB > maxAllowedNoSQLStorageGB {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.storage_gb must be a non-negative number up to 1000000", service.ErrInvalidParameters))
+			}
+
+			nosqlAttr = &domain.DatabaseNoSQLAttributes{
+				DataModel:    canonicalModel,
+				PricingMode:  rawPricingMode,
+				ReadUnits:    input.DatabaseNoSQL.ReadUnits,
+				WriteUnits:   input.DatabaseNoSQL.WriteUnits,
+				StorageGB:    input.DatabaseNoSQL.StorageGB,
+				StorageClass: input.DatabaseNoSQL.StorageClass,
+				MultiRegion:  input.DatabaseNoSQL.MultiRegion,
+			}
+		}
+
+		var k8sAttr *domain.KubernetesAttributes
+		if input.Kubernetes != nil {
+			rawTier := strings.TrimSpace(input.Kubernetes.Tier)
+			canonicalTier := kubernetestieremap.TierStandard
+			if rawTier != "" {
+				resolved, err := kubernetestieremap.ResolveCanonicalTier(rawTier)
+				if err != nil || !kubernetestieremap.IsSupportedStageTier(resolved) {
+					return nil, nil, MapServiceError(fmt.Errorf("%w: kubernetes.tier must be a supported Kubernetes tier (free, standard, extended_support)", service.ErrInvalidParameters))
+				}
+				canonicalTier = resolved
+			}
+
+			rawTopology := strings.ToLower(strings.TrimSpace(input.Kubernetes.ClusterTopology))
+			var clusterTopology domain.ClusterTopology
+			if rawTopology != "" {
+				switch domain.ClusterTopology(rawTopology) {
+				case domain.ClusterTopologyZonal, domain.ClusterTopologyRegional, domain.ClusterTopologyAutopilot:
+					clusterTopology = domain.ClusterTopology(rawTopology)
+				default:
+					return nil, nil, MapServiceError(fmt.Errorf("%w: kubernetes.cluster_topology must be one of: zonal, regional, autopilot", service.ErrInvalidParameters))
+				}
+			}
+			k8sAttr = &domain.KubernetesAttributes{
+				Tier:            canonicalTier,
+				ClusterTopology: clusterTopology,
+			}
+		}
+
+		var serverlessWorkload *service.ServerlessWorkload
+		if input.Serverless != nil {
+			var rawReqs, rawMem, rawDur string
+			if input.Serverless.RequestsPerMonth != nil {
+				rawReqs = strconv.FormatFloat(*input.Serverless.RequestsPerMonth, 'f', -1, 64)
+			}
+			if input.Serverless.MemoryMB != nil {
+				rawMem = strconv.FormatFloat(*input.Serverless.MemoryMB, 'f', -1, 64)
+			}
+			if input.Serverless.ExecutionDurationMS != nil {
+				rawDur = strconv.FormatFloat(*input.Serverless.ExecutionDurationMS, 'f', -1, 64)
+			}
+			wl, err := service.ParseServerlessWorkload(input.Serverless.Architecture, input.Serverless.Tier, rawReqs, rawMem, rawDur)
+			if err != nil {
+				return nil, nil, MapServiceError(err)
+			}
+			serverlessWorkload = &wl
 		}
 
 		strictFamily := true
@@ -968,38 +1581,17 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 			})
 		}
 
-		var computeAttr *domain.ComputeAttributes
-		if input.Compute != nil {
-			computeAttr = &domain.ComputeAttributes{
-				VCPU:   input.Compute.VCPU,
-				RAMGB:  input.Compute.RAMGB,
-				Family: input.Compute.Family,
-			}
-		}
-
-		var storageAttr *domain.StorageAttributes
-		if input.Storage != nil {
-			storageAttr = &domain.StorageAttributes{
-				SizeGB:       input.Storage.SizeGB,
-				StorageClass: input.Storage.StorageClass,
-			}
-		}
-
-		var networkAttr *domain.NetworkAttributes
-		if input.Network != nil {
-			networkAttr = &domain.NetworkAttributes{
-				EgressGB:     input.Network.EgressGB,
-				TransferType: input.Network.TransferType,
-			}
-		}
-
 		svcReq := service.CalculateRequest{
-			Region:       region,
-			Currency:     "USD",
-			StrictFamily: strictFamily,
-			Compute:      computeAttr,
-			Storage:      storageAttr,
-			Network:      networkAttr,
+			Region:        region,
+			Currency:      "USD",
+			StrictFamily:  strictFamily,
+			Compute:       computeAttr,
+			Storage:       storageAttr,
+			Network:       networkAttr,
+			DatabaseRDBMS: dbAttr,
+			DatabaseNoSQL: nosqlAttr,
+			Kubernetes:    k8sAttr,
+			Serverless:    serverlessWorkload,
 		}
 
 		svcRes, err := pricingSvc.Calculate(ctx, svcReq)
@@ -1073,7 +1665,7 @@ func handleGetProviderStatus(freshnessSvc *service.FreshnessService) sdk.ToolHan
 	}
 }
 
-// RegisterTools registers all 5 standard CloudVitta comparison and calculation tools on the given MCP server.
+// RegisterTools registers all 9 standard CloudVitta comparison and calculation tools on the given MCP server.
 func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, freshnessSvc *service.FreshnessService, cfg *serverConfig) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "compare_compute",
@@ -1089,6 +1681,16 @@ func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, fresh
 		Name:        "compare_network",
 		Description: "Compare outbound network data transfer pricing across cloud providers for specified egress volume.",
 	}, instrumentTool("compare_network", cfg, handleCompareNetwork(pricingSvc)))
+
+	sdk.AddTool(server, &sdk.Tool{
+		Name:        "compare_database",
+		Description: "Compare managed relational database (RDBMS) pricing across cloud providers for requested engine, compute, and storage specs.",
+	}, instrumentTool("compare_database", cfg, handleCompareDatabase(pricingSvc)))
+
+	sdk.AddTool(server, &sdk.Tool{
+		Name:        "compare_database_nosql",
+		Description: "Compare managed NoSQL database pricing across cloud providers for requested data model, throughput, and capacity.",
+	}, instrumentTool("compare_database_nosql", cfg, handleCompareDatabaseNoSQL(pricingSvc)))
 
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "compare_kubernetes",
