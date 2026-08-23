@@ -134,6 +134,17 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsNetworkAdapter)
 
+	// Register AWS database adapter with rate limiting and retry config
+	awsDBClient := aws.NewClient(aws.WithURL(aws.DefaultRDSPriceListURL))
+	awsDBAdapter := aws.NewAdapter(awsDBClient, rawStorage, aws.WithCategory("database_rdbms"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "database_rdbms",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsDBAdapter)
+
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
 	azureAdapter := azure.NewAdapter(azureClient, rawStorage, azure.WithCategory("compute"))
@@ -166,6 +177,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureNetworkAdapter)
+
+	// Register Azure database adapter with rate limiting and retry config
+	azureDBClient := azure.NewClient(azure.WithURL(azure.DefaultDatabaseRetailPricesURL))
+	azureDBAdapter := azure.NewAdapter(azureDBClient, rawStorage, azure.WithCategory("database_rdbms"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "database_rdbms",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureDBAdapter)
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
@@ -213,6 +235,22 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpNetworkAdapter)
+
+	// Register GCP database adapter with rate limiting and retry config
+	var gcpDBOpts []gcp.Option
+	if cfg.GCP.APIKey != "" {
+		gcpDBOpts = append(gcpDBOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpDBOpts = append(gcpDBOpts, gcp.WithURL(gcp.DefaultDatabaseBillingCatalogURL))
+	gcpDBClient := gcp.NewClient(gcpDBOpts...)
+	gcpDBAdapter := gcp.NewAdapter(gcpDBClient, rawStorage, gcp.WithCategory("database_rdbms"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "database_rdbms",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpDBAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

@@ -59,6 +59,7 @@ classDiagram
         regionmap
         storageclassmap
         transfertypemap
+        databaseenginemap
     }
 
     class fx {

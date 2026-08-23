@@ -169,7 +169,7 @@ func (s *PricingService) GetPrices(ctx context.Context, provider, category, regi
 }
 
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {
-	computeAttrs, storageAttrs, networkAttrs, err := domain.UnmarshalAttributes(row.ServiceCategory, row.Attributes)
+	computeAttrs, storageAttrs, networkAttrs, dbAttrs, err := domain.UnmarshalAttributes(row.ServiceCategory, row.Attributes)
 	if err != nil {
 		return domain.PriceObservation{}, err
 	}
@@ -185,19 +185,20 @@ func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, erro
 	}
 
 	return domain.PriceObservation{
-		Provider:          row.Provider,
-		ServiceCategory:   row.ServiceCategory,
-		SkuID:             row.SkuID,
-		DisplayName:       row.DisplayName,
-		Region:            row.Region,
-		RegionGroup:       row.RegionGroup,
-		Unit:              row.Unit,
-		PriceAmount:       priceDec,
-		PriceCurrency:     row.PriceCurrency,
-		PricingModel:      row.PricingModel,
-		Attributes:        computeAttrs,
-		StorageAttributes: storageAttrs,
-		NetworkAttributes: networkAttrs,
-		FetchedAt:         fetchedAtTime,
+		Provider:                row.Provider,
+		ServiceCategory:         row.ServiceCategory,
+		SkuID:                   row.SkuID,
+		DisplayName:             row.DisplayName,
+		Region:                  row.Region,
+		RegionGroup:             row.RegionGroup,
+		Unit:                    row.Unit,
+		PriceAmount:             priceDec,
+		PriceCurrency:           row.PriceCurrency,
+		PricingModel:            row.PricingModel,
+		Attributes:              computeAttrs,
+		StorageAttributes:       storageAttrs,
+		NetworkAttributes:       networkAttrs,
+		DatabaseRDBMSAttributes: dbAttrs,
+		FetchedAt:               fetchedAtTime,
 	}, nil
 }

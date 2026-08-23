@@ -58,6 +58,7 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	computeHandler := NewComputeHandler(pricingSvc)
 	storageHandler := NewStorageHandler(pricingSvc)
 	networkHandler := NewNetworkHandler(pricingSvc)
+	databaseHandler := NewDatabaseHandler(pricingSvc)
 	calculateHandler := NewCalculateHandler(pricingSvc)
 	statusHandler := NewStatusHandler(freshnessSvc)
 
@@ -70,6 +71,7 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	mux.Handle("GET /api/v1/prices/compute", limiter.Handler(computeHandler))
 	mux.Handle("GET /api/v1/prices/storage", limiter.Handler(storageHandler))
 	mux.Handle("GET /api/v1/prices/network", limiter.Handler(networkHandler))
+	mux.Handle("GET /api/v1/prices/database", limiter.Handler(databaseHandler))
 	mux.Handle("GET /api/v1/providers/{provider}/status", limiter.Handler(statusHandler))
 	mux.Handle("POST /api/v1/calculate", limiter.Handler(calculateHandler))
 	mux.Handle("POST /api/v1/auth/signup", limiter.Handler(signupHandler))

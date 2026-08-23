@@ -57,19 +57,20 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		return nil, nil // No data available
 	}
 
-	var scorer CategoryScorer
+	var matchResult *MatchResult
 	switch category {
 	case "compute":
-		scorer = ComputeScorer{}
+		matchResult = MatchObservations(ComputeScorer{}, obsList, target, ThresholdsForCategory(category))
 	case "storage":
-		scorer = StorageScorer{}
+		matchResult = MatchObservations(StorageScorer{}, obsList, target, ThresholdsForCategory(category))
 	case "network":
-		scorer = NetworkScorer{}
+		matchResult = MatchObservations(NetworkScorer{}, obsList, target, ThresholdsForCategory(category))
+	case "database_rdbms":
+		matchResult = MatchDatabaseObservations(obsList, target, ThresholdsForCategory(category))
 	default:
 		return nil, ErrInvalidParameters
 	}
 
-	matchResult := MatchObservations(scorer, obsList, target, ThresholdsForCategory(category))
 	if matchResult == nil {
 		return nil, ErrNoMatchFound
 	}
@@ -106,6 +107,13 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		unit = matchResult.Observation.Unit
 		if unit == "" {
 			unit = "GB"
+		}
+	case "database_rdbms":
+		hourlyCost = matchResult.Observation.PriceAmount
+		monthlyCost = hourlyCost.Mul(HoursInMonth)
+		unit = matchResult.Observation.Unit
+		if unit == "" {
+			unit = "hour"
 		}
 	}
 

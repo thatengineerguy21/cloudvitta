@@ -30,7 +30,7 @@ func SupportedProviders() []string {
 func SupportedCategoriesForProvider(provider string) []string {
 	switch provider {
 	case "aws", "azure", "gcp":
-		return []string{"compute", "storage", "network"}
+		return []string{"compute", "storage", "network", "database_rdbms"}
 	default:
 		return nil
 	}

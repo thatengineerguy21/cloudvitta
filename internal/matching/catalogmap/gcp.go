@@ -5,14 +5,18 @@ import (
 )
 
 var gcpCatalogMap = map[string]string{
-	"Compute Engine":     "compute",
-	"6F81-5844-456A":     "compute",
-	"Cloud Storage":      "storage",
-	"95FF-2EF5-5EA1":     "storage",
-	"Cloud Interconnect": "network",
-	"Networking":         "network",
-	"Bandwidth":          "network",
-	"E89B-A08C-8A2D":     "network",
+	"Compute Engine":         "compute",
+	"6F81-5844-456A":         "compute",
+	"Cloud Storage":          "storage",
+	"95FF-2EF5-5EA1":         "storage",
+	"Cloud Interconnect":     "network",
+	"Networking":             "network",
+	"Bandwidth":              "network",
+	"E89B-A08C-8A2D":         "network",
+	"Cloud SQL":              "database_rdbms",
+	"AlloyDB":                "database_rdbms",
+	"9662-B51E-5089":         "database_rdbms",
+	"AlloyDB for PostgreSQL": "database_rdbms",
 }
 
 // MapGCPProduct resolves a GCP service display name or service ID to a normalized service category.

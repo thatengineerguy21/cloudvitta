@@ -31,8 +31,14 @@ func TestMapAWSProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
-			name:         "unmapped product fails loudly",
+			name:         "valid AmazonRDS product",
 			productCode:  "AmazonRDS",
+			wantCategory: "database_rdbms",
+			wantErr:      nil,
+		},
+		{
+			name:         "unmapped product fails loudly",
+			productCode:  "AmazonDynamoDB",
 			wantCategory: "",
 			wantErr:      ErrUnmappedProduct,
 		},

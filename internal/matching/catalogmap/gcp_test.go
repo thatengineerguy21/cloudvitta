@@ -55,6 +55,24 @@ func TestMapGCPProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Cloud SQL service display name",
+			serviceName:  "Cloud SQL",
+			wantCategory: "database_rdbms",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Cloud SQL service ID",
+			serviceName:  "9662-B51E-5089",
+			wantCategory: "database_rdbms",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid AlloyDB service display name",
+			serviceName:  "AlloyDB",
+			wantCategory: "database_rdbms",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "Cloud Bigtable",
 			wantCategory: "",

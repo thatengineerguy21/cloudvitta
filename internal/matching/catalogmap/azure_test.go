@@ -31,8 +31,14 @@ func TestMapAzureProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
-			name:         "unmapped service fails loudly",
+			name:         "valid SQL Database service",
 			serviceName:  "SQL Database",
+			wantCategory: "database_rdbms",
+			wantErr:      nil,
+		},
+		{
+			name:         "unmapped service fails loudly",
+			serviceName:  "Cosmos DB",
 			wantCategory: "",
 			wantErr:      ErrUnmappedProduct,
 		},

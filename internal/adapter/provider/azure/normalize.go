@@ -15,6 +15,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/databaseenginemap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
@@ -74,6 +75,12 @@ var knownAzureVMSpecs = map[string]azureVMSpec{
 	"Standard_D2s_v4":  {vcpu: 2, ramGB: 8, family: "d"},
 	"Standard_D4s_v4":  {vcpu: 4, ramGB: 16, family: "d"},
 	"Standard_D8s_v4":  {vcpu: 8, ramGB: 32, family: "d"},
+	"Standard_D4ds_v4": {vcpu: 4, ramGB: 16, family: "d"},
+	"Standard_D2ds_v4": {vcpu: 2, ramGB: 8, family: "d"},
+	"Standard_D8ds_v4": {vcpu: 8, ramGB: 32, family: "d"},
+	"GP_Gen5_2":        {vcpu: 2, ramGB: 10.2, family: "gp"},
+	"GP_Gen5_4":        {vcpu: 4, ramGB: 20.4, family: "gp"},
+	"GP_Gen5_8":        {vcpu: 8, ramGB: 40.8, family: "gp"},
 	"Standard_D2s_v5":  {vcpu: 2, ramGB: 8, family: "d"},
 	"Standard_D4s_v5":  {vcpu: 4, ramGB: 16, family: "d"},
 	"Standard_D8s_v5":  {vcpu: 8, ramGB: 32, family: "d"},
@@ -302,6 +309,117 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 				FetchedAt: fetchedAt,
 			}
 			observations = append(observations, obs)
+
+		} else if category == "database_rdbms" {
+			engine, err := databaseenginemap.MapAzureEngine(item.ServiceName)
+			if err != nil {
+				if errors.Is(err, databaseenginemap.ErrUnmappedDatabaseEngine) {
+					if sink != nil {
+						_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+							Provider:   "azure",
+							Category:   category,
+							Kind:       "database_engine",
+							RawValue:   item.ServiceName,
+							SkuID:      skuID,
+							ObservedAt: fetchedAt,
+						})
+					}
+					slog.Warn("azure normalize: skipping SKU due to unmapped database engine", "sku", skuID, "service", item.ServiceName)
+					continue
+				}
+				return nil, "", fmt.Errorf("azure normalize sku %s database engine: %w", skuID, err)
+			}
+
+			isStorage := strings.Contains(item.MeterName, "Storage") ||
+				strings.Contains(item.SkuName, "Storage") ||
+				strings.Contains(item.ProductName, "Storage") ||
+				strings.EqualFold(item.UnitOfMeasure, "1 GB/Month") ||
+				strings.EqualFold(item.UnitOfMeasure, "1 GB/month") ||
+				strings.EqualFold(item.UnitOfMeasure, "1 GB/Mo")
+
+			multiAZ := strings.Contains(item.MeterName, "Zone Redundant") ||
+				strings.Contains(item.SkuName, "Zone Redundant") ||
+				strings.Contains(item.MeterName, "High Availability")
+
+			if isStorage {
+				displayName := item.ProductName
+				if displayName == "" {
+					displayName = item.MeterName
+				}
+				storageFamily := "ssd"
+				if strings.Contains(strings.ToLower(item.MeterName), "premium") {
+					storageFamily = "io1"
+				}
+
+				obs := domain.PriceObservation{
+					Provider:        "azure",
+					ServiceCategory: category,
+					SkuID:           skuID,
+					DisplayName:     displayName,
+					Region:          region,
+					RegionGroup:     regionGroup,
+					Unit:            "GB-Mo",
+					PriceAmount:     priceAmount,
+					PriceCurrency:   item.CurrencyCode,
+					PricingModel:    "OnDemand",
+					DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+						Engine:        engine,
+						VCPU:          0,
+						RAMGB:         0,
+						StorageGB:     1,
+						MultiAZ:       multiAZ,
+						StorageFamily: storageFamily,
+						ComponentType: "storage",
+					},
+					FetchedAt: fetchedAt,
+				}
+				observations = append(observations, obs)
+			} else {
+				vcpu, ram, _ := parseAzureDatabaseAttributes(item.ArmSkuName, item.SkuName, item.MeterName)
+				displayName := item.ArmSkuName
+				if displayName == "" {
+					displayName = item.SkuName
+				}
+				if displayName == "" {
+					displayName = item.MeterName
+				}
+
+				tier := "standard"
+				if strings.Contains(strings.ToLower(item.ArmSkuName), "b") || strings.Contains(strings.ToLower(item.SkuName), "burstable") {
+					tier = "burstable"
+				} else if strings.Contains(strings.ToLower(item.ProductName), "flexible") {
+					tier = "flexible"
+				}
+
+				unit := item.UnitOfMeasure
+				if unit == "1 Hour" || unit == "1 hour" {
+					unit = "Hrs"
+				}
+
+				obs := domain.PriceObservation{
+					Provider:        "azure",
+					ServiceCategory: category,
+					SkuID:           skuID,
+					DisplayName:     displayName,
+					Region:          region,
+					RegionGroup:     regionGroup,
+					Unit:            unit,
+					PriceAmount:     priceAmount,
+					PriceCurrency:   item.CurrencyCode,
+					PricingModel:    "OnDemand",
+					DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+						Engine:         engine,
+						VCPU:           vcpu,
+						RAMGB:          ram,
+						StorageGB:      0,
+						MultiAZ:        multiAZ,
+						DeploymentTier: tier,
+						ComponentType:  "instance",
+					},
+					FetchedAt: fetchedAt,
+				}
+				observations = append(observations, obs)
+			}
 		}
 	}
 
@@ -428,4 +546,23 @@ func parseAzureAttributes(armSkuName, skuName, _ string) (float64, float64, stri
 	}
 
 	return 0, 0, strings.ToLower(nameToParse)
+}
+
+var vcoreRegex = regexp.MustCompile(`(?i)(\d+)\s*vCore`)
+
+func parseAzureDatabaseAttributes(armSkuName, skuName, meterName string) (float64, float64, string) {
+	if spec, ok := knownAzureVMSpecs[armSkuName]; ok {
+		return spec.vcpu, spec.ramGB, spec.family
+	}
+
+	for _, s := range []string{meterName, skuName, armSkuName} {
+		m := vcoreRegex.FindStringSubmatch(s)
+		if len(m) > 1 {
+			if v, err := strconv.ParseFloat(m[1], 64); err == nil && v > 0 {
+				return v, v * 4, "general_purpose"
+			}
+		}
+	}
+
+	return 2, 8, "general_purpose"
 }

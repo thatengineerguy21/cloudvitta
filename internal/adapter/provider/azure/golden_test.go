@@ -33,6 +33,12 @@ func TestAzureNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 2, // East US egress, Intercontinental egress
 			expectedSKUs: []string{"DZH318Z0BNZ7/0001", "DZH318Z0BNZ7/0002"},
 		},
+		{
+			name:         "Azure Database Golden",
+			goldenFile:   "../../../../testdata/golden/azure/database.json",
+			wantObsCount: 5, // PG GP 4vCore (single & HA), Storage (single & HA), SQL DB GP 4vCore
+			expectedSKUs: []string{"SKU-AZURE-PG-GP-4VCORE", "SKU-AZURE-PG-GP-4VCORE-HA", "SKU-AZURE-PG-STORAGE", "SKU-AZURE-PG-STORAGE-HA", "SKU-AZURE-SQL-GP-4VCORE"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -35,9 +35,16 @@ type MatchTarget struct {
 	EgressGB     float64
 	TransferType string // canonical: intra_region, inter_region, internet_egress
 
+	// Database RDBMS dimensions
+	Engine            string  // canonical: postgresql, mysql, sqlserver, mariadb, oracle
+	DatabaseStorageGB float64 // storage requested in GB
+	DatabaseIOPS      *int    // provisioned IOPS
+	MultiAZ           bool    // High Availability requested
+	StorageFamily     string  // optional: gp3, gp2, io1, ssd
+
 	// Cross-category controls
 	StrictFamily bool   // default true — only match within same family tier
-	Category     string // compute, storage, network
+	Category     string // compute, storage, network, database_rdbms
 }
 
 // MatchResult holds the outcome of matching one provider's observations.

@@ -42,10 +42,11 @@ type PriceObservation struct {
 	PriceAmount       decimal.Decimal   `json:"price_amount"`
 	PriceCurrency     string            `json:"price_currency"`
 	PricingModel      string            `json:"pricing_model"`
-	Attributes        ComputeAttributes `json:"attributes,omitempty"`
-	StorageAttributes StorageAttributes `json:"storage_attributes,omitempty"`
-	NetworkAttributes NetworkAttributes `json:"network_attributes,omitempty"`
-	FetchedAt         time.Time         `json:"fetched_at"`
+	Attributes              ComputeAttributes       `json:"attributes,omitempty"`
+	StorageAttributes       StorageAttributes       `json:"storage_attributes,omitempty"`
+	NetworkAttributes       NetworkAttributes       `json:"network_attributes,omitempty"`
+	DatabaseRDBMSAttributes DatabaseRDBMSAttributes `json:"database_rdbms_attributes,omitempty"`
+	FetchedAt               time.Time               `json:"fetched_at"`
 }
 
 // FetchResult bundles a batch of observations, raw storage path, and unmapped count.
@@ -70,35 +71,42 @@ func MarshalAttributes(obs PriceObservation) ([]byte, error) {
 		return json.Marshal(obs.StorageAttributes)
 	case "network":
 		return json.Marshal(obs.NetworkAttributes)
+	case "database_rdbms":
+		return json.Marshal(obs.DatabaseRDBMSAttributes)
 	default:
 		return json.Marshal(obs.Attributes)
 	}
 }
 
 // UnmarshalAttributes deserializes raw JSON bytes into the corresponding category attribute struct.
-func UnmarshalAttributes(serviceCategory string, raw []byte) (ComputeAttributes, StorageAttributes, NetworkAttributes, error) {
+func UnmarshalAttributes(serviceCategory string, raw []byte) (ComputeAttributes, StorageAttributes, NetworkAttributes, DatabaseRDBMSAttributes, error) {
 	var computeAttrs ComputeAttributes
 	var storageAttrs StorageAttributes
 	var networkAttrs NetworkAttributes
+	var databaseAttrs DatabaseRDBMSAttributes
 
 	if len(raw) == 0 {
-		return computeAttrs, storageAttrs, networkAttrs, nil
+		return computeAttrs, storageAttrs, networkAttrs, databaseAttrs, nil
 	}
 
 	switch serviceCategory {
 	case "storage":
 		if err := json.Unmarshal(raw, &storageAttrs); err != nil {
-			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal storage attributes: %w", err)
+			return computeAttrs, storageAttrs, networkAttrs, databaseAttrs, fmt.Errorf("unmarshal storage attributes: %w", err)
 		}
 	case "network":
 		if err := json.Unmarshal(raw, &networkAttrs); err != nil {
-			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal network attributes: %w", err)
+			return computeAttrs, storageAttrs, networkAttrs, databaseAttrs, fmt.Errorf("unmarshal network attributes: %w", err)
+		}
+	case "database_rdbms":
+		if err := json.Unmarshal(raw, &databaseAttrs); err != nil {
+			return computeAttrs, storageAttrs, networkAttrs, databaseAttrs, fmt.Errorf("unmarshal database attributes: %w", err)
 		}
 	default:
 		if err := json.Unmarshal(raw, &computeAttrs); err != nil {
-			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal compute attributes: %w", err)
+			return computeAttrs, storageAttrs, networkAttrs, databaseAttrs, fmt.Errorf("unmarshal compute attributes: %w", err)
 		}
 	}
 
-	return computeAttrs, storageAttrs, networkAttrs, nil
+	return computeAttrs, storageAttrs, networkAttrs, databaseAttrs, nil
 }

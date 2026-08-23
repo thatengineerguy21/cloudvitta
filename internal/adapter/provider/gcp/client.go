@@ -27,6 +27,12 @@ const DefaultNetworkServiceID = DefaultComputeServiceID
 // DefaultNetworkBillingCatalogURL is the base URL for the GCP Network Billing Catalog API.
 const DefaultNetworkBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultNetworkServiceID + "/skus"
 
+// DefaultDatabaseServiceID is the well-known GCP Cloud Billing service ID for Cloud SQL.
+const DefaultDatabaseServiceID = "9662-B51E-5089"
+
+// DefaultDatabaseBillingCatalogURL is the base URL for the GCP Cloud SQL Billing Catalog API.
+const DefaultDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultDatabaseServiceID + "/skus"
+
 // Client is an HTTP client for fetching GCP Cloud Billing Catalog API data.
 type Client struct {
 	httpClient *http.Client

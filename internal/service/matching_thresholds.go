@@ -48,6 +48,14 @@ var (
 		CloseCutoff:       0.10,
 		ApproximateCutoff: 0.50,
 	}
+
+	// DatabaseRDBMSThresholds defines match quality boundaries for relational database category.
+	// close: within 20% combined vCPU+RAM+storage+iops delta.
+	// approximate: within 50% combined delta.
+	DatabaseRDBMSThresholds = CategoryThresholds{
+		CloseCutoff:       0.20,
+		ApproximateCutoff: 0.50,
+	}
 )
 
 // ThresholdsForCategory returns the per-category thresholds for the given category.
@@ -59,6 +67,8 @@ func ThresholdsForCategory(category string) CategoryThresholds {
 		return StorageThresholds
 	case "network":
 		return NetworkThresholds
+	case "database_rdbms":
+		return DatabaseRDBMSThresholds
 	default:
 		// Fallback to the strictest thresholds for unknown categories.
 		return ComputeThresholds

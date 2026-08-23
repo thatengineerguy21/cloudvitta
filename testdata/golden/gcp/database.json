@@ -1,0 +1,169 @@
+{
+  "skus": [
+    {
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-4VCORE",
+      "skuId": "SKU-GCP-CLOUDSQL-PG-4VCORE",
+      "description": "Cloud SQL for PostgreSQL: DB instance - db-custom-4-15360 running in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud SQL",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "SQLServer",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 230000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-4VCORE-HA",
+      "skuId": "SKU-GCP-CLOUDSQL-PG-4VCORE-HA",
+      "description": "Cloud SQL for PostgreSQL: DB instance - db-custom-4-15360 (Regional HA) running in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud SQL",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "SQLServer",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 460000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-STORAGE-SSD",
+      "skuId": "SKU-GCP-CLOUDSQL-STORAGE-SSD",
+      "description": "Cloud SQL for PostgreSQL: Storage PD SSD in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud SQL",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "PDSSD",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.mo",
+            "usageUnitDescription": "gigabyte month",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 170000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-STORAGE-SSD-HA",
+      "skuId": "SKU-GCP-CLOUDSQL-STORAGE-SSD-HA",
+      "description": "Cloud SQL for PostgreSQL: Regional Storage PD SSD in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud SQL",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "PDSSD",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.mo",
+            "usageUnitDescription": "gigabyte month",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 340000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-ALLOYDB-PG-8VCORE",
+      "skuId": "SKU-GCP-ALLOYDB-PG-8VCORE",
+      "description": "AlloyDB for PostgreSQL: Instance 8 vCPU, 64 GB running in Virginia",
+      "category": {
+        "serviceDisplayName": "AlloyDB",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "AlloyDB",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 780000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ]
+}

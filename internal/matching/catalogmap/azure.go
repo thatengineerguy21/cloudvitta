@@ -5,9 +5,13 @@ import (
 )
 
 var azureCatalogMap = map[string]string{
-	"Virtual Machines": "compute",
-	"Storage":          "storage",
-	"Bandwidth":        "network",
+	"Virtual Machines":              "compute",
+	"Storage":                       "storage",
+	"Bandwidth":                     "network",
+	"Azure Database for PostgreSQL": "database_rdbms",
+	"Azure Database for MySQL":      "database_rdbms",
+	"SQL Database":                  "database_rdbms",
+	"Azure Database for MariaDB":    "database_rdbms",
 }
 
 // MapAzureProduct resolves an Azure service name to a normalized service category.

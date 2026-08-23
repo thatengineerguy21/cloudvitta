@@ -37,6 +37,13 @@ func TestAWSNormalize_GoldenCorpus(t *testing.T) {
 			expectedSKUs:  []string{"SKU-TRANSFER-US-EAST", "SKU-TRANSFER-VODAFONE-DORTMUND"},
 			expectedPrice: "0.0900000000",
 		},
+		{
+			name:          "AWS Database Golden",
+			goldenFile:    "../../../../testdata/golden/aws/database.json",
+			wantObsCount:  6, // RDS PG M6g xlarge (single & HA), GP3 (single & HA), Aurora PG R6g 2xlarge, Aurora Storage
+			expectedSKUs:  []string{"SKU-RDS-PG-M6G-XLARGE", "SKU-RDS-PG-M6G-XLARGE-HA", "SKU-RDS-STORAGE-GP3", "SKU-RDS-STORAGE-GP3-HA", "SKU-AURORA-PG-R6G-2XLARGE", "SKU-AURORA-STORAGE"},
+			expectedPrice: "0.2600000000",
+		},
 	}
 
 	for _, tt := range tests {

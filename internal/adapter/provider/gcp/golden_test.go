@@ -33,6 +33,12 @@ func TestGCPNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 1, // Premium Tier Internet Egress
 			expectedSKUs: []string{"SKU-GCP-NETWORK-PREMIUM"},
 		},
+		{
+			name:         "GCP Database Golden",
+			goldenFile:   "../../../../testdata/golden/gcp/database.json",
+			wantObsCount: 5, // Cloud SQL PG 4vCore (single & HA), Storage (single & HA), AlloyDB PG 8vCore
+			expectedSKUs: []string{"SKU-GCP-CLOUDSQL-PG-4VCORE", "SKU-GCP-CLOUDSQL-PG-4VCORE-HA", "SKU-GCP-CLOUDSQL-STORAGE-SSD", "SKU-GCP-CLOUDSQL-STORAGE-SSD-HA", "SKU-GCP-ALLOYDB-PG-8VCORE"},
+		},
 	}
 
 	for _, tt := range tests {
