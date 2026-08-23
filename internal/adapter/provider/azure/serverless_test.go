@@ -8,7 +8,6 @@ import (
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
 )
 
 func TestNormalize_AzureServerlessGolden(t *testing.T) {
@@ -42,7 +41,7 @@ func TestNormalize_AzureServerlessGolden(t *testing.T) {
 		if o.Region != "eastus" || o.RegionGroup != "us-east" {
 			t.Errorf("unexpected region/group: %s / %s", o.Region, o.RegionGroup)
 		}
-		if o.ServerlessRateAttributes.Architecture != serverlessarchmap.ArchX86_64 {
+		if o.ServerlessRateAttributes.Architecture != domain.ArchitectureX86_64 {
 			t.Errorf("unexpected architecture: %s", o.ServerlessRateAttributes.Architecture)
 		}
 		if o.ServerlessRateAttributes.Tier != domain.ServerlessTierConsumption &&

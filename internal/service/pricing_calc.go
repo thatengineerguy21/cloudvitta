@@ -185,11 +185,11 @@ func init() {
 			return MatchServerlessObservations(obsList, target, thresholds)
 		},
 		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
-			hourlyCost := match.Observation.PriceAmount
-			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			monthlyCost := match.Observation.PriceAmount
+			hourlyCost := monthlyCost.Div(HoursInMonth)
 			unit := match.Observation.Unit
 			if unit == "" {
-				unit = "hour"
+				unit = "month"
 			}
 			return hourlyCost, monthlyCost, unit, nil
 		},

@@ -34,13 +34,13 @@
       "serviceProviderName": "Google"
     },
     {
-      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-EXEC-TIME",
-      "skuId": "SKU-GCP-CF-EXEC-TIME",
-      "description": "Cloud Functions Execution Time",
+      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-CPU-TIME",
+      "skuId": "SKU-GCP-CF-CPU-TIME",
+      "description": "Cloud Functions CPU Time",
       "category": {
         "serviceDisplayName": "Cloud Functions",
         "resourceFamily": "ApplicationServices",
-        "resourceGroup": "Time",
+        "resourceGroup": "CPU",
         "usageType": "OnDemand"
       },
       "serviceRegions": [
@@ -57,7 +57,40 @@
                 "unitPrice": {
                   "currencyCode": "USD",
                   "units": "0",
-                  "nanos": 16500
+                  "nanos": 10000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-MEM-TIME",
+      "skuId": "SKU-GCP-CF-MEM-TIME",
+      "description": "Cloud Functions Memory Time",
+      "category": {
+        "serviceDisplayName": "Cloud Functions",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Memory",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.s",
+            "usageUnitDescription": "gigabyte seconds",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 2500
                 }
               }
             ]

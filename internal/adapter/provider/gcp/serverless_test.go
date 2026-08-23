@@ -8,7 +8,6 @@ import (
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
 )
 
 func TestNormalize_GCPServerlessGolden(t *testing.T) {
@@ -25,10 +24,11 @@ func TestNormalize_GCPServerlessGolden(t *testing.T) {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
 
-	if len(obs) != 2 {
-		t.Fatalf("expected 2 observations, got %d", len(obs))
+	if len(obs) != 3 {
+		t.Fatalf("expected 3 observations (request_fee, duration_fee_cpu, duration_fee_memory), got %d", len(obs))
 	}
 
+	componentTypes := make(map[string]bool)
 	for _, o := range obs {
 		if o.Provider != "gcp" {
 			t.Errorf("expected Provider gcp, got %s", o.Provider)
@@ -42,13 +42,20 @@ func TestNormalize_GCPServerlessGolden(t *testing.T) {
 		if o.Region != "us-central1" || o.RegionGroup != "us-central" {
 			t.Errorf("unexpected region/group: %s / %s", o.Region, o.RegionGroup)
 		}
-		if o.ServerlessRateAttributes.Architecture != serverlessarchmap.ArchX86_64 {
+		if o.ServerlessRateAttributes.Architecture != domain.ArchitectureX86_64 {
 			t.Errorf("unexpected architecture: %s", o.ServerlessRateAttributes.Architecture)
 		}
-		if o.ServerlessRateAttributes.ComponentType != domain.ComponentTypeRequestFee &&
-			o.ServerlessRateAttributes.ComponentType != domain.ComponentTypeDurationFee {
-			t.Errorf("unexpected component type: %s", o.ServerlessRateAttributes.ComponentType)
-		}
+		componentTypes[o.ServerlessRateAttributes.ComponentType] = true
+	}
+
+	if !componentTypes[domain.ComponentTypeRequestFee] {
+		t.Errorf("expected request_fee component observation")
+	}
+	if !componentTypes[domain.ComponentTypeDurationFeeCPU] {
+		t.Errorf("expected duration_fee_cpu component observation")
+	}
+	if !componentTypes[domain.ComponentTypeDurationFeeMemory] {
+		t.Errorf("expected duration_fee_memory component observation")
 	}
 }
 
@@ -109,5 +116,56 @@ func TestNormalize_GCPServerless_UnmappedArchQuarantine(t *testing.T) {
 	item := sink.items[0]
 	if item.Provider != "gcp" || item.Category != "serverless" || item.Kind != "serverless_architecture" || item.SkuID != "SKU-GCP-CF-ARM-INVOCATIONS" {
 		t.Errorf("unexpected quarantine item: %+v", item)
+	}
+}
+
+func TestNormalize_GCPServerless_UnmappedUnitQuarantine(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
+	rawJSON := `{
+		"skus": [
+			{
+				"name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-UNKNOWN-UNIT",
+				"skuId": "SKU-GCP-CF-UNKNOWN-UNIT",
+				"description": "Cloud Functions Unknown Meter",
+				"category": {
+					"serviceDisplayName": "Cloud Functions",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "UnknownGroup",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": [
+					"us-central1"
+				],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "unknown_metric_unit",
+							"usageUnitDescription": "unknown",
+							"tieredRates": [
+								{
+									"startUsageAmount": 0,
+									"unitPrice": {
+										"currencyCode": "USD",
+										"units": "1",
+										"nanos": 0
+									}
+								}
+							]
+						}
+					}
+				],
+				"serviceProviderName": "Google"
+			}
+		]
+	}`
+
+	sink := &mockQuarantineSink{}
+	obs, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	if err != nil {
+		t.Fatalf("Normalize() unexpected error: %v", err)
+	}
+
+	if len(obs) != 0 {
+		t.Fatalf("expected 0 normalized observations, got %d", len(obs))
 	}
 }

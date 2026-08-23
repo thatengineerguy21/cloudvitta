@@ -63,6 +63,7 @@ classDiagram
         nosqldatamodelmap
         kubernetestieremap
         serverlessarchmap
+        serverlessunitmap
     }
 
     class fx {

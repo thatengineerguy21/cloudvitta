@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -825,52 +825,25 @@ func handleCompareServerless(pricingSvc *service.PricingService) sdk.ToolHandler
 		}
 		currency = "USD"
 
-		rawArch := strings.TrimSpace(input.Architecture)
-		canonicalArch := serverlessarchmap.ArchX86_64
-		if rawArch != "" {
-			resolved, err := serverlessarchmap.ResolveCanonicalArchitecture(rawArch)
-			if err != nil || !serverlessarchmap.IsSupportedStageArchitecture(resolved) {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: architecture must be a supported CPU architecture (x86_64, arm64)", service.ErrInvalidParameters))
-			}
-			canonicalArch = resolved
-		}
-
-		rawTier := strings.ToLower(strings.TrimSpace(input.Tier))
-		if rawTier == "" {
-			rawTier = domain.ServerlessTierConsumption
-		}
-
-		requestsPerMonth := 1_000_000.0
+		var rawReqs, rawMem, rawDur string
 		if input.RequestsPerMonth != nil {
-			if *input.RequestsPerMonth < 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: requests_per_month must be a non-negative number", service.ErrInvalidParameters))
-			}
-			requestsPerMonth = *input.RequestsPerMonth
+			rawReqs = strconv.FormatFloat(*input.RequestsPerMonth, 'f', -1, 64)
 		}
-
-		memoryMB := 512.0
 		if input.MemoryMB != nil {
-			if *input.MemoryMB < 128 || *input.MemoryMB > 10240 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: memory_mb must be between 128 and 10240 MB", service.ErrInvalidParameters))
-			}
-			memoryMB = *input.MemoryMB
+			rawMem = strconv.FormatFloat(*input.MemoryMB, 'f', -1, 64)
+		}
+		if input.ExecutionDurationMS != nil {
+			rawDur = strconv.FormatFloat(*input.ExecutionDurationMS, 'f', -1, 64)
 		}
 
-		executionDurationMS := 200.0
-		if input.ExecutionDurationMS != nil {
-			if *input.ExecutionDurationMS < 1 || *input.ExecutionDurationMS > 900000 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: execution_duration_ms must be between 1 and 900000 ms", service.ErrInvalidParameters))
-			}
-			executionDurationMS = *input.ExecutionDurationMS
+		workload, err := service.ParseServerlessWorkload(input.Architecture, input.Tier, rawReqs, rawMem, rawDur)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
 		}
 
 		target := service.MatchTarget{
-			Category:               "serverless",
-			ServerlessArchitecture: canonicalArch,
-			ServerlessTier:         rawTier,
-			RequestsPerMonth:       requestsPerMonth,
-			MemoryMB:               memoryMB,
-			ExecutionDurationMS:    executionDurationMS,
+			Category:           "serverless",
+			ServerlessWorkload: workload,
 		}
 
 		compRes, err := pricingSvc.Compare(ctx, "serverless", region, target)
@@ -911,8 +884,8 @@ func handleCompareServerless(pricingSvc *service.PricingService) sdk.ToolHandler
 			Category:            "serverless",
 			Region:              region,
 			Currency:            reqCurrency,
-			Architecture:        canonicalArch,
-			Tier:                rawTier,
+			Architecture:        workload.Architecture,
+			Tier:                workload.Tier,
 			RequestsPerMonth:    input.RequestsPerMonth,
 			MemoryMB:            input.MemoryMB,
 			ExecutionDurationMS: input.ExecutionDurationMS,

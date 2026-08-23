@@ -54,8 +54,8 @@ func TestGCPNormalize_GoldenCorpus(t *testing.T) {
 		{
 			name:         "GCP Serverless Golden",
 			goldenFile:   "../../../../testdata/golden/gcp/serverless.json",
-			wantObsCount: 2, // Invocations, Execution Time
-			expectedSKUs: []string{"SKU-GCP-CF-INVOCATIONS", "SKU-GCP-CF-EXEC-TIME"},
+			wantObsCount: 3, // Invocations, CPU Time, Memory Time
+			expectedSKUs: []string{"SKU-GCP-CF-INVOCATIONS", "SKU-GCP-CF-CPU-TIME", "SKU-GCP-CF-MEM-TIME"},
 		},
 	}
 

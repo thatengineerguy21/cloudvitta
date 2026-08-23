@@ -14,7 +14,6 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
@@ -137,9 +136,10 @@ func TestServerlessHandler_Success_Comparison(t *testing.T) {
 			Unit:            "Requests",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchX86_64,
+				Architecture:  domain.ArchitectureX86_64,
 				Tier:          domain.ServerlessTierConsumption,
 				ComponentType: domain.ComponentTypeRequestFee,
+				Unit:          domain.UnitPerMillionRequests,
 			},
 			FetchedAt: fixedTime,
 		},
@@ -153,9 +153,10 @@ func TestServerlessHandler_Success_Comparison(t *testing.T) {
 			Unit:            "Seconds",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchX86_64,
+				Architecture:  domain.ArchitectureX86_64,
 				Tier:          domain.ServerlessTierConsumption,
 				ComponentType: domain.ComponentTypeDurationFee,
+				Unit:          domain.UnitPerGBSecond,
 			},
 			FetchedAt: fixedTime,
 		},
@@ -169,9 +170,10 @@ func TestServerlessHandler_Success_Comparison(t *testing.T) {
 			Unit:            "Requests",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchARM64,
+				Architecture:  domain.ArchitectureARM64,
 				Tier:          domain.ServerlessTierConsumption,
 				ComponentType: domain.ComponentTypeRequestFee,
+				Unit:          domain.UnitPerMillionRequests,
 			},
 			FetchedAt: fixedTime,
 		},
@@ -185,9 +187,10 @@ func TestServerlessHandler_Success_Comparison(t *testing.T) {
 			Unit:            "Seconds",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchARM64,
+				Architecture:  domain.ArchitectureARM64,
 				Tier:          domain.ServerlessTierConsumption,
 				ComponentType: domain.ComponentTypeDurationFee,
+				Unit:          domain.UnitPerGBSecond,
 			},
 			FetchedAt: fixedTime,
 		},
@@ -205,9 +208,10 @@ func TestServerlessHandler_Success_Comparison(t *testing.T) {
 			Unit:            "10",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchX86_64,
+				Architecture:  domain.ArchitectureX86_64,
 				Tier:          domain.ServerlessTierConsumption,
 				ComponentType: domain.ComponentTypeRequestFee,
+				Unit:          domain.UnitPer10Requests,
 			},
 			FetchedAt: fixedTime,
 		},
@@ -221,9 +225,10 @@ func TestServerlessHandler_Success_Comparison(t *testing.T) {
 			Unit:            "1 GB Second",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchX86_64,
+				Architecture:  domain.ArchitectureX86_64,
 				Tier:          domain.ServerlessTierConsumption,
 				ComponentType: domain.ComponentTypeDurationFee,
+				Unit:          domain.UnitPerGBSecond,
 			},
 			FetchedAt: fixedTime,
 		},
@@ -241,25 +246,44 @@ func TestServerlessHandler_Success_Comparison(t *testing.T) {
 			Unit:            "Calls",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchX86_64,
+				Architecture:  domain.ArchitectureX86_64,
 				Tier:          domain.ServerlessTierConsumption,
 				ComponentType: domain.ComponentTypeRequestFee,
+				Unit:          domain.UnitPerRequest,
 			},
 			FetchedAt: fixedTime,
 		},
 		{
 			Provider:        "gcp",
 			ServiceCategory: "serverless",
-			SkuID:           "SKU-GCP-DUR",
+			SkuID:           "SKU-GCP-CPU",
 			Region:          "us-east4",
 			RegionGroup:     regionGroup,
-			PriceAmount:     decimal.RequireFromString("0.0000165"),
+			PriceAmount:     decimal.RequireFromString("0.0000100"),
 			Unit:            "s",
 			PriceCurrency:   "USD",
 			ServerlessRateAttributes: domain.ServerlessRateAttributes{
-				Architecture:  serverlessarchmap.ArchX86_64,
+				Architecture:  domain.ArchitectureX86_64,
 				Tier:          domain.ServerlessTierConsumption,
-				ComponentType: domain.ComponentTypeDurationFee,
+				ComponentType: domain.ComponentTypeDurationFeeCPU,
+				Unit:          domain.UnitPerGHzSecond,
+			},
+			FetchedAt: fixedTime,
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-GCP-MEM",
+			Region:          "us-east4",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.0000025"),
+			Unit:            "GiBy.s",
+			PriceCurrency:   "USD",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  domain.ArchitectureX86_64,
+				Tier:          domain.ServerlessTierConsumption,
+				ComponentType: domain.ComponentTypeDurationFeeMemory,
+				Unit:          domain.UnitPerGBSecond,
 			},
 			FetchedAt: fixedTime,
 		},

@@ -11,6 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessunitmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
 
@@ -85,7 +86,28 @@ func normalizeAzureServerlessItem(item azureItem, category, region, regionGroup,
 		displayName = item.MeterName
 	}
 
-	unit := item.UnitOfMeasure
+	rawUnit := item.UnitOfMeasure
+	canonicalUnit, err := serverlessunitmap.MapAzureUnit(rawUnit, componentType)
+	if err != nil && meterName != "" && meterName != rawUnit {
+		canonicalUnit, err = serverlessunitmap.MapAzureUnit(meterName, componentType)
+	}
+	if err != nil {
+		if errors.Is(err, serverlessunitmap.ErrUnmappedUnit) {
+			if sink != nil {
+				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+					Provider:   "azure",
+					Category:   category,
+					Kind:       "serverless_unit",
+					RawValue:   rawUnit + " " + meterName,
+					SkuID:      skuID,
+					ObservedAt: fetchedAt,
+				})
+			}
+			slog.Warn("azure normalize: skipping SKU due to unmapped serverless unit", "sku", skuID, "unit", rawUnit, "meter_name", meterName)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+	}
 
 	return &domain.PriceObservation{
 		Provider:        "azure",
@@ -94,7 +116,7 @@ func normalizeAzureServerlessItem(item azureItem, category, region, regionGroup,
 		DisplayName:     displayName,
 		Region:          region,
 		RegionGroup:     regionGroup,
-		Unit:            unit,
+		Unit:            rawUnit,
 		PriceAmount:     priceAmount,
 		PriceCurrency:   item.CurrencyCode,
 		PricingModel:    "OnDemand",
@@ -102,6 +124,7 @@ func normalizeAzureServerlessItem(item azureItem, category, region, regionGroup,
 			Architecture:  arch,
 			Tier:          tier,
 			ComponentType: componentType,
+			Unit:          canonicalUnit,
 		},
 		FetchedAt: fetchedAt,
 	}, nil

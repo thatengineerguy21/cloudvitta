@@ -3,15 +3,11 @@ package rest
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
@@ -88,59 +84,21 @@ func (h *ServerlessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	reqCurrency, _, warnings := NormalizeCurrencyAndWarnings(q.Get("currency"))
 
-	rawArch := strings.TrimSpace(q.Get("architecture"))
-	canonicalArch := serverlessarchmap.ArchX86_64
-	if rawArch != "" {
-		resolved, err := serverlessarchmap.ResolveCanonicalArchitecture(rawArch)
-		if err != nil || !serverlessarchmap.IsSupportedStageArchitecture(resolved) {
-			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", "architecture must be a supported CPU architecture (x86_64, arm64)")
-			return
-		}
-		canonicalArch = resolved
-	}
-
-	rawTier := strings.ToLower(strings.TrimSpace(q.Get("tier")))
-	if rawTier == "" {
-		rawTier = domain.ServerlessTierConsumption
-	}
-
-	requestsPerMonth := 1_000_000.0
-	if rawReq := q.Get("requests_per_month"); rawReq != "" {
-		val, err := strconv.ParseFloat(rawReq, 64)
-		if err != nil || val < 0 {
-			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", "requests_per_month must be a non-negative number")
-			return
-		}
-		requestsPerMonth = val
-	}
-
-	memoryMB := 512.0
-	if rawMem := q.Get("memory_mb"); rawMem != "" {
-		val, err := strconv.ParseFloat(rawMem, 64)
-		if err != nil || val < 128 || val > 10240 {
-			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", fmt.Sprintf("memory_mb must be between 128 and 10240 MB (got %s)", rawMem))
-			return
-		}
-		memoryMB = val
-	}
-
-	executionDurationMS := 200.0
-	if rawDur := q.Get("execution_duration_ms"); rawDur != "" {
-		val, err := strconv.ParseFloat(rawDur, 64)
-		if err != nil || val < 1 || val > 900000 {
-			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", fmt.Sprintf("execution_duration_ms must be between 1 and 900000 ms (got %s)", rawDur))
-			return
-		}
-		executionDurationMS = val
+	workload, err := service.ParseServerlessWorkload(
+		q.Get("architecture"),
+		q.Get("tier"),
+		q.Get("requests_per_month"),
+		q.Get("memory_mb"),
+		q.Get("execution_duration_ms"),
+	)
+	if err != nil {
+		middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", err.Error())
+		return
 	}
 
 	target := service.MatchTarget{
-		Category:               "serverless",
-		ServerlessArchitecture: canonicalArch,
-		ServerlessTier:         rawTier,
-		RequestsPerMonth:       requestsPerMonth,
-		MemoryMB:               memoryMB,
-		ExecutionDurationMS:    executionDurationMS,
+		Category:           "serverless",
+		ServerlessWorkload: workload,
 	}
 
 	compResult, err := h.pricingSvc.Compare(r.Context(), "serverless", region, target)
@@ -183,11 +141,11 @@ func (h *ServerlessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	queryMeta := map[string]interface{}{
-		"architecture":          canonicalArch,
-		"tier":                  rawTier,
-		"requests_per_month":    requestsPerMonth,
-		"memory_mb":             memoryMB,
-		"execution_duration_ms": executionDurationMS,
+		"architecture":          workload.Architecture,
+		"tier":                  workload.Tier,
+		"requests_per_month":    workload.RequestsPerMonth,
+		"memory_mb":             workload.MemoryMB,
+		"execution_duration_ms": workload.ExecutionDurationMS,
 		"region":                region,
 		"currency":              reqCurrency,
 	}

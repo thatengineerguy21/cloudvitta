@@ -4,8 +4,18 @@ import (
 	"math"
 	"sort"
 
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
+
+// ServerlessWorkload holds caller-specified workload parameters for serverless compute matching and cost estimation.
+type ServerlessWorkload struct {
+	Architecture        string          // canonical: x86_64, arm64
+	Tier                string          // canonical: consumption, flex_consumption, 1st_gen, 2nd_gen
+	ExecutionDurationMS decimal.Decimal // average execution duration in milliseconds
+	MemoryMB            decimal.Decimal // allocated memory in MB
+	RequestsPerMonth    decimal.Decimal // invocation requests per month
+}
 
 // CategoryScorer is the Strategy interface for per-category distance scoring.
 // Each category (compute, storage, network) implements its own scorer.
@@ -55,11 +65,7 @@ type MatchTarget struct {
 	ClusterTopology domain.ClusterTopology // GCP-specific: zonal, regional, autopilot
 
 	// Serverless dimensions
-	ServerlessArchitecture string  // canonical: x86_64, arm64
-	ServerlessTier         string  // canonical: consumption, flex_consumption, 1st_gen, 2nd_gen
-	ExecutionDurationMS    float64 // average execution duration in milliseconds
-	MemoryMB               float64 // allocated memory in MB
-	RequestsPerMonth       float64 // invocation requests per month
+	ServerlessWorkload ServerlessWorkload
 
 	// Cross-category controls
 	StrictFamily bool   // default true — only match within same family tier

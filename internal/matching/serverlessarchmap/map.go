@@ -8,27 +8,21 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
-// Canonical architecture constants for serverless compute.
-const (
-	ArchX86_64 = domain.ArchitectureX86_64
-	ArchARM64  = domain.ArchitectureARM64
-)
-
 // ErrUnmappedArchitecture is returned when a raw architecture value cannot be mapped to canonical taxonomy.
 var ErrUnmappedArchitecture = errors.New("serverlessarchmap: unmapped architecture")
 
 // SupportedCanonicalArchitectures returns the list of canonical architectures active in the current stage.
 func SupportedCanonicalArchitectures() []string {
 	return []string{
-		ArchX86_64,
-		ArchARM64,
+		domain.ArchitectureX86_64,
+		domain.ArchitectureARM64,
 	}
 }
 
 // IsSupportedStageArchitecture returns true if the architecture is active in the current stage.
 func IsSupportedStageArchitecture(arch string) bool {
 	switch strings.ToLower(strings.TrimSpace(arch)) {
-	case ArchX86_64, ArchARM64:
+	case domain.ArchitectureX86_64, domain.ArchitectureARM64:
 		return true
 	default:
 		return false
@@ -46,10 +40,10 @@ func ResolveCanonicalArchitecture(rawArch string) (string, error) {
 
 	lower := strings.ToLower(trimmed)
 	switch lower {
-	case ArchX86_64, "x86", "x86-64", "amd64", "intel":
-		return ArchX86_64, nil
-	case ArchARM64, "arm", "graviton", "graviton2":
-		return ArchARM64, nil
+	case domain.ArchitectureX86_64, "x86", "x86-64", "amd64", "intel":
+		return domain.ArchitectureX86_64, nil
+	case domain.ArchitectureARM64, "arm", "graviton", "graviton2":
+		return domain.ArchitectureARM64, nil
 	}
 
 	for _, prov := range []string{"aws", "azure", "gcp"} {

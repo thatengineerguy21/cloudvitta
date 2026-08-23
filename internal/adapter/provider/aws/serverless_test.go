@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
 func TestNormalize_AWSServerlessGolden(t *testing.T) {
@@ -41,8 +41,8 @@ func TestNormalize_AWSServerlessGolden(t *testing.T) {
 		if o.Region != "us-east-1" || o.RegionGroup != "us-east" {
 			t.Errorf("unexpected region/group: %s / %s", o.Region, o.RegionGroup)
 		}
-		if o.ServerlessRateAttributes.Architecture != serverlessarchmap.ArchX86_64 &&
-			o.ServerlessRateAttributes.Architecture != serverlessarchmap.ArchARM64 {
+		if o.ServerlessRateAttributes.Architecture != domain.ArchitectureX86_64 &&
+			o.ServerlessRateAttributes.Architecture != domain.ArchitectureARM64 {
 			t.Errorf("unexpected architecture: %s", o.ServerlessRateAttributes.Architecture)
 		}
 		if o.ServerlessRateAttributes.ComponentType != "request_fee" &&

@@ -12,6 +12,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessunitmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
 
@@ -132,6 +133,28 @@ func normalizeServerlessProduct(prod awsProduct, serviceCode, sku string, fetche
 		return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
 	}
 
+	unit, err := serverlessunitmap.MapAWSUnit(archLookupKey, componentType)
+	if err != nil && usageType != "" && usageType != archLookupKey {
+		unit, err = serverlessunitmap.MapAWSUnit(usageType, componentType)
+	}
+	if err != nil {
+		if errors.Is(err, serverlessunitmap.ErrUnmappedUnit) {
+			if sink != nil {
+				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+					Provider:   "aws",
+					Category:   category,
+					Kind:       "serverless_unit",
+					RawValue:   archLookupKey,
+					SkuID:      sku,
+					ObservedAt: fetchedAt,
+				})
+			}
+			slog.Warn("aws normalize: skipping SKU due to unmapped serverless unit", "sku", sku, "unit_key", archLookupKey)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+	}
+
 	displayName := desc
 	if displayName == "" {
 		if componentType == domain.ComponentTypeRequestFee {
@@ -151,6 +174,7 @@ func normalizeServerlessProduct(prod awsProduct, serviceCode, sku string, fetche
 			Architecture:  arch,
 			Tier:          domain.ServerlessTierConsumption,
 			ComponentType: componentType,
+			Unit:          unit,
 		},
 	}, nil
 }
