@@ -51,6 +51,13 @@ func TestAWSNormalize_GoldenCorpus(t *testing.T) {
 			expectedSKUs:  []string{"SKU-DDB-READ-PROVISIONED", "SKU-DDB-WRITE-PROVISIONED", "SKU-DDB-READ-ONDEMAND", "SKU-DDB-WRITE-ONDEMAND", "SKU-DDB-STORAGE-STANDARD", "SKU-DDB-STORAGE-IA"},
 			expectedPrice: "0.0001300000",
 		},
+		{
+			name:          "AWS Kubernetes Golden",
+			goldenFile:    "../../../../testdata/golden/aws/kubernetes.json",
+			wantObsCount:  2, // Standard, Extended Support
+			expectedSKUs:  []string{"SKU-AWS-EKS-STANDARD", "SKU-AWS-EKS-EXTENDED"},
+			expectedPrice: "0.1000000000",
+		},
 	}
 
 	for _, tt := range tests {

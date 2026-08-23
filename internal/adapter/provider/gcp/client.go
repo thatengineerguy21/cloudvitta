@@ -39,6 +39,12 @@ const DefaultNoSQLDatabaseServiceID = "C237-7D12-9F12"
 // DefaultNoSQLDatabaseBillingCatalogURL is the base URL for the GCP Cloud Firestore Billing Catalog API.
 const DefaultNoSQLDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultNoSQLDatabaseServiceID + "/skus"
 
+// DefaultKubernetesServiceID is the well-known GCP Cloud Billing service ID for Kubernetes Engine (GKE).
+const DefaultKubernetesServiceID = "44CD-3C5E-2A4B"
+
+// DefaultKubernetesBillingCatalogURL is the base URL for the GCP Kubernetes Engine Billing Catalog API.
+const DefaultKubernetesBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultKubernetesServiceID + "/skus"
+
 // Client is an HTTP client for fetching GCP Cloud Billing Catalog API data.
 type Client struct {
 	httpClient *http.Client

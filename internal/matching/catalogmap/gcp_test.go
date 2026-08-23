@@ -85,6 +85,18 @@ func TestMapGCPProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Kubernetes Engine service display name",
+			serviceName:  "Kubernetes Engine",
+			wantCategory: "kubernetes",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Kubernetes Engine service ID",
+			serviceName:  "44CD-3C5E-2A4B",
+			wantCategory: "kubernetes",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "Cloud Bigtable",
 			wantCategory: "",

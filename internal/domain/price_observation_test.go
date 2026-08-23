@@ -154,4 +154,26 @@ func TestMarshalUnmarshalOtherCategoryAttributes(t *testing.T) {
 		nosqlTarget.DatabaseNoSQLAttributes.ComponentType != "throughput" {
 		t.Errorf("unexpected database_nosql attributes: %+v", nosqlTarget.DatabaseNoSQLAttributes)
 	}
+
+	// Kubernetes
+	k8s := domain.PriceObservation{
+		ServiceCategory: "kubernetes",
+		KubernetesAttributes: domain.KubernetesAttributes{
+			Tier:            "standard",
+			ClusterTopology: "zonal",
+		},
+	}
+	k8sBytes, err := domain.MarshalAttributes(k8s)
+	if err != nil {
+		t.Fatalf("MarshalAttributes(kubernetes) failed: %v", err)
+	}
+	var k8sTarget domain.PriceObservation
+	k8sTarget.ServiceCategory = "kubernetes"
+	if err := domain.UnmarshalAttributes(&k8sTarget, k8sBytes); err != nil {
+		t.Fatalf("UnmarshalAttributes(kubernetes) failed: %v", err)
+	}
+	if k8sTarget.KubernetesAttributes.Tier != "standard" ||
+		k8sTarget.KubernetesAttributes.ClusterTopology != "zonal" {
+		t.Errorf("unexpected kubernetes attributes: %+v", k8sTarget.KubernetesAttributes)
+	}
 }

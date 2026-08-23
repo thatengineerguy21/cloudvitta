@@ -64,6 +64,14 @@ var (
 		CloseCutoff:       0.20,
 		ApproximateCutoff: 0.50,
 	}
+
+	// KubernetesThresholds defines match quality boundaries for Kubernetes control plane category.
+	// close: within 20% tier mismatch penalty.
+	// approximate: within 50% combined delta.
+	KubernetesThresholds = CategoryThresholds{
+		CloseCutoff:       0.20,
+		ApproximateCutoff: 0.50,
+	}
 )
 
 // ThresholdsForCategory returns the per-category thresholds for the given category.
@@ -79,6 +87,8 @@ func ThresholdsForCategory(category string) CategoryThresholds {
 		return DatabaseRDBMSThresholds
 	case "database_nosql":
 		return DatabaseNoSQLThresholds
+	case "kubernetes":
+		return KubernetesThresholds
 	default:
 		// Fallback to the strictest thresholds for unknown categories.
 		return ComputeThresholds

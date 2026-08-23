@@ -45,6 +45,12 @@ func TestAzureNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 4, // 100 RU/s, Serverless 1M RUs, Transactional Storage, Analytical Storage
 			expectedSKUs: []string{"SKU-AZURE-COSMOS-PROVISIONED-100RU", "SKU-AZURE-COSMOS-SERVERLESS-1MRU", "SKU-AZURE-COSMOS-STORAGE-TRANSACTIONAL", "SKU-AZURE-COSMOS-STORAGE-ANALYTICAL"},
 		},
+		{
+			name:         "Azure Kubernetes Golden",
+			goldenFile:   "../../../../testdata/golden/azure/kubernetes.json",
+			wantObsCount: 3, // Free, Standard, Extended Support
+			expectedSKUs: []string{"SKU-AZURE-AKS-FREE", "SKU-AZURE-AKS-STANDARD", "SKU-AZURE-AKS-EXTENDED"},
+		},
 	}
 
 	for _, tt := range tests {

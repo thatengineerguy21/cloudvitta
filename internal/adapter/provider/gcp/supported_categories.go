@@ -7,6 +7,7 @@ var supportedCategories = map[string]bool{
 	"network":        true,
 	"database_rdbms": true,
 	"database_nosql": true,
+	"kubernetes":     true,
 }
 
 // IsCategorySupported reports whether the specified category is supported by the GCP adapter.
@@ -16,5 +17,5 @@ func IsCategorySupported(category string) bool {
 
 // SupportedCategories returns a copy of the supported category names.
 func SupportedCategories() []string {
-	return []string{"compute", "storage", "network", "database_rdbms", "database_nosql"}
+	return []string{"compute", "storage", "network", "database_rdbms", "database_nosql", "kubernetes"}
 }

@@ -68,6 +68,15 @@ definitions:
         description: Number of vCPUs (0 for pure storage rows)
         type: number
     type: object
+  domain.KubernetesAttributes:
+    properties:
+      cluster_topology:
+        description: '"zonal", "regional", "autopilot" — GCP-specific'
+        type: string
+      tier:
+        description: '"free", "standard", "extended_support"'
+        type: string
+    type: object
   domain.NetworkAttributes:
     properties:
       egress_gb:
@@ -336,6 +345,54 @@ definitions:
         type: string
       matched_spec:
         $ref: '#/definitions/domain.DatabaseRDBMSAttributes'
+      missing_attributes:
+        items:
+          type: string
+        type: array
+      normalized_hourly_usd:
+        type: number
+      price:
+        $ref: '#/definitions/rest.PriceDetail'
+      provider:
+        type: string
+      sku_id:
+        type: string
+      stale:
+        type: boolean
+    type: object
+  rest.KubernetesComparisonMeta:
+    properties:
+      api_version:
+        type: string
+      generated_at:
+        type: string
+      query:
+        additionalProperties: true
+        type: object
+    type: object
+  rest.KubernetesComparisonResponse:
+    properties:
+      meta:
+        $ref: '#/definitions/rest.KubernetesComparisonMeta'
+      results:
+        items:
+          $ref: '#/definitions/rest.KubernetesResultEntry'
+        type: array
+      warnings:
+        items:
+          $ref: '#/definitions/rest.ProviderWarning'
+        type: array
+    type: object
+  rest.KubernetesResultEntry:
+    properties:
+      fetched_at:
+        type: string
+      match_delta_pct:
+        type: number
+      match_quality:
+        type: string
+      matched_spec:
+        $ref: '#/definitions/domain.KubernetesAttributes'
       missing_attributes:
         items:
           type: string
@@ -935,6 +992,51 @@ paths:
           schema:
             $ref: '#/definitions/middleware.RFC7807Error'
       summary: Get NoSQL database pricing comparison
+      tags:
+      - prices
+  /api/v1/prices/kubernetes:
+    get:
+      description: Returns normalized Kubernetes control-plane pricing across cloud
+        providers (AWS EKS, Azure AKS, GCP GKE) for requested tier.
+      parameters:
+      - description: 'Requested Kubernetes cluster tier (free, standard, extended_support;
+          default: standard)'
+        in: query
+        name: tier
+        type: string
+      - description: 'GCP-specific cluster topology for credit application (zonal,
+          regional, autopilot; default: zonal)'
+        in: query
+        name: cluster_topology
+        type: string
+      - description: 'Canonical region group (default: us-east)'
+        in: query
+        name: region
+        type: string
+      - description: 'Target currency code (default: USD)'
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rest.KubernetesComparisonResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Get Kubernetes control-plane pricing comparison
       tags:
       - prices
   /api/v1/prices/network:

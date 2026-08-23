@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
@@ -155,6 +156,34 @@ func init() {
 		},
 		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
 			hourlyCost := match.Observation.PriceAmount
+			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "hour"
+			}
+			return hourlyCost, monthlyCost, unit
+		},
+	})
+
+	RegisterCategoryPricingHandler("kubernetes", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			return MatchKubernetesObservations(obsList, target, thresholds)
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
+			hourlyCost := match.Observation.PriceAmount
+
+			// Conditional GKE credit modeling:
+			// GCP provides a $74.40/month credit per billing account.
+			// Applied when cluster_topology is "zonal" or "autopilot" (or empty/default), not when "regional".
+			if match.Observation.Provider == "gcp" {
+				topology := strings.ToLower(strings.TrimSpace(target.ClusterTopology))
+				if topology == "" || topology == "zonal" || topology == "autopilot" {
+					monthlyCredit := decimal.NewFromFloat(74.40)
+					hourlyCredit := monthlyCredit.Div(HoursInMonth)
+					hourlyCost = decimal.Max(decimal.Zero, hourlyCost.Sub(hourlyCredit))
+				}
+			}
+
 			monthlyCost := hourlyCost.Mul(HoursInMonth)
 			unit := match.Observation.Unit
 			if unit == "" {

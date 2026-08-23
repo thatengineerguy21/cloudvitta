@@ -45,6 +45,12 @@ func TestGCPNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 3, // Firestore Reads, Firestore Writes, Firestore Storage
 			expectedSKUs: []string{"SKU-GCP-FIRESTORE-READS", "SKU-GCP-FIRESTORE-WRITES", "SKU-GCP-FIRESTORE-STORAGE"},
 		},
+		{
+			name:         "GCP Kubernetes Golden",
+			goldenFile:   "../../../../testdata/golden/gcp/kubernetes.json",
+			wantObsCount: 1, // GKE Cluster Management Fee
+			expectedSKUs: []string{"SKU-GCP-GKE-CLUSTER-MGMT"},
+		},
 	}
 
 	for _, tt := range tests {

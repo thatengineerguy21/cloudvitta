@@ -1,6 +1,7 @@
 package rest_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,8 +11,11 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/auth"
+	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
 )
@@ -201,6 +205,45 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 		}
 		if methods := resp.Header.Get("Access-Control-Allow-Methods"); !strings.Contains(methods, "POST") {
 			t.Errorf("expected POST in Access-Control-Allow-Methods, got %s", methods)
+		}
+	})
+
+	t.Run("GET /api/v1/prices/kubernetes returns 200 with rate limiting", func(t *testing.T) {
+		k8sObs := []domain.PriceObservation{
+			{
+				Provider:        "aws",
+				ServiceCategory: "kubernetes",
+				SkuID:           "SKU-AWS-EKS-STD",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.10"),
+				PriceCurrency:   "USD",
+				Unit:            "hour",
+				KubernetesAttributes: domain.KubernetesAttributes{
+					Tier: "standard",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.SchemaVersion, "aws", "kubernetes", "us-east-1"), k8sObs, time.Hour)
+
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/kubernetes?tier=standard", nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Origin", "https://cloudvitta.dev")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+		if limit := resp.Header.Get("X-RateLimit-Limit"); limit == "" {
+			t.Errorf("expected X-RateLimit-Limit header, got empty")
 		}
 	})
 }

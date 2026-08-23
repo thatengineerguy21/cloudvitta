@@ -61,6 +61,7 @@ classDiagram
         transfertypemap
         databaseenginemap
         nosqldatamodelmap
+        kubernetestieremap
     }
 
     class fx {

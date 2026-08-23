@@ -156,6 +156,17 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsNoSQLDBAdapter)
 
+	// Register AWS Kubernetes adapter with rate limiting and retry config
+	awsKubernetesClient := aws.NewClient(aws.WithURL(aws.DefaultEKSPriceListURL))
+	awsKubernetesAdapter := aws.NewAdapter(awsKubernetesClient, rawStorage, aws.WithCategory("kubernetes"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "kubernetes",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsKubernetesAdapter)
+
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
 	azureAdapter := azure.NewAdapter(azureClient, rawStorage, azure.WithCategory("compute"))
@@ -210,6 +221,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureNoSQLDBAdapter)
+
+	// Register Azure Kubernetes adapter with rate limiting and retry config
+	azureKubernetesClient := azure.NewClient(azure.WithURL(azure.DefaultKubernetesRetailPricesURL))
+	azureKubernetesAdapter := azure.NewAdapter(azureKubernetesClient, rawStorage, azure.WithCategory("kubernetes"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "kubernetes",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureKubernetesAdapter)
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
@@ -289,6 +311,22 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpNoSQLDBAdapter)
+
+	// Register GCP Kubernetes adapter with rate limiting and retry config
+	var gcpKubernetesOpts []gcp.Option
+	if cfg.GCP.APIKey != "" {
+		gcpKubernetesOpts = append(gcpKubernetesOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpKubernetesOpts = append(gcpKubernetesOpts, gcp.WithURL(gcp.DefaultKubernetesBillingCatalogURL))
+	gcpKubernetesClient := gcp.NewClient(gcpKubernetesOpts...)
+	gcpKubernetesAdapter := gcp.NewAdapter(gcpKubernetesClient, rawStorage, gcp.WithCategory("kubernetes"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "kubernetes",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpKubernetesAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

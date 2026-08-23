@@ -21,6 +21,8 @@ var gcpCatalogMap = map[string]string{
 	"Firestore":              "database_nosql",
 	"Cloud Datastore":        "database_nosql",
 	"Datastore":              "database_nosql",
+	"Kubernetes Engine":      "kubernetes",
+	"44CD-3C5E-2A4B":         "kubernetes",
 }
 
 // MapGCPProduct resolves a GCP service display name or service ID to a normalized service category.

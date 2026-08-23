@@ -180,6 +180,12 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
 						ObservationCount: 60,
 					},
+					{
+						ServiceCategory:  "kubernetes",
+						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						ObservationCount: 20,
+					},
 				}, nil
 			case "azure":
 				// Stale observations (> 168 hours ago)
@@ -214,6 +220,12 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-200 * time.Hour), Valid: true},
 						ObservationCount: 40,
 					},
+					{
+						ServiceCategory:  "kubernetes",
+						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-200 * time.Hour), Valid: true},
+						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-200 * time.Hour), Valid: true},
+						ObservationCount: 15,
+					},
 				}, nil
 			case "gcp":
 				return []store.GetProviderCategoryStatusRow{
@@ -246,6 +258,12 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
 						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
 						ObservationCount: 50,
+					},
+					{
+						ServiceCategory:  "kubernetes",
+						LastFetchedAt:    pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						LastSeenAt:       pgtype.Timestamptz{Time: fixedNow.Add(-1 * time.Hour), Valid: true},
+						ObservationCount: 10,
 					},
 				}, nil
 			default:

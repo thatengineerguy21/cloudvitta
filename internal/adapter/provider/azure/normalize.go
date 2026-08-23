@@ -16,6 +16,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/databaseenginemap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/nosqldatamodelmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
@@ -533,6 +534,56 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 				}
 				observations = append(observations, obs)
 			}
+		} else if category == "kubernetes" {
+			if !isAzureKubernetesProduct(item) {
+				continue
+			}
+			tier, err := parseAzureKubernetesTier(item)
+			if err != nil {
+				if errors.Is(err, kubernetestieremap.ErrUnmappedTier) {
+					if sink != nil {
+						_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+							Provider:   "azure",
+							Category:   category,
+							Kind:       "kubernetes_tier",
+							RawValue:   item.SkuName + " " + item.MeterName,
+							SkuID:      skuID,
+							ObservedAt: fetchedAt,
+						})
+					}
+					slog.Warn("azure normalize: skipping SKU due to unmapped kubernetes tier", "sku", skuID, "sku_name", item.SkuName, "meter_name", item.MeterName)
+					continue
+				}
+				return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+			}
+
+			displayName := item.ProductName
+			if displayName == "" {
+				displayName = item.MeterName
+			}
+
+			unit := item.UnitOfMeasure
+			if unit == "1 Hour" || unit == "1 hour" {
+				unit = "Hrs"
+			}
+
+			obs := domain.PriceObservation{
+				Provider:        "azure",
+				ServiceCategory: category,
+				SkuID:           skuID,
+				DisplayName:     displayName,
+				Region:          region,
+				RegionGroup:     regionGroup,
+				Unit:            unit,
+				PriceAmount:     priceAmount,
+				PriceCurrency:   item.CurrencyCode,
+				PricingModel:    "OnDemand",
+				KubernetesAttributes: domain.KubernetesAttributes{
+					Tier: tier,
+				},
+				FetchedAt: fetchedAt,
+			}
+			observations = append(observations, obs)
 		}
 	}
 
@@ -678,4 +729,22 @@ func parseAzureDatabaseAttributes(armSkuName, skuName, meterName string) (float6
 	}
 
 	return 2, 8, "general_purpose"
+}
+
+func isAzureKubernetesProduct(item azureItem) bool {
+	return item.ServiceName == "Azure Kubernetes Service" || strings.Contains(strings.ToLower(item.ProductName), "kubernetes")
+}
+
+func parseAzureKubernetesTier(item azureItem) (string, error) {
+	combined := strings.ToLower(item.SkuName + " " + item.MeterName + " " + item.ProductName)
+	switch {
+	case strings.Contains(combined, "free"):
+		return kubernetestieremap.TierFree, nil
+	case strings.Contains(combined, "extended") || strings.Contains(combined, "long term support") || strings.Contains(combined, "lts") || strings.Contains(combined, "premium"):
+		return kubernetestieremap.TierExtendedSupport, nil
+	case strings.Contains(combined, "standard") || strings.Contains(combined, "uptime sla") || strings.Contains(combined, "cluster management"):
+		return kubernetestieremap.TierStandard, nil
+	default:
+		return kubernetestieremap.MapAzureTier(item.MeterName)
+	}
 }

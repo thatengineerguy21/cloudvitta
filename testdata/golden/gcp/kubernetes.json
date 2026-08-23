@@ -1,0 +1,37 @@
+{
+  "skus": [
+    {
+      "name": "services/44CD-3C5E-2A4B/skus/SKU-GCP-GKE-CLUSTER-MGMT",
+      "skuId": "SKU-GCP-GKE-CLUSTER-MGMT",
+      "description": "Kubernetes Engine Cluster Management Fee",
+      "category": {
+        "serviceDisplayName": "Kubernetes Engine",
+        "resourceFamily": "Compute",
+        "resourceGroup": "Cluster",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "usageUnitDescription": "hours",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 100000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ]
+}

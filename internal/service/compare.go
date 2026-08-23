@@ -18,6 +18,7 @@ type CategoryComparisonItem struct {
 	MatchedNetwork    domain.NetworkAttributes
 	MatchedDatabase   domain.DatabaseRDBMSAttributes
 	MatchedNoSQL      domain.DatabaseNoSQLAttributes
+	MatchedKubernetes domain.KubernetesAttributes
 	MatchQuality      string
 	MatchDeltaPct     float64
 	MissingAttributes []string
@@ -99,6 +100,7 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 			MatchedNetwork:    obs.NetworkAttributes,
 			MatchedDatabase:   obs.DatabaseRDBMSAttributes,
 			MatchedNoSQL:      obs.DatabaseNoSQLAttributes,
+			MatchedKubernetes: obs.KubernetesAttributes,
 			MatchQuality:      catResult.MatchResult.MatchQuality,
 			MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
 			MissingAttributes: catResult.MatchResult.MissingAttributes,

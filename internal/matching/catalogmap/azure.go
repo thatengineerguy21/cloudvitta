@@ -14,6 +14,7 @@ var azureCatalogMap = map[string]string{
 	"Azure Database for MariaDB":    "database_rdbms",
 	"Azure Cosmos DB":               "database_nosql",
 	"Cosmos DB":                     "database_nosql",
+	"Azure Kubernetes Service":      "kubernetes",
 }
 
 // MapAzureProduct resolves an Azure service name to a normalized service category.

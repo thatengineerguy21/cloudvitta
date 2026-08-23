@@ -49,6 +49,12 @@ func TestMapAzureProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Azure Kubernetes Service",
+			serviceName:  "Azure Kubernetes Service",
+			wantCategory: "kubernetes",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "Azure Synapse",
 			wantCategory: "",

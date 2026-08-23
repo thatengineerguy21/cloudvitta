@@ -50,9 +50,13 @@ type MatchTarget struct {
 	NoSQLStorageGB   float64 // requested storage in GB
 	NoSQLMultiRegion bool    // Multi-Region replication requested
 
+	// Kubernetes dimensions
+	KubernetesTier  string // canonical: free, standard, extended_support
+	ClusterTopology string // GCP-specific: zonal, regional, autopilot
+
 	// Cross-category controls
 	StrictFamily bool   // default true — only match within same family tier
-	Category     string // compute, storage, network, database_rdbms, database_nosql
+	Category     string // compute, storage, network, database_rdbms, database_nosql, kubernetes
 }
 
 // MatchResult holds the outcome of matching one provider's observations.
