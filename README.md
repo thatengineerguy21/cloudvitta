@@ -7,7 +7,12 @@ Comparing cloud costs today requires visiting each provider's calculator or pric
 * **Compute Comparison**: `GET /api/v1/prices/compute?vcpu=2&ram_gb=8&region=us-east`
 * **Storage Comparison**: `GET /api/v1/prices/storage?tier=standard&region=us-east`
 * **Network Comparison**: `GET /api/v1/prices/network?transfer_type=internet_egress&region=us-east`
+* **Relational Database (RDBMS)**: `GET /api/v1/prices/database?engine=postgresql&vcpu=4&ram_gb=16&storage_gb=100&region=us-east`
+* **NoSQL Database**: `GET /api/v1/prices/database-nosql?data_model=document&pricing_mode=provisioned&read_units=1000&write_units=500&region=us-east`
+* **Managed Kubernetes**: `GET /api/v1/prices/kubernetes?tier=standard&cluster_topology=zonal&region=us-east`
+* **Serverless Compute (FaaS)**: `GET /api/v1/prices/serverless?tier=standard&architecture=x86_64&requests_per_month=5000000&execution_duration_ms=200&memory_mb=512&region=us-east`
 * **Composite Workload Calculation**: `POST /api/v1/calculate`
+* **Model Context Protocol (MCP)**: `POST /mcp` (Streamable HTTP, 9 AI Agent Tools)
 * **Provider Freshness & Status**: `GET /api/v1/providers/aws/status`
 * **Interactive Swagger Documentation**: [https://cloudvitta-api-pelqqgz3mq-as.a.run.app/docs/](https://cloudvitta-api-pelqqgz3mq-as.a.run.app/docs/)
 * **Health Check**: [https://cloudvitta-api-pelqqgz3mq-as.a.run.app/healthz](https://cloudvitta-api-pelqqgz3mq-as.a.run.app/healthz)
@@ -29,7 +34,7 @@ flowchart TD
         Router --> AuthSvc["Auth Service"]
         Router --> FreshSvc["Freshness Service"]
         
-        PricingSvc --> Matching["SKU Matching Engine"]
+        PricingSvc --> Matching["7 Strategy SKU Scorers"]
         CalcSvc --> PricingSvc
         CalcSvc --> Matching
     end
@@ -48,6 +53,7 @@ flowchart TD
         IngestJob --> Adapters["Provider Adapters (AWS/Azure/GCP)"]
         Adapters --> GCS[("GCS Raw JSON Archive")]
         Adapters --> Normalizer["Streaming Parser & Anomaly Detector"]
+        Adapters --> QSink["Quarantine Sink"]
         Normalizer --> Postgres
         Normalizer --> Cache
     end
@@ -60,12 +66,12 @@ flowchart TD
 | Document | Description |
 | :--- | :--- |
 | [System Architecture](docs/diagrams/01-system-architecture.md) | High-level system architecture and infrastructure topology |
-| [Data Model ERD](docs/diagrams/02-data-model-erd.md) | Entity relationship diagram for price observations, users, refresh tokens, and FX rates |
-| [Ingestion Flow Diagram](docs/diagrams/03-ingestion-flow.md) | Ingestion orchestrator lifecycle, rate limiting, GCS raw storage, and event-driven cache warming |
-| [Calculator Request Lifecycle](docs/diagrams/04-calculator-request-lifecycle.md) | Single-category cache-miss flow, composite calculation fan-out, and provider status lifecycle |
+| [Data Model ERD](docs/diagrams/02-data-model-erd.md) | Entity relationship diagram and polymorphic JSONB attribute schemas for 7 categories |
+| [Ingestion Flow Diagram](docs/diagrams/03-ingestion-flow.md) | Ingestion orchestrator lifecycle, multi-component splitting, quarantine isolation, and event-driven cache warming |
+| [Calculator Request Lifecycle](docs/diagrams/04-calculator-request-lifecycle.md) | Single-category cache-miss flow, composite calculation fan-out, and 9 MCP tools lifecycle |
 | [Auth Token Rotation & Theft Containment](docs/diagrams/05-auth-token-rotation.md) | Refresh token family rotation, idempotency replay cache, and theft detection |
 | [Package Structure & Dependencies](docs/diagrams/06-package-structure.md) | Modular monolith package hierarchy and dependency rules |
-| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 29 architectural decision records with context, trade-offs, and alternatives |
+| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 34 architectural decision records with context, trade-offs, and alternatives |
 | [Master Development Guide](docs/DEVELOPMENT_GUIDE.md) | Local environment setup, coding conventions, testing guidelines, and quality standards |
 | [Production Deployment Guide](docs/devops/01-deployment-guide.md) | Cloud Run service configuration, Google Cloud Secret Manager wiring, and CI/CD pipelines |
 

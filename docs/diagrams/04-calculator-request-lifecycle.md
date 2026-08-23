@@ -6,7 +6,7 @@ This document describes the request lifecycles for single-category pricing looku
 
 ## 1. Single-Category Pricing Lifecycle (Cache-Miss Flow)
 
-The following diagram illustrates a request to `GET /api/v1/prices/{category}` (e.g., compute, storage, network) when the requested pricing slice is not present in the Redis cache.
+The following diagram illustrates a request to `GET /api/v1/prices/{category}` across all seven supported categories (`compute`, `storage`, `network`, `database`, `database-nosql`, `kubernetes`, `serverless`) when the requested pricing slice is not present in the Redis cache.
 
 ```mermaid
 sequenceDiagram
@@ -55,7 +55,7 @@ sequenceDiagram
     
     %% Scoring and Matching
     Svc->>Match: MatchObservations(requested_specs, observations)
-    Note over Match: Calculate weighted distance<br/>Assign match_quality (exact / close / loose)<br/>Resolve ties & surface alternatives
+    Note over Match: Category-specific Strategy Scorer<br/>Assign match_quality (exact / close / loose)<br/>Dynamic join for DB & NoSQL candidates
     Match-->>Svc: Matched Price Result
     
     %% Freshness Evaluation
@@ -70,7 +70,7 @@ sequenceDiagram
 
 ## 2. Composite Calculation Lifecycle (`POST /api/v1/calculate`)
 
-The following diagram illustrates the composite workload calculation lifecycle across multiple providers and categories, enforcing the ADR 0022 Honesty Contract.
+The following diagram illustrates the composite workload calculation lifecycle across all seven categories via the `calculateCategoryRegistry` (ADR 0031), supporting request alias conflict detection (ADR 0032) and enforcing the ADR 0022 Honesty Contract.
 
 ```mermaid
 sequenceDiagram
@@ -79,6 +79,7 @@ sequenceDiagram
     participant Router as REST Router / Middleware
     participant CalcHandler as CalculateHandler
     participant CalcSvc as CalculateService
+    participant Reg as calculateCategoryRegistry
     participant PricingSvc as PricingService
     participant Scorer as Strategy Scorers
     participant CalcLogic as Pricing Calculations (Decimal)
@@ -87,7 +88,11 @@ sequenceDiagram
     Client->>Router: POST /api/v1/calculate {workload payload}
     Router->>CalcHandler: Authenticated & Rate-Limited Request
     CalcHandler->>CalcHandler: Decode JSON Body & Validate Workload Specs
+    Note over CalcHandler: ResolveAliasedField (database vs database_rdbms)<br/>Reject conflicting specs with 400 Bad Request
     CalcHandler->>CalcSvc: Calculate(ctx, request)
+    
+    CalcSvc->>Reg: Extract MatchTargets for Registered Categories
+    Reg-->>CalcSvc: Map[Category]MatchTarget (compute, storage, network, db, nosql, k8s, serverless)
     
     par Concurrent Category Evaluation via errgroup
         CalcSvc->>PricingSvc: Evaluate Compute (AWS, Azure, GCP)
@@ -104,9 +109,29 @@ sequenceDiagram
         PricingSvc->>Scorer: Score Network (egress GB, direction)
         Scorer-->>PricingSvc: Network Matches
         PricingSvc-->>CalcSvc: Network Results
+    and
+        CalcSvc->>PricingSvc: Evaluate Relational Database (AWS, Azure, GCP)
+        PricingSvc->>Scorer: Score RDBMS (Instance + Storage Join, IOPS)
+        Scorer-->>PricingSvc: Database Matches
+        PricingSvc-->>CalcSvc: Database Results
+    and
+        CalcSvc->>PricingSvc: Evaluate NoSQL Database (AWS, Azure, GCP)
+        PricingSvc->>Scorer: Score NoSQL (Throughput + Storage Join, 1 KB payload)
+        Scorer-->>PricingSvc: NoSQL Matches
+        PricingSvc-->>CalcSvc: NoSQL Results
+    and
+        CalcSvc->>PricingSvc: Evaluate Kubernetes Control Plane (AWS, Azure, GCP)
+        PricingSvc->>Scorer: Score Kubernetes (Conditional GKE Credit)
+        Scorer-->>PricingSvc: Kubernetes Matches
+        PricingSvc-->>CalcSvc: Kubernetes Results
+    and
+        CalcSvc->>PricingSvc: Evaluate Serverless Compute (AWS, Azure, GCP)
+        PricingSvc->>Scorer: Score Serverless (Duration + Request Netting)
+        Scorer-->>PricingSvc: Serverless Matches
+        PricingSvc-->>CalcSvc: Serverless Results
     end
 
-    CalcSvc->>CalcLogic: Compute Hourly Breakdown per Provider (decimal.Decimal)
+    CalcSvc->>CalcLogic: Compute Category Hourly/Monthly Totals (decimal.Decimal)
     
     loop For each provider
         CalcSvc->>Fresh: Check Provider Freshness
@@ -141,7 +166,7 @@ sequenceDiagram
     Client->>Handler: GET /api/v1/providers/{provider}/status
     Handler->>FreshSvc: GetProviderStatus(ctx, provider)
     
-    alt Stage 3 Un-ingested Provider (oracle, ibm, alibaba, digitalocean)
+    alt Stage 4 Un-ingested Provider (oracle, ibm, alibaba, digitalocean)
         FreshSvc-->>Handler: ProviderStatus {status: "not_yet_ingested", stale: true}
         Handler-->>Client: 200 OK ProviderStatus JSON
     else Supported Provider (aws, azure, gcp)
@@ -167,7 +192,7 @@ sequenceDiagram
 
 ## 4. Model Context Protocol (MCP) Streamable HTTP Lifecycle (`/mcp`)
 
-The following diagram illustrates how AI agent clients connect, authenticate, discover tools, and invoke comparison operations over Streamable HTTP transport.
+The following diagram illustrates how AI agent clients connect, authenticate, discover tools, and invoke comparison operations over Streamable HTTP transport across all nine registered MCP tools.
 
 ```mermaid
 sequenceDiagram
@@ -197,9 +222,10 @@ sequenceDiagram
             MCPHandler->>MCPServer: Dispatch JSON-RPC Method
             
             alt tools/list
-                MCPServer-->>MCPHandler: Return 5 Tool Schemas (JSON)
+                MCPServer-->>MCPHandler: Return 9 Tool Schemas (JSON)
                 MCPHandler-->>Agent: 200 OK ListToolsResult
-            else tools/call (compare_compute, compare_storage, compare_network, calculate_workload, get_provider_status)
+            else tools/call (9 Tools)
+                Note over MCPServer: compare_compute, compare_storage, compare_network,<br/>compare_database, compare_database_nosql,<br/>compare_kubernetes, compare_serverless,<br/>calculate_workload, get_provider_status
                 MCPServer->>Svc: Invoke Unified Pricing / Freshness Service
                 Svc-->>MCPServer: Calculated Domain Results + Honesty Attributes
                 MCPServer-->>MCPHandler: CallToolResult (JSON Content)
@@ -214,8 +240,9 @@ sequenceDiagram
 ## 5. Key Architectural Invariants
 
 1. **Stampede Protection**: All database fallbacks on cache misses pass through `singleflight.Group.DoChan` using `context.WithoutCancel` so client cancellations do not abort in-flight database population.
-2. **Honesty Contract**: Incomplete provider comparisons set `partial: true`, omit `total_normalized_hourly_usd`, and provide `partial_total_normalized_hourly_usd` to prevent false ranking victories.
-3. **Decimal Arithmetic**: All pricing sums, conversions, and breakdowns strictly use `decimal.Decimal` to eliminate floating-point rounding errors.
-4. **Stateless Tiered Rate Limiting**: The 4-step rate limiter executes before pricing arithmetic, protecting backend database compute and Redis memory.
+2. **Honesty Contract**: Incomplete provider comparisons set `partial: true`, omit `total_normalized_hourly_usd`, and provide `partial_total_normalized_hourly_usd` to prevent false ranking victories (ADR 0022).
+3. **Decimal Arithmetic**: All pricing sums, conversions, and breakdowns strictly use `decimal.Decimal` to eliminate floating-point rounding errors (ADR 0015).
+4. **Stateless Tiered Rate Limiting**: The 4-step rate limiter executes before pricing arithmetic, protecting backend database compute and Redis memory (ADR 0009).
 5. **Strict MCP Authentication**: MCP tool access requires a valid JWT Bearer token and enforces the 120 req/min Standard Tier quota keyed by `user_id`.
-
+6. **Extensible Registries**: Category serialization, calculate dispatch, and pricing arithmetic use strategy registries, eliminating monolithic switch blocks (ADR 0031).
+7. **Alias Conflict Resolution**: Conflicting specifications between alias and canonical request parameters are rejected with HTTP 400 (ADR 0032).
