@@ -10,12 +10,29 @@ This guide provides step-by-step instructions to provision required external ser
 Before starting, ensure the following tools are installed on your development machine:
 - **Go**: Version `1.26+` installed and available in `$PATH`.
 - **Git**: Installed for version control.
+- **Task Runner (`task`)**: Version `3+` for running project commands.
 - **Tern Migration Tool**: Install via Go:
   ```bash
   go install github.com/jackc/tern/v2@latest
   ```
 - **Google Cloud SDK (`gcloud`)**: Installed for local GCS authentication.
 - **golangci-lint**: Installed for static code analysis.
+
+### Common Task Commands
+- `task`: List all available project commands.
+- `task build`: Build all binaries (`api`, `ingest`, `migrate`, `quarantine-digest`).
+- `task dev:api`: Start API server locally.
+- `task dev:ingest`: Run pricing ingestion worker locally.
+- `task dev:quarantine`: Run quarantine digest processor locally.
+- `task test`: Run all tests with race detector enabled (`go test -race ./...`).
+- `task test:fast`: Run all tests without race detector (local iteration only, never gate CI or merges).
+- `task test:cover`: Run all tests with race detector and generate coverage report.
+- `task lint`: Run formatting check and `go vet`.
+- `task fmt`: Auto-format all Go source files.
+- `task swagger`: Regenerate OpenAPI Swagger documentation.
+- `task sqlc`: Regenerate type-safe SQL store queries via SQLC.
+- `task db:migrate`: Run database migrations forward.
+- `task clean`: Clean Go build cache and test artifacts.
 
 ---
 
@@ -162,12 +179,17 @@ The orchestrator concurrently fetches pricing data from all registered provider/
 | `/api/v1/prices/compute` | `GET` | Compute pricing lookup & SKU comparison endpoint |
 | `/api/v1/prices/storage` | `GET` | Storage pricing lookup & cost comparison endpoint |
 | `/api/v1/prices/network` | `GET` | Network pricing lookup & egress cost comparison endpoint |
-| `/api/v1/calculate` | `POST` | Composite multi-category workload total, server-computed |
+| `/api/v1/prices/database` | `GET` | Relational database (RDBMS) pricing comparison endpoint |
+| `/api/v1/prices/database-nosql` | `GET` | NoSQL database pricing comparison endpoint |
+| `/api/v1/prices/kubernetes` | `GET` | Managed Kubernetes control-plane fee comparison endpoint |
+| `/api/v1/prices/serverless` | `GET` | Serverless compute (FaaS) pricing comparison endpoint |
+| `/api/v1/calculate` | `POST` | Composite multi-category workload total across 7 categories |
 | `/api/v1/providers/{provider}/status` | `GET` | Provider operational status, category data age, and DLQ state |
 | `/api/v1/auth/signup` | `POST` | User registration endpoint (returns user details) |
 | `/api/v1/auth/login` | `POST` | User authentication endpoint (returns JWT access and refresh tokens) |
 | `/api/v1/auth/refresh` | `POST` | Token rotation endpoint (requires `idempotency_key`, returns new token pair) |
 | `/api/v1/auth/logout` | `POST` | Session revocation endpoint (revokes refresh token and clears cache) |
+| `/mcp` | `POST` | Model Context Protocol (MCP) Streamable HTTP tools endpoint |
 
 ### Local Verification Commands
 
@@ -177,21 +199,76 @@ The orchestrator concurrently fetches pricing data from all registered provider/
    curl http://localhost:8080/readyz
    ```
 
-2. **Query Compute, Storage, and Network Pricing Endpoints**:
+2. **Query Single-Category Pricing Endpoints (7 Categories)**:
    ```bash
+   # 1. Compute
    curl "http://localhost:8080/api/v1/prices/compute?vcpu=4&ram_gb=16&region=us-east"
+   
+   # 2. Storage
    curl "http://localhost:8080/api/v1/prices/storage?size_gb=500&storage_class=standard&region=us-east"
+   
+   # 3. Network
    curl "http://localhost:8080/api/v1/prices/network?egress_gb=1000&region=us-east"
+   
+   # 4. Relational Database (RDBMS)
+   curl "http://localhost:8080/api/v1/prices/database?engine=postgresql&vcpu=4&ram_gb=16&storage_gb=100&region=us-east"
+   
+   # 5. NoSQL Database
+   curl "http://localhost:8080/api/v1/prices/database-nosql?data_model=document&pricing_mode=provisioned&read_units=1000&write_units=500&storage_gb=200&region=us-east"
+   
+   # 6. Managed Kubernetes Control-Plane
+   curl "http://localhost:8080/api/v1/prices/kubernetes?tier=standard&cluster_topology=zonal&region=us-east"
+   
+   # 7. Serverless Compute (FaaS)
+   curl "http://localhost:8080/api/v1/prices/serverless?tier=standard&architecture=x86_64&requests_per_month=5000000&execution_duration_ms=200&memory_mb=512&region=us-east"
    ```
 
-3. **Query Composite Calculation Endpoint**:
+3. **Query Composite Calculation Endpoint (7 Categories)**:
    ```bash
    curl -X POST "http://localhost:8080/api/v1/calculate" \
      -H "Content-Type: application/json" \
-     -d '{"region":"us-east","compute":{"vcpu":4,"ram_gb":16},"storage":{"size_gb":500},"network":{"egress_gb":100}}'
+     -d '{
+       "region": "us-east",
+       "compute": {"vcpu": 4, "ram_gb": 16},
+       "storage": {"size_gb": 500},
+       "network": {"egress_gb": 100},
+       "database": {"engine": "postgresql", "vcpu": 4, "ram_gb": 16, "storage_gb": 100},
+       "database_nosql": {"data_model": "document", "pricing_mode": "provisioned", "read_units": 1000, "write_units": 500, "storage_gb": 200},
+       "kubernetes": {"tier": "standard", "cluster_topology": "zonal"},
+       "serverless": {"tier": "standard", "architecture": "x86_64", "requests_per_month": 5000000, "execution_duration_ms": 200, "memory_mb": 512}
+     }'
    ```
 
-4. **Register and Authenticate User**:
+4. **Query Model Context Protocol (MCP) Streamable HTTP Tools**:
+   ```bash
+   # List available tools (requires Bearer JWT)
+   curl -X POST "http://localhost:8080/mcp" \
+     -H "Authorization: Bearer <access_token>" \
+     -H "Content-Type: application/json" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+   # Call compare_serverless tool
+   curl -X POST "http://localhost:8080/mcp" \
+     -H "Authorization: Bearer <access_token>" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 2,
+       "method": "tools/call",
+       "params": {
+         "name": "compare_serverless",
+         "arguments": {
+           "architecture": "x86_64",
+           "requests_per_month": 5000000,
+           "execution_duration_ms": 200,
+           "memory_mb": 512,
+           "region": "us-east"
+         }
+       }
+     }'
+   ```
+
+5. **Register and Authenticate User**:
    ```bash
    # Register new user
    curl -X POST "http://localhost:8080/api/v1/auth/signup" \
@@ -214,10 +291,10 @@ The orchestrator concurrently fetches pricing data from all registered provider/
      -d '{"refresh_token":"<raw_refresh_token>"}'
    ```
 
-5. **Verify Rate Limiter (60 req/min generic, 10 req/min login)**:
+6. **Verify Rate Limiter (60 req/min generic, 10 req/min login, 120 req/min JWT)**:
    Execute >10 requests to `/api/v1/auth/login` or >60 requests to generic endpoints within 1 minute to receive `429 Too Many Requests` with a `Retry-After` header.
 
-6. **Inspect Local Prometheus Metrics**:
+7. **Inspect Local Prometheus Metrics**:
    ```bash
    curl http://localhost:8080/metrics | grep cache_requests_total
    ```

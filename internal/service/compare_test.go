@@ -178,3 +178,58 @@ func TestPricingService_Compare_Network(t *testing.T) {
 		t.Errorf("expected monthly cost %s, got %s", expectedMonthly, res.Results[0].MonthlyCost)
 	}
 }
+
+func TestPricingService_Compare_Kubernetes(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	regionGroup := "us-east"
+
+	awsK8s := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "kubernetes",
+			SkuID:           "SKU-AWS-EKS-STD",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.100"),
+			PriceCurrency:   "USD",
+			Unit:            "hour",
+			KubernetesAttributes: domain.KubernetesAttributes{
+				Tier: "standard",
+			},
+			FetchedAt: time.Now().UTC(),
+		},
+	}
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "kubernetes", "us-east-1"), awsK8s, cache.DefaultTTL)
+
+	svc := service.NewPricingService(nil, rdb)
+
+	res, err := svc.Compare(ctx, "kubernetes", regionGroup, service.MatchTarget{
+		KubernetesTier: "standard",
+		Category:       "kubernetes",
+	})
+	if err != nil {
+		t.Fatalf("Compare kubernetes failed: %v", err)
+	}
+
+	if len(res.Results) == 0 {
+		t.Fatal("expected at least 1 kubernetes comparison result, got 0")
+	}
+	if res.Results[0].Provider != "aws" {
+		t.Errorf("expected provider 'aws', got %s", res.Results[0].Provider)
+	}
+	if res.Results[0].MatchedKubernetes.Tier != "standard" {
+		t.Errorf("expected matched tier 'standard', got %s", res.Results[0].MatchedKubernetes.Tier)
+	}
+	if !res.Results[0].HourlyCost.Equal(decimal.RequireFromString("0.100")) {
+		t.Errorf("expected hourly cost 0.100, got %s", res.Results[0].HourlyCost)
+	}
+}

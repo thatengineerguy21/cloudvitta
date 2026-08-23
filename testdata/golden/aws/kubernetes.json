@@ -1,0 +1,64 @@
+{
+  "formatVersion": "v1.0",
+  "offerCode": "AmazonEKS",
+  "products": {
+    "SKU-AWS-EKS-STANDARD": {
+      "sku": "SKU-AWS-EKS-STANDARD",
+      "productFamily": "Compute",
+      "attributes": {
+        "servicecode": "AmazonEKS",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "AmazonEKS-Hours",
+        "usagetype": "AmazonEKS-Hours:perCluster",
+        "operation": "CreateCluster",
+        "description": "Amazon EKS Cluster Management"
+      }
+    },
+    "SKU-AWS-EKS-EXTENDED": {
+      "sku": "SKU-AWS-EKS-EXTENDED",
+      "productFamily": "Compute",
+      "attributes": {
+        "servicecode": "AmazonEKS",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "AmazonEKS-ExtendedSupport-Hours",
+        "usagetype": "AmazonEKS-ExtendedSupport-Hours:perCluster",
+        "operation": "ClusterSupport",
+        "description": "Amazon EKS Extended Support"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-AWS-EKS-STANDARD": {
+        "SKU-AWS-EKS-STANDARD.TERM": {
+          "offerTermCode": "TERM",
+          "sku": "SKU-AWS-EKS-STANDARD",
+          "priceDimensions": {
+            "SKU-AWS-EKS-STANDARD.TERM.DIM": {
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "0.1000000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-AWS-EKS-EXTENDED": {
+        "SKU-AWS-EKS-EXTENDED.TERM": {
+          "offerTermCode": "TERM",
+          "sku": "SKU-AWS-EKS-EXTENDED",
+          "priceDimensions": {
+            "SKU-AWS-EKS-EXTENDED.TERM.DIM": {
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "0.6000000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

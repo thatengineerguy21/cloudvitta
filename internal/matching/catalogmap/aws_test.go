@@ -31,8 +31,32 @@ func TestMapAWSProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
-			name:         "unmapped product fails loudly",
+			name:         "valid AmazonRDS product",
 			productCode:  "AmazonRDS",
+			wantCategory: "database_rdbms",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid AmazonDynamoDB product",
+			productCode:  "AmazonDynamoDB",
+			wantCategory: "database_nosql",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid AmazonEKS product",
+			productCode:  "AmazonEKS",
+			wantCategory: "kubernetes",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid AWSLambda product",
+			productCode:  "AWSLambda",
+			wantCategory: "serverless",
+			wantErr:      nil,
+		},
+		{
+			name:         "unmapped product fails loudly",
+			productCode:  "AmazonNeptune",
 			wantCategory: "",
 			wantErr:      ErrUnmappedProduct,
 		},

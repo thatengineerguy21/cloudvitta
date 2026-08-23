@@ -20,7 +20,10 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/mcp"
 )
 
-var testJWTSecret = []byte("super-secret-jwt-signing-key-32b-length!")
+var (
+	testJWTSecret = []byte("super-secret-jwt-signing-key-32b-length!")
+	testFixedTime = time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+)
 
 type bearerAuthTransport struct {
 	token string
@@ -40,6 +43,10 @@ func (b *bearerAuthTransport) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 func setupTestServer(t *testing.T) (http.Handler, *miniredis.Miniredis, *redis.Client, *service.PricingService, *service.FreshnessService) {
+	return setupTestServerWithClock(t, func() time.Time { return testFixedTime })
+}
+
+func setupTestServerWithClock(t *testing.T, clock func() time.Time) (http.Handler, *miniredis.Miniredis, *redis.Client, *service.PricingService, *service.FreshnessService) {
 	t.Helper()
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -59,9 +66,10 @@ func setupTestServer(t *testing.T) (http.Handler, *miniredis.Miniredis, *redis.C
 		FreeTierRate:     20,
 		IPCeilingRate:    60,
 		CookieSecret:     testJWTSecret,
+		Clock:            clock,
 	})
 
-	authMw := authmw.NewAuthMiddleware(testJWTSecret, time.Now)
+	authMw := authmw.NewAuthMiddleware(testJWTSecret, clock)
 
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", authmw.RequireAuth(limiter.Handler(mcpHandler)))
@@ -119,7 +127,7 @@ func TestStreamableHTTP_Authenticated_ToolsList(t *testing.T) {
 	defer ts.Close()
 
 	userID := uuid.New()
-	token, err := auth.GenerateAccessToken(userID, "standard", testJWTSecret, time.Now(), 15*time.Minute)
+	token, err := auth.GenerateAccessToken(userID, "standard", testJWTSecret, testFixedTime, 15*time.Minute)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -162,7 +170,7 @@ func TestStreamableHTTP_Authenticated_ToolCall(t *testing.T) {
 	defer ts.Close()
 
 	userID := uuid.New()
-	token, err := auth.GenerateAccessToken(userID, "standard", testJWTSecret, time.Now(), 15*time.Minute)
+	token, err := auth.GenerateAccessToken(userID, "standard", testJWTSecret, testFixedTime, 15*time.Minute)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -214,7 +222,7 @@ func TestStreamableHTTP_RateLimiting_StandardTier(t *testing.T) {
 	defer ts.Close()
 
 	userID := uuid.New()
-	token, err := auth.GenerateAccessToken(userID, "standard", testJWTSecret, time.Now(), 15*time.Minute)
+	token, err := auth.GenerateAccessToken(userID, "standard", testJWTSecret, testFixedTime, 15*time.Minute)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}

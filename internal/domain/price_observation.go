@@ -32,20 +32,24 @@ type NetworkAttributes struct {
 
 // PriceObservation represents a single normalized cloud pricing observation.
 type PriceObservation struct {
-	Provider          string            `json:"provider"`
-	ServiceCategory   string            `json:"service_category"`
-	SkuID             string            `json:"sku_id"`
-	DisplayName       string            `json:"display_name"`
-	Region            string            `json:"region"`
-	RegionGroup       string            `json:"region_group"`
-	Unit              string            `json:"unit"`
-	PriceAmount       decimal.Decimal   `json:"price_amount"`
-	PriceCurrency     string            `json:"price_currency"`
-	PricingModel      string            `json:"pricing_model"`
-	Attributes        ComputeAttributes `json:"attributes,omitempty"`
-	StorageAttributes StorageAttributes `json:"storage_attributes,omitempty"`
-	NetworkAttributes NetworkAttributes `json:"network_attributes,omitempty"`
-	FetchedAt         time.Time         `json:"fetched_at"`
+	Provider                 string                   `json:"provider"`
+	ServiceCategory          string                   `json:"service_category"`
+	SkuID                    string                   `json:"sku_id"`
+	DisplayName              string                   `json:"display_name"`
+	Region                   string                   `json:"region"`
+	RegionGroup              string                   `json:"region_group"`
+	Unit                     string                   `json:"unit"`
+	PriceAmount              decimal.Decimal          `json:"price_amount"`
+	PriceCurrency            string                   `json:"price_currency"`
+	PricingModel             string                   `json:"pricing_model"`
+	Attributes               ComputeAttributes        `json:"attributes,omitempty"`
+	StorageAttributes        StorageAttributes        `json:"storage_attributes,omitempty"`
+	NetworkAttributes        NetworkAttributes        `json:"network_attributes,omitempty"`
+	DatabaseRDBMSAttributes  DatabaseRDBMSAttributes  `json:"database_rdbms_attributes,omitempty"`
+	DatabaseNoSQLAttributes  DatabaseNoSQLAttributes  `json:"database_nosql_attributes,omitempty"`
+	KubernetesAttributes     KubernetesAttributes     `json:"kubernetes_attributes,omitempty"`
+	ServerlessRateAttributes ServerlessRateAttributes `json:"serverless_attributes,omitempty"`
+	FetchedAt                time.Time                `json:"fetched_at"`
 }
 
 // FetchResult bundles a batch of observations, raw storage path, and unmapped count.
@@ -63,42 +67,127 @@ type ScoredComputeObservation struct {
 	MissingAttributes []string
 }
 
-// MarshalAttributes serializes the category-specific attributes of an observation to JSON bytes.
-func MarshalAttributes(obs PriceObservation) ([]byte, error) {
-	switch obs.ServiceCategory {
-	case "storage":
-		return json.Marshal(obs.StorageAttributes)
-	case "network":
-		return json.Marshal(obs.NetworkAttributes)
-	default:
-		return json.Marshal(obs.Attributes)
+// AttributeMarshaler serializes domain attributes of a PriceObservation into JSON bytes.
+type AttributeMarshaler func(obs PriceObservation) ([]byte, error)
+
+// AttributeUnmarshaler deserializes JSON bytes into the domain attributes of a PriceObservation.
+type AttributeUnmarshaler func(obs *PriceObservation, raw []byte) error
+
+type categoryAttributeCodec struct {
+	marshal   AttributeMarshaler
+	unmarshal AttributeUnmarshaler
+}
+
+var categoryCodecs = map[string]categoryAttributeCodec{}
+
+// RegisterCategoryAttributeCodec registers a marshal/unmarshal codec for a service category.
+func RegisterCategoryAttributeCodec(category string, marshal AttributeMarshaler, unmarshal AttributeUnmarshaler) {
+	categoryCodecs[category] = categoryAttributeCodec{
+		marshal:   marshal,
+		unmarshal: unmarshal,
 	}
 }
 
-// UnmarshalAttributes deserializes raw JSON bytes into the corresponding category attribute struct.
-func UnmarshalAttributes(serviceCategory string, raw []byte) (ComputeAttributes, StorageAttributes, NetworkAttributes, error) {
-	var computeAttrs ComputeAttributes
-	var storageAttrs StorageAttributes
-	var networkAttrs NetworkAttributes
+func init() {
+	RegisterCategoryAttributeCodec("compute",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.Attributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.Attributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("storage",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.StorageAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.StorageAttributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("network",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.NetworkAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.NetworkAttributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("database_rdbms",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.DatabaseRDBMSAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.DatabaseRDBMSAttributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("database_nosql",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.DatabaseNoSQLAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.DatabaseNoSQLAttributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("kubernetes",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.KubernetesAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.KubernetesAttributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("serverless",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.ServerlessRateAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.ServerlessRateAttributes)
+		},
+	)
+}
 
+// MarshalAttributes serializes the category-specific attributes of an observation to JSON bytes.
+func MarshalAttributes(obs PriceObservation) ([]byte, error) {
+	codec, ok := categoryCodecs[obs.ServiceCategory]
+	if !ok {
+		codec = categoryCodecs["compute"]
+	}
+	return codec.marshal(obs)
+}
+
+// UnmarshalAttributes deserializes raw JSON bytes into the corresponding category attribute fields of obs.
+func UnmarshalAttributes(obs *PriceObservation, raw []byte) error {
 	if len(raw) == 0 {
-		return computeAttrs, storageAttrs, networkAttrs, nil
+		return nil
 	}
-
-	switch serviceCategory {
-	case "storage":
-		if err := json.Unmarshal(raw, &storageAttrs); err != nil {
-			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal storage attributes: %w", err)
-		}
-	case "network":
-		if err := json.Unmarshal(raw, &networkAttrs); err != nil {
-			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal network attributes: %w", err)
-		}
-	default:
-		if err := json.Unmarshal(raw, &computeAttrs); err != nil {
-			return computeAttrs, storageAttrs, networkAttrs, fmt.Errorf("unmarshal compute attributes: %w", err)
-		}
+	codec, ok := categoryCodecs[obs.ServiceCategory]
+	if !ok {
+		codec = categoryCodecs["compute"]
 	}
-
-	return computeAttrs, storageAttrs, networkAttrs, nil
+	if err := codec.unmarshal(obs, raw); err != nil {
+		return fmt.Errorf("unmarshal %s attributes: %w", obs.ServiceCategory, err)
+	}
+	return nil
 }

@@ -95,27 +95,7 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		region = "us-east"
 	}
 
-	// Build warnings array for Stage 3 providers
-	warnings := []ProviderWarning{
-		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
-		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
-		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
-		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
-	}
-
-	currency := q.Get("currency")
-	reqCurrency := currency
-	if reqCurrency == "" {
-		reqCurrency = "USD"
-	}
-	if currency != "" && currency != "USD" {
-		warnings = append(warnings, ProviderWarning{
-			Provider: "system",
-			Code:     "currency_conversion_not_yet_supported",
-			Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
-		})
-	}
-	currency = "USD"
+	reqCurrency, currency, warnings := NormalizeCurrencyAndWarnings(q.Get("currency"))
 
 	strictFamily := true
 	if strictStr := q.Get("strict_family"); strictStr != "" {

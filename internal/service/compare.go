@@ -16,6 +16,10 @@ type CategoryComparisonItem struct {
 	MatchedCompute    domain.ComputeAttributes
 	MatchedStorage    domain.StorageAttributes
 	MatchedNetwork    domain.NetworkAttributes
+	MatchedDatabase   domain.DatabaseRDBMSAttributes
+	MatchedNoSQL      domain.DatabaseNoSQLAttributes
+	MatchedKubernetes domain.KubernetesAttributes
+	MatchedServerless domain.ServerlessRateAttributes
 	MatchQuality      string
 	MatchDeltaPct     float64
 	MissingAttributes []string
@@ -56,6 +60,18 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 					Code:     "category_not_supported",
 					Message:  category + " category is not supported by " + prov,
 				})
+			case errors.Is(err, ErrEngineMismatch):
+				warnings = append(warnings, CalculateWarning{
+					Provider: prov,
+					Code:     "engine_mismatch_excluded",
+					Message:  "Database candidate was excluded due to engine mismatch.",
+				})
+			case errors.Is(err, ErrArchitectureUnsupported):
+				warnings = append(warnings, CalculateWarning{
+					Provider: prov,
+					Code:     "architecture_unsupported_excluded",
+					Message:  "Provider does not offer the requested CPU architecture for serverless compute.",
+				})
 			case errors.Is(err, ErrNoMatchFound):
 				warnings = append(warnings, CalculateWarning{
 					Provider: prov,
@@ -82,6 +98,10 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 			continue
 		}
 
+		if len(catResult.Warnings) > 0 {
+			warnings = append(warnings, catResult.Warnings...)
+		}
+
 		obs := catResult.MatchResult.Observation
 		results = append(results, CategoryComparisonItem{
 			Provider:          obs.Provider,
@@ -89,6 +109,10 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 			MatchedCompute:    obs.Attributes,
 			MatchedStorage:    obs.StorageAttributes,
 			MatchedNetwork:    obs.NetworkAttributes,
+			MatchedDatabase:   obs.DatabaseRDBMSAttributes,
+			MatchedNoSQL:      obs.DatabaseNoSQLAttributes,
+			MatchedKubernetes: obs.KubernetesAttributes,
+			MatchedServerless: obs.ServerlessRateAttributes,
 			MatchQuality:      catResult.MatchResult.MatchQuality,
 			MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
 			MissingAttributes: catResult.MatchResult.MissingAttributes,

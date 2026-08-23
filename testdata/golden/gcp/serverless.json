@@ -1,0 +1,103 @@
+{
+  "skus": [
+    {
+      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-INVOCATIONS",
+      "skuId": "SKU-GCP-CF-INVOCATIONS",
+      "description": "Cloud Functions Invocations",
+      "category": {
+        "serviceDisplayName": "Cloud Functions",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Invocations",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "Calls",
+            "usageUnitDescription": "invocations",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 400000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-CPU-TIME",
+      "skuId": "SKU-GCP-CF-CPU-TIME",
+      "description": "Cloud Functions CPU Time",
+      "category": {
+        "serviceDisplayName": "Cloud Functions",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "CPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "s",
+            "usageUnitDescription": "seconds",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 10000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-MEM-TIME",
+      "skuId": "SKU-GCP-CF-MEM-TIME",
+      "description": "Cloud Functions Memory Time",
+      "category": {
+        "serviceDisplayName": "Cloud Functions",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Memory",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-central1"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.s",
+            "usageUnitDescription": "gigabyte seconds",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 2500
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ]
+}

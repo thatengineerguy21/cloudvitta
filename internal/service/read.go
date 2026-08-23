@@ -169,11 +169,6 @@ func (s *PricingService) GetPrices(ctx context.Context, provider, category, regi
 }
 
 func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, error) {
-	computeAttrs, storageAttrs, networkAttrs, err := domain.UnmarshalAttributes(row.ServiceCategory, row.Attributes)
-	if err != nil {
-		return domain.PriceObservation{}, err
-	}
-
 	priceDec, err := store.NumericToDecimal(row.PriceAmount)
 	if err != nil {
 		return domain.PriceObservation{}, fmt.Errorf("convert numeric price: %w", err)
@@ -184,20 +179,23 @@ func mapStoreToDomain(row store.PriceObservation) (domain.PriceObservation, erro
 		fetchedAtTime = row.FetchedAt.Time
 	}
 
-	return domain.PriceObservation{
-		Provider:          row.Provider,
-		ServiceCategory:   row.ServiceCategory,
-		SkuID:             row.SkuID,
-		DisplayName:       row.DisplayName,
-		Region:            row.Region,
-		RegionGroup:       row.RegionGroup,
-		Unit:              row.Unit,
-		PriceAmount:       priceDec,
-		PriceCurrency:     row.PriceCurrency,
-		PricingModel:      row.PricingModel,
-		Attributes:        computeAttrs,
-		StorageAttributes: storageAttrs,
-		NetworkAttributes: networkAttrs,
-		FetchedAt:         fetchedAtTime,
-	}, nil
+	obs := domain.PriceObservation{
+		Provider:        row.Provider,
+		ServiceCategory: row.ServiceCategory,
+		SkuID:           row.SkuID,
+		DisplayName:     row.DisplayName,
+		Region:          row.Region,
+		RegionGroup:     row.RegionGroup,
+		Unit:            row.Unit,
+		PriceAmount:     priceDec,
+		PriceCurrency:   row.PriceCurrency,
+		PricingModel:    row.PricingModel,
+		FetchedAt:       fetchedAtTime,
+	}
+
+	if err := domain.UnmarshalAttributes(&obs, row.Attributes); err != nil {
+		return domain.PriceObservation{}, err
+	}
+
+	return obs, nil
 }

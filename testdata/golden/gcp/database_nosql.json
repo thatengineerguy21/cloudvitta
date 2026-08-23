@@ -1,0 +1,104 @@
+{
+  "skus": [
+    {
+      "name": "services/firestore/skus/SKU-GCP-FIRESTORE-READS",
+      "skuId": "SKU-GCP-FIRESTORE-READS",
+      "description": "Cloud Firestore Document Reads",
+      "category": {
+        "serviceDisplayName": "Cloud Firestore",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Reads",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "100k-ops",
+            "usageUnitDescription": "100k operations",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 30000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/firestore/skus/SKU-GCP-FIRESTORE-WRITES",
+      "skuId": "SKU-GCP-FIRESTORE-WRITES",
+      "description": "Cloud Firestore Document Writes",
+      "category": {
+        "serviceDisplayName": "Cloud Firestore",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Writes",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "100k-ops",
+            "usageUnitDescription": "100k operations",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 90000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/firestore/skus/SKU-GCP-FIRESTORE-STORAGE",
+      "skuId": "SKU-GCP-FIRESTORE-STORAGE",
+      "description": "Cloud Firestore Database Stored Data",
+      "category": {
+        "serviceDisplayName": "Cloud Firestore",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "DatabaseStoredData",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.mo",
+            "usageUnitDescription": "gibibyte month",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 180000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ],
+  "nextPageToken": ""
+}

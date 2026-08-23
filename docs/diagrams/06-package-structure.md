@@ -59,6 +59,11 @@ classDiagram
         regionmap
         storageclassmap
         transfertypemap
+        databaseenginemap
+        nosqldatamodelmap
+        kubernetestieremap
+        serverlessarchmap
+        serverlessunitmap
     }
 
     class fx {

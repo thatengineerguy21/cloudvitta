@@ -37,6 +37,34 @@ func TestAWSNormalize_GoldenCorpus(t *testing.T) {
 			expectedSKUs:  []string{"SKU-TRANSFER-US-EAST", "SKU-TRANSFER-VODAFONE-DORTMUND"},
 			expectedPrice: "0.0900000000",
 		},
+		{
+			name:          "AWS Database Golden",
+			goldenFile:    "../../../../testdata/golden/aws/database.json",
+			wantObsCount:  6, // RDS PG M6g xlarge (single & HA), GP3 (single & HA), Aurora PG R6g 2xlarge, Aurora Storage
+			expectedSKUs:  []string{"SKU-RDS-PG-M6G-XLARGE", "SKU-RDS-PG-M6G-XLARGE-HA", "SKU-RDS-STORAGE-GP3", "SKU-RDS-STORAGE-GP3-HA", "SKU-AURORA-PG-R6G-2XLARGE", "SKU-AURORA-STORAGE"},
+			expectedPrice: "0.2600000000",
+		},
+		{
+			name:          "AWS NoSQL Database Golden",
+			goldenFile:    "../../../../testdata/golden/aws/database_nosql.json",
+			wantObsCount:  6, // Read provisioned, Write provisioned, Read on-demand, Write on-demand, Standard storage, IA storage
+			expectedSKUs:  []string{"SKU-DDB-READ-PROVISIONED", "SKU-DDB-WRITE-PROVISIONED", "SKU-DDB-READ-ONDEMAND", "SKU-DDB-WRITE-ONDEMAND", "SKU-DDB-STORAGE-STANDARD", "SKU-DDB-STORAGE-IA"},
+			expectedPrice: "0.0001300000",
+		},
+		{
+			name:          "AWS Kubernetes Golden",
+			goldenFile:    "../../../../testdata/golden/aws/kubernetes.json",
+			wantObsCount:  2, // Standard, Extended Support
+			expectedSKUs:  []string{"SKU-AWS-EKS-STANDARD", "SKU-AWS-EKS-EXTENDED"},
+			expectedPrice: "0.1000000000",
+		},
+		{
+			name:          "AWS Serverless Golden",
+			goldenFile:    "../../../../testdata/golden/aws/serverless.json",
+			wantObsCount:  4, // x86 Request, x86 Duration, ARM Request, ARM Duration
+			expectedSKUs:  []string{"SKU-AWS-LAMBDA-REQ-X86", "SKU-AWS-LAMBDA-DUR-X86", "SKU-AWS-LAMBDA-REQ-ARM", "SKU-AWS-LAMBDA-DUR-ARM"},
+			expectedPrice: "0.2000000000",
+		},
 	}
 
 	for _, tt := range tests {

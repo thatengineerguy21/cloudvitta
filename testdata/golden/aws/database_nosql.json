@@ -1,0 +1,166 @@
+{
+  "formatVersion": "v1.0",
+  "offerCode": "AmazonDynamoDB",
+  "products": {
+    "SKU-DDB-READ-PROVISIONED": {
+      "sku": "SKU-DDB-READ-PROVISIONED",
+      "productFamily": "Database",
+      "attributes": {
+        "servicecode": "AmazonDynamoDB",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "DDB-ReadUnits",
+        "usagetype": "ReadCapacityUnit-Hrs",
+        "operation": "CommittedThroughput"
+      }
+    },
+    "SKU-DDB-WRITE-PROVISIONED": {
+      "sku": "SKU-DDB-WRITE-PROVISIONED",
+      "productFamily": "Database",
+      "attributes": {
+        "servicecode": "AmazonDynamoDB",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "DDB-WriteUnits",
+        "usagetype": "WriteCapacityUnit-Hrs",
+        "operation": "CommittedThroughput"
+      }
+    },
+    "SKU-DDB-READ-ONDEMAND": {
+      "sku": "SKU-DDB-READ-ONDEMAND",
+      "productFamily": "Database",
+      "attributes": {
+        "servicecode": "AmazonDynamoDB",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "DDB-OnDemandReadUnits",
+        "usagetype": "ReadRequestUnits",
+        "operation": "PayPerRequestThroughput"
+      }
+    },
+    "SKU-DDB-WRITE-ONDEMAND": {
+      "sku": "SKU-DDB-WRITE-ONDEMAND",
+      "productFamily": "Database",
+      "attributes": {
+        "servicecode": "AmazonDynamoDB",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "DDB-OnDemandWriteUnits",
+        "usagetype": "WriteRequestUnits",
+        "operation": "PayPerRequestThroughput"
+      }
+    },
+    "SKU-DDB-STORAGE-STANDARD": {
+      "sku": "SKU-DDB-STORAGE-STANDARD",
+      "productFamily": "Database Storage",
+      "attributes": {
+        "servicecode": "AmazonDynamoDB",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "DDB-Storage",
+        "usagetype": "TimedStorage-ByteHrs",
+        "operation": "TimedStorage-ByteHrs"
+      }
+    },
+    "SKU-DDB-STORAGE-IA": {
+      "sku": "SKU-DDB-STORAGE-IA",
+      "productFamily": "Database Storage",
+      "attributes": {
+        "servicecode": "AmazonDynamoDB",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "DDB-StorageIA",
+        "usagetype": "TimedStorage-IA-ByteHrs",
+        "operation": "TimedStorage-IA-ByteHrs"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-DDB-READ-PROVISIONED": {
+        "SKU-DDB-READ-PROVISIONED.TERM": {
+          "priceDimensions": {
+            "SKU-DDB-READ-PROVISIONED.DIM": {
+              "unit": "Hrs",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.0001300000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-DDB-WRITE-PROVISIONED": {
+        "SKU-DDB-WRITE-PROVISIONED.TERM": {
+          "priceDimensions": {
+            "SKU-DDB-WRITE-PROVISIONED.DIM": {
+              "unit": "Hrs",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.0006500000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-DDB-READ-ONDEMAND": {
+        "SKU-DDB-READ-ONDEMAND.TERM": {
+          "priceDimensions": {
+            "SKU-DDB-READ-ONDEMAND.DIM": {
+              "unit": "Req",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.2500000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-DDB-WRITE-ONDEMAND": {
+        "SKU-DDB-WRITE-ONDEMAND.TERM": {
+          "priceDimensions": {
+            "SKU-DDB-WRITE-ONDEMAND.DIM": {
+              "unit": "Req",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "1.2500000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-DDB-STORAGE-STANDARD": {
+        "SKU-DDB-STORAGE-STANDARD.TERM": {
+          "priceDimensions": {
+            "SKU-DDB-STORAGE-STANDARD.DIM": {
+              "unit": "GB-Mo",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.2500000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-DDB-STORAGE-IA": {
+        "SKU-DDB-STORAGE-IA.TERM": {
+          "priceDimensions": {
+            "SKU-DDB-STORAGE-IA.DIM": {
+              "unit": "GB-Mo",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.1000000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

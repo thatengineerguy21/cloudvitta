@@ -15,6 +15,8 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/databaseenginemap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/nosqldatamodelmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
@@ -39,14 +41,18 @@ type awsOfferTerm struct {
 }
 
 type awsProductMeta struct {
-	sku          string
-	category     string
-	regionGroup  string
-	region       string
-	displayName  string
-	computeAttrs domain.ComputeAttributes
-	storageAttrs domain.StorageAttributes
-	networkAttrs domain.NetworkAttributes
+	sku                string
+	category           string
+	regionGroup        string
+	region             string
+	displayName        string
+	computeAttrs       domain.ComputeAttributes
+	storageAttrs       domain.StorageAttributes
+	networkAttrs       domain.NetworkAttributes
+	databaseAttrs      domain.DatabaseRDBMSAttributes
+	databaseNoSQLAttrs domain.DatabaseNoSQLAttributes
+	kubernetesAttrs    domain.KubernetesAttributes
+	serverlessAttrs    domain.ServerlessRateAttributes
 }
 
 // Normalize parses an AWS Pricing Bulk JSON file stream and returns normalized domain observations.
@@ -397,6 +403,274 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string, fetchedAt time.T
 		}, nil
 	}
 
+	if isNoSQLProduct(prod, prod.Attributes) {
+		category, err := catalogmap.MapAWSProduct(serviceCode)
+		if err != nil {
+			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   "database_nosql",
+						Kind:       "product",
+						RawValue:   serviceCode,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
+				return nil, nil
+			}
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		location := prod.Attributes["location"]
+		if location == "" {
+			location = prod.Attributes["regionCode"]
+		}
+		regionGroup, err := regionmap.MapAWSRegion(location)
+		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   location,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped region", "sku", sku, "region", location)
+				return nil, nil
+			}
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		region := prod.Attributes["regionCode"]
+		if region == "" {
+			region = location
+		}
+
+		dataModel, err := nosqldatamodelmap.MapAWSDataModel("AmazonDynamoDB")
+		if err != nil {
+			dataModel = nosqldatamodelmap.DataModelDocument
+		}
+
+		usageType := prod.Attributes["usagetype"]
+		group := prod.Attributes["group"]
+		operation := prod.Attributes["operation"]
+		desc := prod.Attributes["description"]
+
+		multiRegion := strings.Contains(usageType, "GlobalTables") ||
+			strings.Contains(group, "GlobalTables") ||
+			strings.Contains(operation, "Replication") ||
+			strings.Contains(desc, "Global Table")
+
+		var pricingMode string
+		var componentType string
+		var readUnits float64
+		var writeUnits float64
+		var storageGB float64
+		var storageClass string
+		var displayName string
+
+		switch {
+		case strings.Contains(usageType, "ReadCapacityUnit-Hrs") || group == "DDB-ReadUnits" || (operation == "CommittedThroughput" && strings.Contains(usageType, "Read")):
+			pricingMode = "provisioned"
+			componentType = "throughput"
+			readUnits = 1
+			displayName = "DynamoDB Provisioned Read Capacity Unit"
+		case strings.Contains(usageType, "WriteCapacityUnit-Hrs") || group == "DDB-WriteUnits" || (operation == "CommittedThroughput" && strings.Contains(usageType, "Write")):
+			pricingMode = "provisioned"
+			componentType = "throughput"
+			writeUnits = 1
+			displayName = "DynamoDB Provisioned Write Capacity Unit"
+		case strings.Contains(usageType, "ReadRequestUnits") || group == "DDB-OnDemandReadUnits" || (operation == "PayPerRequestThroughput" && strings.Contains(usageType, "Read")):
+			pricingMode = "on_demand"
+			componentType = "request_operations"
+			readUnits = 1
+			displayName = "DynamoDB On-Demand Read Request Units"
+		case strings.Contains(usageType, "WriteRequestUnits") || group == "DDB-OnDemandWriteUnits" || (operation == "PayPerRequestThroughput" && strings.Contains(usageType, "Write")):
+			pricingMode = "on_demand"
+			componentType = "request_operations"
+			writeUnits = 1
+			displayName = "DynamoDB On-Demand Write Request Units"
+		case strings.Contains(usageType, "TimedStorage-IA-ByteHrs") || group == "DDB-StorageIA":
+			pricingMode = "provisioned"
+			componentType = "storage"
+			storageGB = 1
+			storageClass = "infrequent_access"
+			displayName = "DynamoDB Standard-IA Storage"
+		case strings.Contains(usageType, "TimedStorage-ByteHrs") || group == "DDB-Storage" || prod.ProductFamily == "Database Storage":
+			pricingMode = "provisioned"
+			componentType = "storage"
+			storageGB = 1
+			storageClass = "standard"
+			displayName = "DynamoDB Standard Storage"
+		default:
+			return nil, nil
+		}
+
+		if desc != "" {
+			displayName = desc
+		}
+
+		return &awsProductMeta{
+			sku:         sku,
+			category:    category,
+			regionGroup: regionGroup,
+			region:      region,
+			displayName: displayName,
+			databaseNoSQLAttrs: domain.DatabaseNoSQLAttributes{
+				DataModel:     dataModel,
+				PricingMode:   pricingMode,
+				ReadUnits:     readUnits,
+				WriteUnits:    writeUnits,
+				StorageGB:     storageGB,
+				StorageClass:  storageClass,
+				MultiRegion:   multiRegion,
+				ComponentType: componentType,
+			},
+		}, nil
+	}
+
+	if isKubernetesProduct(prod, prod.Attributes) {
+		return normalizeKubernetesProduct(prod, serviceCode, sku, fetchedAt, sink)
+	}
+
+	if isServerlessProduct(prod, prod.Attributes) {
+		return normalizeServerlessProduct(prod, serviceCode, sku, fetchedAt, sink)
+	}
+
+	if isDatabaseProduct(prod, prod.Attributes) {
+		category, err := catalogmap.MapAWSProduct(serviceCode)
+		if err != nil {
+			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   "database_rdbms",
+						Kind:       "product",
+						RawValue:   serviceCode,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
+				return nil, nil
+			}
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		location := prod.Attributes["location"]
+		if location == "" {
+			location = prod.Attributes["regionCode"]
+		}
+		regionGroup, err := regionmap.MapAWSRegion(location)
+		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "aws",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   location,
+						SkuID:      sku,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("aws normalize: skipping SKU due to unmapped region", "sku", sku, "region", location)
+				return nil, nil
+			}
+			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
+		}
+
+		region := prod.Attributes["regionCode"]
+		if region == "" {
+			region = location
+		}
+
+		multiAZ := prod.Attributes["deploymentOption"] == "Multi-AZ"
+
+		if prod.ProductFamily == "Database Instance" {
+			rawEngine := prod.Attributes["databaseEngine"]
+			engine, err := databaseenginemap.MapAWSEngine(rawEngine)
+			if err != nil {
+				if errors.Is(err, databaseenginemap.ErrUnmappedDatabaseEngine) {
+					if sink != nil {
+						_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+							Provider:   "aws",
+							Category:   category,
+							Kind:       "database_engine",
+							RawValue:   rawEngine,
+							SkuID:      sku,
+							ObservedAt: fetchedAt,
+						})
+					}
+					slog.Warn("aws normalize: skipping SKU due to unmapped database engine", "sku", sku, "engine", rawEngine)
+					return nil, nil
+				}
+				return nil, fmt.Errorf("aws normalize sku %s database engine: %w", sku, err)
+			}
+
+			instanceType := prod.Attributes["instanceType"]
+			vcpu := parseVCPU(prod.Attributes["vcpu"])
+			ram := parseRAMGB(prod.Attributes["memory"])
+			tier := parseAWSDatabaseTier(instanceType, rawEngine)
+
+			return &awsProductMeta{
+				sku:         sku,
+				category:    category,
+				regionGroup: regionGroup,
+				region:      region,
+				displayName: instanceType,
+				databaseAttrs: domain.DatabaseRDBMSAttributes{
+					Engine:         engine,
+					VCPU:           vcpu,
+					RAMGB:          ram,
+					StorageGB:      0,
+					MultiAZ:        multiAZ,
+					DeploymentTier: tier,
+					ComponentType:  "instance",
+				},
+			}, nil
+		}
+
+		if prod.ProductFamily == "Database Storage" {
+			rawEngine := prod.Attributes["databaseEngine"]
+			var engine string
+			if rawEngine != "" && rawEngine != "Any" {
+				if mappedEngine, err := databaseenginemap.MapAWSEngine(rawEngine); err == nil {
+					engine = mappedEngine
+				}
+			}
+
+			rawVolumeType := prod.Attributes["volumeType"]
+			storageFamily := parseAWSStorageFamily(rawVolumeType)
+			displayName := "Database Storage"
+			if rawVolumeType != "" {
+				displayName = "Database Storage " + rawVolumeType
+			}
+
+			return &awsProductMeta{
+				sku:         sku,
+				category:    category,
+				regionGroup: regionGroup,
+				region:      region,
+				displayName: displayName,
+				databaseAttrs: domain.DatabaseRDBMSAttributes{
+					Engine:        engine,
+					VCPU:          0,
+					RAMGB:         0,
+					StorageGB:     1,
+					MultiAZ:       multiAZ,
+					StorageFamily: storageFamily,
+					ComponentType: "storage",
+				},
+			}, nil
+		}
+	}
+
 	return nil, nil
 }
 
@@ -502,20 +776,24 @@ func parseSKUTerms(skuTerms map[string]awsOfferTerm, sku string, meta awsProduct
 
 func buildObservation(meta awsProductMeta, unit string, price decimal.Decimal, fetchedAt time.Time) domain.PriceObservation {
 	return domain.PriceObservation{
-		Provider:          "aws",
-		ServiceCategory:   meta.category,
-		SkuID:             meta.sku,
-		DisplayName:       meta.displayName,
-		Region:            meta.region,
-		RegionGroup:       meta.regionGroup,
-		Unit:              unit,
-		PriceAmount:       price,
-		PriceCurrency:     "USD",
-		PricingModel:      "OnDemand",
-		Attributes:        meta.computeAttrs,
-		StorageAttributes: meta.storageAttrs,
-		NetworkAttributes: meta.networkAttrs,
-		FetchedAt:         fetchedAt,
+		Provider:                 "aws",
+		ServiceCategory:          meta.category,
+		SkuID:                    meta.sku,
+		DisplayName:              meta.displayName,
+		Region:                   meta.region,
+		RegionGroup:              meta.regionGroup,
+		Unit:                     unit,
+		PriceAmount:              price,
+		PriceCurrency:            "USD",
+		PricingModel:             "OnDemand",
+		Attributes:               meta.computeAttrs,
+		StorageAttributes:        meta.storageAttrs,
+		NetworkAttributes:        meta.networkAttrs,
+		DatabaseRDBMSAttributes:  meta.databaseAttrs,
+		DatabaseNoSQLAttributes:  meta.databaseNoSQLAttrs,
+		KubernetesAttributes:     meta.kubernetesAttrs,
+		ServerlessRateAttributes: meta.serverlessAttrs,
+		FetchedAt:                fetchedAt,
 	}
 }
 
@@ -634,4 +912,66 @@ func parseFamily(instanceType string) string {
 		return parts[0]
 	}
 	return instanceType
+}
+
+func isNoSQLProduct(product awsProduct, attrs map[string]string) bool {
+	if attrs == nil {
+		return false
+	}
+	if attrs["servicecode"] == "AmazonDynamoDB" {
+		return true
+	}
+	if product.ProductFamily == "Database" && (strings.Contains(attrs["usagetype"], "ReadCapacityUnit") || strings.Contains(attrs["usagetype"], "WriteCapacityUnit") || strings.Contains(attrs["usagetype"], "RequestUnits")) {
+		return true
+	}
+	if product.ProductFamily == "Database Storage" && (strings.Contains(attrs["usagetype"], "TimedStorage") || strings.Contains(attrs["group"], "DDB")) {
+		return true
+	}
+	return false
+}
+
+func isDatabaseProduct(product awsProduct, attrs map[string]string) bool {
+	if attrs == nil {
+		return false
+	}
+	if attrs["servicecode"] == "AmazonDynamoDB" || strings.Contains(attrs["usagetype"], "DDB") || strings.Contains(attrs["group"], "DDB") {
+		return false
+	}
+	if product.ProductFamily == "Database Instance" || product.ProductFamily == "Database Storage" {
+		return true
+	}
+	if attrs["servicecode"] == "AmazonRDS" || attrs["servicecode"] == "AmazonAurora" {
+		return true
+	}
+	return false
+}
+
+func parseAWSDatabaseTier(instanceType, rawEngine string) string {
+	lowEngine := strings.ToLower(rawEngine)
+	if strings.Contains(lowEngine, "aurora") {
+		return "aurora"
+	}
+	lowInst := strings.ToLower(instanceType)
+	if strings.Contains(lowInst, "db.t") {
+		return "burstable"
+	}
+	return "standard"
+}
+
+func parseAWSStorageFamily(volumeType string) string {
+	low := strings.ToLower(strings.TrimSpace(volumeType))
+	switch {
+	case strings.Contains(low, "gp3"):
+		return "gp3"
+	case strings.Contains(low, "gp2"):
+		return "gp2"
+	case strings.Contains(low, "io1") || strings.Contains(low, "io2") || strings.Contains(low, "provisioned iops"):
+		return "io1"
+	case strings.Contains(low, "aurora"):
+		return "aurora"
+	case strings.Contains(low, "magnetic") || strings.Contains(low, "hdd"):
+		return "hdd"
+	default:
+		return "ssd"
+	}
 }

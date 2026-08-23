@@ -2,11 +2,14 @@ package service
 
 // CategoryThresholds defines per-category boundaries for match quality classification.
 // The matching engine classifies candidates into tiers based on their weighted distance:
-//   - exact:       distance == 0
+//   - exact:       distance <= ExactThreshold (typically 0.0)
 //   - close:       distance <= CloseCutoff
 //   - approximate: distance <= ApproximateCutoff
 //   - none:        distance > ApproximateCutoff (provider omitted from results)
 type CategoryThresholds struct {
+	// ExactThreshold is the maximum distance for an "exact" match (default: 0.0).
+	ExactThreshold float64
+
 	// CloseCutoff is the maximum distance for a "close" match (e.g. 0.10 = 10%).
 	CloseCutoff float64
 
@@ -27,6 +30,7 @@ var (
 	// close: within 10% combined vCPU+RAM delta.
 	// approximate: within 50% combined delta (same as prior behavior where >50% was dropped).
 	ComputeThresholds = CategoryThresholds{
+		ExactThreshold:    0.0,
 		CloseCutoff:       0.10,
 		ApproximateCutoff: 0.50,
 	}
@@ -36,6 +40,7 @@ var (
 	// close: within 15% combined size+class delta.
 	// approximate: within 60% combined delta.
 	StorageThresholds = CategoryThresholds{
+		ExactThreshold:    0.0,
 		CloseCutoff:       0.15,
 		ApproximateCutoff: 0.60,
 	}
@@ -45,7 +50,45 @@ var (
 	// close: within 10% combined egress+transfer_type delta.
 	// approximate: within 50% combined delta.
 	NetworkThresholds = CategoryThresholds{
+		ExactThreshold:    0.0,
 		CloseCutoff:       0.10,
+		ApproximateCutoff: 0.50,
+	}
+
+	// DatabaseRDBMSThresholds defines match quality boundaries for relational database category.
+	// close: within 20% combined vCPU+RAM+storage+iops delta.
+	// approximate: within 50% combined delta.
+	DatabaseRDBMSThresholds = CategoryThresholds{
+		ExactThreshold:    0.0,
+		CloseCutoff:       0.20,
+		ApproximateCutoff: 0.50,
+	}
+
+	// DatabaseNoSQLThresholds defines match quality boundaries for NoSQL database category.
+	// close: within 20% combined throughput+storage delta.
+	// approximate: within 50% combined delta.
+	DatabaseNoSQLThresholds = CategoryThresholds{
+		ExactThreshold:    0.0,
+		CloseCutoff:       0.20,
+		ApproximateCutoff: 0.50,
+	}
+
+	// KubernetesThresholds defines match quality boundaries for Kubernetes control plane category.
+	// close: within 20% tier mismatch penalty.
+	// approximate: within 50% combined delta.
+	KubernetesThresholds = CategoryThresholds{
+		ExactThreshold:    0.0,
+		CloseCutoff:       0.20,
+		ApproximateCutoff: 0.50,
+	}
+
+	// ServerlessThresholds defines match quality boundaries for serverless compute category.
+	// exact: 0.0 tier mismatch penalty.
+	// close: within 20% tier mismatch penalty.
+	// approximate: within 50% combined delta.
+	ServerlessThresholds = CategoryThresholds{
+		ExactThreshold:    0.0,
+		CloseCutoff:       0.20,
 		ApproximateCutoff: 0.50,
 	}
 )
@@ -59,6 +102,14 @@ func ThresholdsForCategory(category string) CategoryThresholds {
 		return StorageThresholds
 	case "network":
 		return NetworkThresholds
+	case "database_rdbms":
+		return DatabaseRDBMSThresholds
+	case "database_nosql":
+		return DatabaseNoSQLThresholds
+	case "kubernetes":
+		return KubernetesThresholds
+	case "serverless":
+		return ServerlessThresholds
 	default:
 		// Fallback to the strictest thresholds for unknown categories.
 		return ComputeThresholds
@@ -68,7 +119,7 @@ func ThresholdsForCategory(category string) CategoryThresholds {
 // classifyTier classifies a weighted distance into one of the four match quality tiers.
 func classifyTier(distance float64, th CategoryThresholds) string {
 	switch {
-	case distance == 0:
+	case distance <= th.ExactThreshold:
 		return "exact"
 	case distance <= th.CloseCutoff:
 		return "close"

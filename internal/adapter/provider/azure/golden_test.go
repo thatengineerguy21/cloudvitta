@@ -33,6 +33,30 @@ func TestAzureNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 2, // East US egress, Intercontinental egress
 			expectedSKUs: []string{"DZH318Z0BNZ7/0001", "DZH318Z0BNZ7/0002"},
 		},
+		{
+			name:         "Azure Database Golden",
+			goldenFile:   "../../../../testdata/golden/azure/database.json",
+			wantObsCount: 5, // PG GP 4vCore (single & HA), Storage (single & HA), SQL DB GP 4vCore
+			expectedSKUs: []string{"SKU-AZURE-PG-GP-4VCORE", "SKU-AZURE-PG-GP-4VCORE-HA", "SKU-AZURE-PG-STORAGE", "SKU-AZURE-PG-STORAGE-HA", "SKU-AZURE-SQL-GP-4VCORE"},
+		},
+		{
+			name:         "Azure NoSQL Database Golden",
+			goldenFile:   "../../../../testdata/golden/azure/database_nosql.json",
+			wantObsCount: 4, // 100 RU/s, Serverless 1M RUs, Transactional Storage, Analytical Storage
+			expectedSKUs: []string{"SKU-AZURE-COSMOS-PROVISIONED-100RU", "SKU-AZURE-COSMOS-SERVERLESS-1MRU", "SKU-AZURE-COSMOS-STORAGE-TRANSACTIONAL", "SKU-AZURE-COSMOS-STORAGE-ANALYTICAL"},
+		},
+		{
+			name:         "Azure Kubernetes Golden",
+			goldenFile:   "../../../../testdata/golden/azure/kubernetes.json",
+			wantObsCount: 3, // Free, Standard, Extended Support
+			expectedSKUs: []string{"SKU-AZURE-AKS-FREE", "SKU-AZURE-AKS-STANDARD", "SKU-AZURE-AKS-EXTENDED"},
+		},
+		{
+			name:         "Azure Serverless Golden",
+			goldenFile:   "../../../../testdata/golden/azure/serverless.json",
+			wantObsCount: 4, // Standard Req, Standard Dur, Flex Req, Flex Dur
+			expectedSKUs: []string{"SKU-AZURE-FUNCTIONS-REQ", "SKU-AZURE-FUNCTIONS-DUR", "SKU-AZURE-FLEX-REQ", "SKU-AZURE-FLEX-DUR"},
+		},
 	}
 
 	for _, tt := range tests {

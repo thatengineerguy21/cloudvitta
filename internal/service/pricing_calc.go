@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/shopspring/decimal"
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
 // CalculateStorageMonthlyCost calculates the estimated monthly storage cost given unit price and size in GB.
@@ -33,13 +34,166 @@ func CalculateNetworkHourlyCost(unitPrice, egressGB decimal.Decimal) decimal.Dec
 	return CalculateNetworkMonthlyCost(unitPrice, egressGB).Div(HoursInMonth)
 }
 
-// CategoryPricingResult contains the match result along with computed costs.
+// CalculateIOPSMonthlyCost calculates estimated monthly provisioned IOPS cost from unit price ($/IOPS-mo) and IOPS count.
+// This encapsulates pricing arithmetic in the service layer (08-CONSISTENCY-RULES.md).
+func CalculateIOPSMonthlyCost(unitPrice decimal.Decimal, iops int64) decimal.Decimal {
+	return unitPrice.Mul(decimal.NewFromInt(iops))
+}
+
+// CalculateIOPSHourlyCost calculates normalized hourly provisioned IOPS cost from unit price ($/IOPS-mo) and IOPS count.
+// Formula: (unitPrice * iops) / 730
+func CalculateIOPSHourlyCost(unitPrice decimal.Decimal, iops int64) decimal.Decimal {
+	return CalculateIOPSMonthlyCost(unitPrice, iops).Div(HoursInMonth)
+}
+
+// CategoryPricingResult contains the match result along with computed costs and warnings.
 type CategoryPricingResult struct {
 	MatchResult *MatchResult
 	HourlyCost  decimal.Decimal
 	MonthlyCost decimal.Decimal
 	Unit        string
 	Stale       bool
+	Warnings    []CalculateWarning
+}
+
+// CategoryPricingHandler encapsulates category-specific matching and cost arithmetic.
+type CategoryPricingHandler struct {
+	Match          func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error)
+	CalculateCosts func(match *MatchResult, target MatchTarget) (hourlyCost, monthlyCost decimal.Decimal, unit string, warnings []CalculateWarning)
+}
+
+var categoryPricingHandlers = map[string]CategoryPricingHandler{}
+
+// RegisterCategoryPricingHandler registers a matching and cost calculation handler for a service category.
+func RegisterCategoryPricingHandler(category string, handler CategoryPricingHandler) {
+	categoryPricingHandlers[category] = handler
+}
+
+func init() {
+	RegisterCategoryPricingHandler("compute", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			res := MatchObservations(ComputeScorer{}, obsList, target, thresholds)
+			if res == nil {
+				return nil, ErrNoMatchFound
+			}
+			return res, nil
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			hourlyCost := match.Observation.PriceAmount
+			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "hour"
+			}
+			return hourlyCost, monthlyCost, unit, nil
+		},
+	})
+
+	RegisterCategoryPricingHandler("storage", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			res := MatchObservations(StorageScorer{}, obsList, target, thresholds)
+			if res == nil {
+				return nil, ErrNoMatchFound
+			}
+			return res, nil
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			sizeGB := decimal.NewFromFloat(target.SizeGB)
+			if sizeGB.LessThanOrEqual(decimal.Zero) {
+				sizeGB = decimal.NewFromInt(1)
+			}
+			hourlyCost := CalculateStorageHourlyCost(match.Observation.PriceAmount, sizeGB)
+			monthlyCost := CalculateStorageMonthlyCost(match.Observation.PriceAmount, sizeGB)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "GB-Mo"
+			}
+			return hourlyCost, monthlyCost, unit, nil
+		},
+	})
+
+	RegisterCategoryPricingHandler("network", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			res := MatchObservations(NetworkScorer{}, obsList, target, thresholds)
+			if res == nil {
+				return nil, ErrNoMatchFound
+			}
+			return res, nil
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			egressGB := decimal.NewFromFloat(target.EgressGB)
+			if egressGB.LessThanOrEqual(decimal.Zero) {
+				egressGB = decimal.NewFromInt(1)
+			}
+			hourlyCost := CalculateNetworkHourlyCost(match.Observation.PriceAmount, egressGB)
+			monthlyCost := CalculateNetworkMonthlyCost(match.Observation.PriceAmount, egressGB)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "GB"
+			}
+			return hourlyCost, monthlyCost, unit, nil
+		},
+	})
+
+	RegisterCategoryPricingHandler("database_rdbms", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			return MatchDatabaseObservations(obsList, target, thresholds)
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			hourlyCost := match.Observation.PriceAmount
+			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "hour"
+			}
+			return hourlyCost, monthlyCost, unit, nil
+		},
+	})
+
+	RegisterCategoryPricingHandler("database_nosql", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			return MatchNoSQLObservations(obsList, target, thresholds)
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			hourlyCost := match.Observation.PriceAmount
+			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "hour"
+			}
+			return hourlyCost, monthlyCost, unit, nil
+		},
+	})
+
+	RegisterCategoryPricingHandler("kubernetes", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			return MatchKubernetesObservations(obsList, target, thresholds)
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			hourlyCost, warnings := AdjustKubernetesCost(match.Observation.Provider, match.Observation.PriceAmount, target)
+			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "hour"
+			}
+			return hourlyCost, monthlyCost, unit, warnings
+		},
+	})
+
+	RegisterCategoryPricingHandler("serverless", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			return MatchServerlessObservations(obsList, target, thresholds)
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			monthlyCost := match.Observation.PriceAmount
+			hourlyCost := monthlyCost.Div(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "month"
+			}
+			return hourlyCost, monthlyCost, unit, nil
+		},
+	})
 }
 
 // MatchAndCalculate encapsulates the fetch, matching, and cost calculation for any category.
@@ -47,6 +201,11 @@ type CategoryPricingResult struct {
 func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, category, region string, target MatchTarget) (*CategoryPricingResult, error) {
 	if !IsProviderCategorySupported(provider, category) {
 		return nil, ErrCategoryNotSupported
+	}
+
+	handler, ok := categoryPricingHandlers[category]
+	if !ok {
+		return nil, ErrInvalidParameters
 	}
 
 	obsList, err := s.GetPrices(ctx, provider, category, region)
@@ -57,57 +216,15 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		return nil, nil // No data available
 	}
 
-	var scorer CategoryScorer
-	switch category {
-	case "compute":
-		scorer = ComputeScorer{}
-	case "storage":
-		scorer = StorageScorer{}
-	case "network":
-		scorer = NetworkScorer{}
-	default:
-		return nil, ErrInvalidParameters
+	matchResult, err := handler.Match(obsList, target, ThresholdsForCategory(category))
+	if err != nil {
+		return nil, err
 	}
-
-	matchResult := MatchObservations(scorer, obsList, target, ThresholdsForCategory(category))
 	if matchResult == nil {
 		return nil, ErrNoMatchFound
 	}
 
-	var hourlyCost, monthlyCost decimal.Decimal
-	var unit string
-
-	switch category {
-	case "compute":
-		hourlyCost = matchResult.Observation.PriceAmount
-		monthlyCost = hourlyCost.Mul(HoursInMonth)
-		unit = matchResult.Observation.Unit
-		if unit == "" {
-			unit = "hour"
-		}
-	case "storage":
-		sizeGB := decimal.NewFromFloat(target.SizeGB)
-		if sizeGB.LessThanOrEqual(decimal.Zero) {
-			sizeGB = decimal.NewFromInt(1)
-		}
-		hourlyCost = CalculateStorageHourlyCost(matchResult.Observation.PriceAmount, sizeGB)
-		monthlyCost = CalculateStorageMonthlyCost(matchResult.Observation.PriceAmount, sizeGB)
-		unit = matchResult.Observation.Unit
-		if unit == "" {
-			unit = "GB-Mo"
-		}
-	case "network":
-		egressGB := decimal.NewFromFloat(target.EgressGB)
-		if egressGB.LessThanOrEqual(decimal.Zero) {
-			egressGB = decimal.NewFromInt(1)
-		}
-		hourlyCost = CalculateNetworkHourlyCost(matchResult.Observation.PriceAmount, egressGB)
-		monthlyCost = CalculateNetworkMonthlyCost(matchResult.Observation.PriceAmount, egressGB)
-		unit = matchResult.Observation.Unit
-		if unit == "" {
-			unit = "GB"
-		}
-	}
+	hourlyCost, monthlyCost, unit, warnings := handler.CalculateCosts(matchResult, target)
 
 	var isStale bool
 	if s.freshnessSvc != nil {
@@ -120,5 +237,6 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		MonthlyCost: monthlyCost,
 		Unit:        unit,
 		Stale:       isStale,
+		Warnings:    warnings,
 	}, nil
 }

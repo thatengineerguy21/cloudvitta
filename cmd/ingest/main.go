@@ -134,6 +134,39 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsNetworkAdapter)
 
+	// Register AWS database adapter with rate limiting and retry config
+	awsDBClient := aws.NewClient(aws.WithURL(aws.DefaultRDSPriceListURL))
+	awsDBAdapter := aws.NewAdapter(awsDBClient, rawStorage, aws.WithCategory("database_rdbms"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "database_rdbms",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsDBAdapter)
+
+	// Register AWS NoSQL database adapter with rate limiting and retry config
+	awsNoSQLDBClient := aws.NewClient(aws.WithURL(aws.DefaultDynamoDBPriceListURL))
+	awsNoSQLDBAdapter := aws.NewAdapter(awsNoSQLDBClient, rawStorage, aws.WithCategory("database_nosql"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "database_nosql",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsNoSQLDBAdapter)
+
+	// Register AWS Kubernetes adapter with rate limiting and retry config
+	awsKubernetesClient := aws.NewClient(aws.WithURL(aws.DefaultEKSPriceListURL))
+	awsKubernetesAdapter := aws.NewAdapter(awsKubernetesClient, rawStorage, aws.WithCategory("kubernetes"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "kubernetes",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsKubernetesAdapter)
+
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
 	azureAdapter := azure.NewAdapter(azureClient, rawStorage, azure.WithCategory("compute"))
@@ -166,6 +199,39 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureNetworkAdapter)
+
+	// Register Azure database adapter with rate limiting and retry config
+	azureDBClient := azure.NewClient(azure.WithURL(azure.DefaultDatabaseRetailPricesURL))
+	azureDBAdapter := azure.NewAdapter(azureDBClient, rawStorage, azure.WithCategory("database_rdbms"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "database_rdbms",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureDBAdapter)
+
+	// Register Azure NoSQL database adapter with rate limiting and retry config
+	azureNoSQLDBClient := azure.NewClient(azure.WithURL(azure.DefaultCosmosDBRetailPricesURL))
+	azureNoSQLDBAdapter := azure.NewAdapter(azureNoSQLDBClient, rawStorage, azure.WithCategory("database_nosql"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "database_nosql",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureNoSQLDBAdapter)
+
+	// Register Azure Kubernetes adapter with rate limiting and retry config
+	azureKubernetesClient := azure.NewClient(azure.WithURL(azure.DefaultKubernetesRetailPricesURL))
+	azureKubernetesAdapter := azure.NewAdapter(azureKubernetesClient, rawStorage, azure.WithCategory("kubernetes"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "kubernetes",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureKubernetesAdapter)
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
@@ -213,6 +279,54 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpNetworkAdapter)
+
+	// Register GCP database adapter with rate limiting and retry config
+	var gcpDBOpts []gcp.Option
+	if cfg.GCP.APIKey != "" {
+		gcpDBOpts = append(gcpDBOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpDBOpts = append(gcpDBOpts, gcp.WithURL(gcp.DefaultDatabaseBillingCatalogURL))
+	gcpDBClient := gcp.NewClient(gcpDBOpts...)
+	gcpDBAdapter := gcp.NewAdapter(gcpDBClient, rawStorage, gcp.WithCategory("database_rdbms"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "database_rdbms",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpDBAdapter)
+
+	// Register GCP NoSQL database adapter with rate limiting and retry config
+	var gcpNoSQLDBOpts []gcp.Option
+	if cfg.GCP.APIKey != "" {
+		gcpNoSQLDBOpts = append(gcpNoSQLDBOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpNoSQLDBOpts = append(gcpNoSQLDBOpts, gcp.WithURL(gcp.DefaultNoSQLDatabaseBillingCatalogURL))
+	gcpNoSQLDBClient := gcp.NewClient(gcpNoSQLDBOpts...)
+	gcpNoSQLDBAdapter := gcp.NewAdapter(gcpNoSQLDBClient, rawStorage, gcp.WithCategory("database_nosql"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "database_nosql",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpNoSQLDBAdapter)
+
+	// Register GCP Kubernetes adapter with rate limiting and retry config
+	var gcpKubernetesOpts []gcp.Option
+	if cfg.GCP.APIKey != "" {
+		gcpKubernetesOpts = append(gcpKubernetesOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpKubernetesOpts = append(gcpKubernetesOpts, gcp.WithURL(gcp.DefaultKubernetesBillingCatalogURL))
+	gcpKubernetesClient := gcp.NewClient(gcpKubernetesOpts...)
+	gcpKubernetesAdapter := gcp.NewAdapter(gcpKubernetesClient, rawStorage, gcp.WithCategory("kubernetes"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "kubernetes",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpKubernetesAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

@@ -1,0 +1,93 @@
+version: '3'
+
+dotenv: ['.env', '.env.local']
+
+tasks:
+  default:
+    desc: List all available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Build all binaries (api, ingest, migrate, quarantine-digest)
+    cmds:
+      - go build -v ./cmd/...
+
+  dev:api:
+    desc: Run the CloudVitta REST API server locally
+    cmds:
+      - go run ./cmd/api
+
+  dev:ingest:
+    desc: Run the pricing ingestion worker
+    cmds:
+      - go run ./cmd/ingest
+
+  dev:quarantine:
+    desc: Run the quarantine digest processor
+    cmds:
+      - go run ./cmd/quarantine-digest
+
+  test:
+    desc: Run all tests with race detector enabled
+    cmds:
+      - go test -race ./... {{.CLI_ARGS}}
+
+  test:fast:
+    desc: Run all tests without race detector — LOCAL ITERATION ONLY, never use to gate CI or merges (see 04-CODING-STANDARDS.md)
+    cmds:
+      - go test ./... {{.CLI_ARGS}}
+
+  test:cover:
+    desc: Run all tests and generate coverage report
+    cmds:
+      - go test -race -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out
+
+  lint:
+    desc: Run gofmt check and go vet
+    cmds:
+      - test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - go vet ./...
+
+  fmt:
+    desc: Auto-format all Go source files
+    cmds:
+      - gofmt -w .
+
+  swagger:
+    desc: Regenerate OpenAPI / Swagger documentation
+    sources:
+      - internal/domain/**/*.go
+      - internal/transport/rest/**/*.go
+    exclude:
+      - internal/transport/rest/openapi/**
+    generates:
+      - internal/transport/rest/openapi/swagger.json
+      - internal/transport/rest/openapi/swagger.yaml
+      - internal/transport/rest/openapi/docs.go
+    cmds:
+      - go run github.com/swaggo/swag/cmd/swag@v1.8.1 init -g internal/transport/rest/router.go -o internal/transport/rest/openapi
+
+  sqlc:
+    desc: Regenerate type-safe SQL store queries via SQLC
+    sources:
+      - migrations/*.sql
+      - internal/store/queries/*.sql
+      - sqlc.yaml
+    generates:
+      - internal/store/*.go
+    cmds:
+      - go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0 generate
+
+  db:migrate:
+    desc: Run database schema migrations forward
+    cmds:
+      - go run ./cmd/migrate
+
+  clean:
+    desc: Clean Go build cache and test artifacts
+    cmds:
+      - go clean
+      - rm -f coverage.out

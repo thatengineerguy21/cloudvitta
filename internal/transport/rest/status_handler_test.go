@@ -61,6 +61,30 @@ func TestStatusHandler_ServeHTTP_HealthyProvider(t *testing.T) {
 					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
 					ObservationCount: 35,
 				},
+				{
+					ServiceCategory:  "database_rdbms",
+					LastFetchedAt:    pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					ObservationCount: 80,
+				},
+				{
+					ServiceCategory:  "database_nosql",
+					LastFetchedAt:    pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					ObservationCount: 60,
+				},
+				{
+					ServiceCategory:  "kubernetes",
+					LastFetchedAt:    pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					ObservationCount: 20,
+				},
+				{
+					ServiceCategory:  "serverless",
+					LastFetchedAt:    pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					ObservationCount: 40,
+				},
 			}, nil
 		},
 	}
@@ -102,8 +126,8 @@ func TestStatusHandler_ServeHTTP_HealthyProvider(t *testing.T) {
 	if status.LastSuccessfulFetch == nil || !status.LastSuccessfulFetch.Equal(fetchTime) {
 		t.Errorf("expected LastSuccessfulFetch %v, got %v", fetchTime, status.LastSuccessfulFetch)
 	}
-	if len(status.Categories) != 3 {
-		t.Errorf("expected 3 categories, got %d", len(status.Categories))
+	if len(status.Categories) != 7 {
+		t.Errorf("expected 7 categories, got %d", len(status.Categories))
 	}
 }
 

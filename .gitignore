@@ -62,4 +62,7 @@ tsconfig.tsbuildinfo
 .turbo
 .vscode
 
+# Task runner checksum cache
+.task/
+
 cloudvitta

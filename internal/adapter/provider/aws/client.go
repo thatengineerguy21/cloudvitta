@@ -16,6 +16,15 @@ const DefaultS3PriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1
 // DefaultDataTransferPriceListURL is the standard AWS Price List API URL for AWSDataTransfer us-east-1.
 const DefaultDataTransferPriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/us-east-1/index.json"
 
+// DefaultRDSPriceListURL is the standard AWS Price List API URL for AmazonRDS us-east-1.
+const DefaultRDSPriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/us-east-1/index.json"
+
+// DefaultDynamoDBPriceListURL is the standard AWS Price List API URL for AmazonDynamoDB us-east-1.
+const DefaultDynamoDBPriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/us-east-1/index.json"
+
+// DefaultEKSPriceListURL is the standard AWS Price List API URL for AmazonEKS us-east-1.
+const DefaultEKSPriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEKS/current/us-east-1/index.json"
+
 // Client is an HTTP client for fetching AWS Price List API data.
 type Client struct {
 	httpClient *http.Client

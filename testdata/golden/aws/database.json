@@ -1,0 +1,172 @@
+{
+  "formatVersion": "v1.0",
+  "offerCode": "AmazonRDS",
+  "products": {
+    "SKU-RDS-PG-M6G-XLARGE": {
+      "sku": "SKU-RDS-PG-M6G-XLARGE",
+      "productFamily": "Database Instance",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "US East (N. Virginia)",
+        "instanceType": "db.m6g.xlarge",
+        "databaseEngine": "PostgreSQL",
+        "vcpu": "4",
+        "memory": "16 GiB",
+        "deploymentOption": "Single-AZ",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-RDS-PG-M6G-XLARGE-HA": {
+      "sku": "SKU-RDS-PG-M6G-XLARGE-HA",
+      "productFamily": "Database Instance",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "US East (N. Virginia)",
+        "instanceType": "db.m6g.xlarge",
+        "databaseEngine": "PostgreSQL",
+        "vcpu": "4",
+        "memory": "16 GiB",
+        "deploymentOption": "Multi-AZ",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-RDS-STORAGE-GP3": {
+      "sku": "SKU-RDS-STORAGE-GP3",
+      "productFamily": "Database Storage",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "US East (N. Virginia)",
+        "databaseEngine": "Any",
+        "volumeType": "General Purpose-GP3",
+        "deploymentOption": "Single-AZ",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-RDS-STORAGE-GP3-HA": {
+      "sku": "SKU-RDS-STORAGE-GP3-HA",
+      "productFamily": "Database Storage",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "US East (N. Virginia)",
+        "databaseEngine": "Any",
+        "volumeType": "General Purpose-GP3",
+        "deploymentOption": "Multi-AZ",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-AURORA-PG-R6G-2XLARGE": {
+      "sku": "SKU-AURORA-PG-R6G-2XLARGE",
+      "productFamily": "Database Instance",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "US East (N. Virginia)",
+        "instanceType": "db.r6g.2xlarge",
+        "databaseEngine": "Aurora PostgreSQL",
+        "vcpu": "8",
+        "memory": "64 GiB",
+        "deploymentOption": "Single-AZ",
+        "regionCode": "us-east-1"
+      }
+    },
+    "SKU-AURORA-STORAGE": {
+      "sku": "SKU-AURORA-STORAGE",
+      "productFamily": "Database Storage",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "US East (N. Virginia)",
+        "databaseEngine": "Aurora PostgreSQL",
+        "volumeType": "Aurora",
+        "deploymentOption": "Single-AZ",
+        "regionCode": "us-east-1"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-RDS-PG-M6G-XLARGE": {
+        "SKU-RDS-PG-M6G-XLARGE.JRTCKXETXF": {
+          "priceDimensions": {
+            "SKU-RDS-PG-M6G-XLARGE.JRTCKXETXF.6YS6EN2CT7": {
+              "unit": "Hrs",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.2600000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-RDS-PG-M6G-XLARGE-HA": {
+        "SKU-RDS-PG-M6G-XLARGE-HA.JRTCKXETXF": {
+          "priceDimensions": {
+            "SKU-RDS-PG-M6G-XLARGE-HA.JRTCKXETXF.6YS6EN2CT7": {
+              "unit": "Hrs",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.5200000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-RDS-STORAGE-GP3": {
+        "SKU-RDS-STORAGE-GP3.JRTCKXETXF": {
+          "priceDimensions": {
+            "SKU-RDS-STORAGE-GP3.JRTCKXETXF.6YS6EN2CT7": {
+              "unit": "GB-Mo",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.1150000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-RDS-STORAGE-GP3-HA": {
+        "SKU-RDS-STORAGE-GP3-HA.JRTCKXETXF": {
+          "priceDimensions": {
+            "SKU-RDS-STORAGE-GP3-HA.JRTCKXETXF.6YS6EN2CT7": {
+              "unit": "GB-Mo",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.2300000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-AURORA-PG-R6G-2XLARGE": {
+        "SKU-AURORA-PG-R6G-2XLARGE.JRTCKXETXF": {
+          "priceDimensions": {
+            "SKU-AURORA-PG-R6G-2XLARGE.JRTCKXETXF.6YS6EN2CT7": {
+              "unit": "Hrs",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "1.0400000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-AURORA-STORAGE": {
+        "SKU-AURORA-STORAGE.JRTCKXETXF": {
+          "priceDimensions": {
+            "SKU-AURORA-STORAGE.JRTCKXETXF.6YS6EN2CT7": {
+              "unit": "GB-Mo",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "pricePerUnit": {
+                "USD": "0.1000000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

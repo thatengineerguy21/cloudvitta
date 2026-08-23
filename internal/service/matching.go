@@ -4,8 +4,18 @@ import (
 	"math"
 	"sort"
 
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
+
+// ServerlessWorkload holds caller-specified workload parameters for serverless compute matching and cost estimation.
+type ServerlessWorkload struct {
+	Architecture        string          // canonical: x86_64, arm64
+	Tier                string          // canonical: consumption, flex_consumption, 1st_gen, 2nd_gen
+	ExecutionDurationMS decimal.Decimal // average execution duration in milliseconds
+	MemoryMB            decimal.Decimal // allocated memory in MB
+	RequestsPerMonth    decimal.Decimal // invocation requests per month
+}
 
 // CategoryScorer is the Strategy interface for per-category distance scoring.
 // Each category (compute, storage, network) implements its own scorer.
@@ -35,9 +45,31 @@ type MatchTarget struct {
 	EgressGB     float64
 	TransferType string // canonical: intra_region, inter_region, internet_egress
 
+	// Database RDBMS dimensions
+	Engine            string  // canonical: postgresql, mysql, sqlserver, mariadb, oracle
+	DatabaseStorageGB float64 // storage requested in GB
+	DatabaseIOPS      *int    // provisioned IOPS
+	MultiAZ           bool    // High Availability requested
+	StorageFamily     string  // optional: gp3, gp2, io1, ssd
+
+	// Database NoSQL dimensions
+	DataModel        string  // canonical: document, key_value, wide_column, graph, multi_model
+	PricingMode      string  // canonical: provisioned, on_demand, serverless
+	ReadUnits        float64 // requested reads/sec or RCU
+	WriteUnits       float64 // requested writes/sec or WCU
+	NoSQLStorageGB   float64 // requested storage in GB
+	NoSQLMultiRegion bool    // Multi-Region replication requested
+
+	// Kubernetes dimensions
+	KubernetesTier  domain.KubernetesTier  // canonical: free, standard, extended_support
+	ClusterTopology domain.ClusterTopology // GCP-specific: zonal, regional, autopilot
+
+	// Serverless dimensions
+	ServerlessWorkload ServerlessWorkload
+
 	// Cross-category controls
 	StrictFamily bool   // default true — only match within same family tier
-	Category     string // compute, storage, network
+	Category     string // compute, storage, network, database_rdbms, database_nosql, kubernetes, serverless
 }
 
 // MatchResult holds the outcome of matching one provider's observations.

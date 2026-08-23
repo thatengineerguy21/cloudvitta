@@ -48,6 +48,8 @@ func MapServiceError(err error) (status int, errorType string, title string) {
 		errors.Is(err, service.ErrNoCategoriesRequested),
 		errors.Is(err, service.ErrMissingIdempotencyKey):
 		return http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters"
+	case errors.Is(err, service.ErrConflictingFields):
+		return http.StatusBadRequest, "https://cloudvitta.dev/errors/conflicting-fields", "Conflicting Category Fields"
 	case errors.Is(err, service.ErrInvalidCredentials),
 		errors.Is(err, service.ErrInvalidToken),
 		errors.Is(err, service.ErrExpiredToken),

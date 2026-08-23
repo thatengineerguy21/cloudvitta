@@ -1,0 +1,118 @@
+{
+  "formatVersion": "v1.0",
+  "offerCode": "AWSLambda",
+  "products": {
+    "SKU-AWS-LAMBDA-REQ-X86": {
+      "sku": "SKU-AWS-LAMBDA-REQ-X86",
+      "productFamily": "Serverless",
+      "attributes": {
+        "servicecode": "AWSLambda",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "AWS-Lambda-Requests",
+        "usagetype": "Request",
+        "operation": "",
+        "description": "AWS Lambda Invocations (x86_64)"
+      }
+    },
+    "SKU-AWS-LAMBDA-DUR-X86": {
+      "sku": "SKU-AWS-LAMBDA-DUR-X86",
+      "productFamily": "Serverless",
+      "attributes": {
+        "servicecode": "AWSLambda",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "AWS-Lambda-Duration",
+        "usagetype": "Lambda-GB-Second",
+        "operation": "",
+        "description": "AWS Lambda Duration (x86_64)"
+      }
+    },
+    "SKU-AWS-LAMBDA-REQ-ARM": {
+      "sku": "SKU-AWS-LAMBDA-REQ-ARM",
+      "productFamily": "Serverless",
+      "attributes": {
+        "servicecode": "AWSLambda",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "AWS-Lambda-Requests-ARM",
+        "usagetype": "Request-ARM",
+        "operation": "",
+        "description": "AWS Lambda Invocations (arm64)"
+      }
+    },
+    "SKU-AWS-LAMBDA-DUR-ARM": {
+      "sku": "SKU-AWS-LAMBDA-DUR-ARM",
+      "productFamily": "Serverless",
+      "attributes": {
+        "servicecode": "AWSLambda",
+        "location": "US East (N. Virginia)",
+        "regionCode": "us-east-1",
+        "group": "AWS-Lambda-Duration-ARM",
+        "usagetype": "Lambda-GB-Second-ARM",
+        "operation": "",
+        "description": "AWS Lambda Duration (arm64)"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "SKU-AWS-LAMBDA-REQ-X86": {
+        "SKU-AWS-LAMBDA-REQ-X86.TERM": {
+          "offerTermCode": "TERM",
+          "sku": "SKU-AWS-LAMBDA-REQ-X86",
+          "priceDimensions": {
+            "SKU-AWS-LAMBDA-REQ-X86.TERM.DIM": {
+              "unit": "Requests",
+              "pricePerUnit": {
+                "USD": "0.2000000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-AWS-LAMBDA-DUR-X86": {
+        "SKU-AWS-LAMBDA-DUR-X86.TERM": {
+          "offerTermCode": "TERM",
+          "sku": "SKU-AWS-LAMBDA-DUR-X86",
+          "priceDimensions": {
+            "SKU-AWS-LAMBDA-DUR-X86.TERM.DIM": {
+              "unit": "Seconds",
+              "pricePerUnit": {
+                "USD": "0.0000166667"
+              }
+            }
+          }
+        }
+      },
+      "SKU-AWS-LAMBDA-REQ-ARM": {
+        "SKU-AWS-LAMBDA-REQ-ARM.TERM": {
+          "offerTermCode": "TERM",
+          "sku": "SKU-AWS-LAMBDA-REQ-ARM",
+          "priceDimensions": {
+            "SKU-AWS-LAMBDA-REQ-ARM.TERM.DIM": {
+              "unit": "Requests",
+              "pricePerUnit": {
+                "USD": "0.2000000000"
+              }
+            }
+          }
+        }
+      },
+      "SKU-AWS-LAMBDA-DUR-ARM": {
+        "SKU-AWS-LAMBDA-DUR-ARM.TERM": {
+          "offerTermCode": "TERM",
+          "sku": "SKU-AWS-LAMBDA-DUR-ARM",
+          "priceDimensions": {
+            "SKU-AWS-LAMBDA-DUR-ARM.TERM.DIM": {
+              "unit": "Seconds",
+              "pricePerUnit": {
+                "USD": "0.0000133334"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

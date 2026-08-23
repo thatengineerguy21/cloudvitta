@@ -36,13 +36,24 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
 
-      - name: go vet
-        run: go vet ./...
+      - name: Lint & Format Check
+        run: task lint
+
+      - name: Verify Swagger Docs Freshness
+        run: |
+          task swagger --force
+          git diff --exit-code internal/transport/rest/openapi/
 
       - name: Cache Tern
         id: cache-tern
@@ -72,10 +83,7 @@ jobs:
       - name: Run Tests
         env:
           TEST_DB_URL: postgres://user:password@localhost:5432/cloudvitta_test?sslmode=disable
-        run: go test -race -v ./...
+        run: task test -- -v
 
-      - name: Build
-        run: |
-          go build ./cmd/api
-          go build ./cmd/ingest
-          go build ./cmd/migrate
+      - name: Build All Targets
+        run: task build

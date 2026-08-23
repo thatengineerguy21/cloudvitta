@@ -37,3 +37,8 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0027-use-koanf-and-validator-for-config.md](0027-use-koanf-and-validator-for-config.md): Use Koanf and Validator for Config
 - [0028-forward-only-database-migrations.md](0028-forward-only-database-migrations.md): Forward-Only Database Migrations
 - [0029-cors-narrowing-with-credentialed-cookies.md](0029-cors-narrowing-with-credentialed-cookies.md): CORS Narrowing with Credentialed Cookies
+- [0030-database-instance-and-storage-query-time-join.md](0030-database-instance-and-storage-query-time-join.md): Database Instance and Storage Query-Time Join
+- [0031-registry-architecture-for-extensible-service-categories.md](0031-registry-architecture-for-extensible-service-categories.md): Registry Architecture for Extensible Service Categories
+- [0032-request-alias-conflict-resolution-strategy.md](0032-request-alias-conflict-resolution-strategy.md): Request Alias Conflict Resolution Strategy
+- [0033-nosql-cross-unit-workload-normalization.md](0033-nosql-cross-unit-workload-normalization.md): NoSQL Cross-Unit Workload Normalization
+- [0034-kubernetes-conditional-control-plane-credit.md](0034-kubernetes-conditional-control-plane-credit.md): Kubernetes Conditional Control-Plane Credit
