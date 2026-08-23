@@ -16,7 +16,6 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/databaseenginemap"
-	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/nosqldatamodelmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
@@ -535,91 +534,7 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string, fetchedAt time.T
 	}
 
 	if isKubernetesProduct(prod, prod.Attributes) {
-		category, err := catalogmap.MapAWSProduct(serviceCode)
-		if err != nil {
-			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-				if sink != nil {
-					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-						Provider:   "aws",
-						Category:   "kubernetes",
-						Kind:       "product",
-						RawValue:   serviceCode,
-						SkuID:      sku,
-						ObservedAt: fetchedAt,
-					})
-				}
-				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
-				return nil, nil
-			}
-			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-		}
-
-		location := prod.Attributes["location"]
-		if location == "" {
-			location = prod.Attributes["regionCode"]
-		}
-		regionGroup, err := regionmap.MapAWSRegion(location)
-		if err != nil {
-			if errors.Is(err, regionmap.ErrUnmappedRegion) {
-				if sink != nil {
-					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-						Provider:   "aws",
-						Category:   category,
-						Kind:       "region",
-						RawValue:   location,
-						SkuID:      sku,
-						ObservedAt: fetchedAt,
-					})
-				}
-				slog.Warn("aws normalize: skipping SKU due to unmapped region", "sku", sku, "region", location)
-				return nil, nil
-			}
-			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-		}
-
-		region := prod.Attributes["regionCode"]
-		if region == "" {
-			region = location
-		}
-
-		usageType := prod.Attributes["usagetype"]
-		group := prod.Attributes["group"]
-		operation := prod.Attributes["operation"]
-
-		var tier string
-		var displayName string
-
-		switch {
-		case strings.Contains(usageType, "ExtendedSupport") || strings.Contains(group, "ExtendedSupport") || strings.EqualFold(operation, "ClusterSupport"):
-			tier = kubernetestieremap.TierExtendedSupport
-			displayName = "Amazon EKS Extended Support"
-		case strings.Contains(usageType, "AmazonEKS-Hours") || strings.Contains(group, "AmazonEKS-Hours") || strings.EqualFold(operation, "CreateCluster") || strings.Contains(usageType, "perCluster"):
-			tier = kubernetestieremap.TierStandard
-			displayName = "Amazon EKS Cluster"
-		default:
-			mappedTier, err := kubernetestieremap.MapAWSTier(usageType)
-			if err != nil {
-				return nil, nil
-			}
-			tier = mappedTier
-			displayName = "Amazon EKS"
-		}
-
-		desc := prod.Attributes["description"]
-		if desc != "" {
-			displayName = desc
-		}
-
-		return &awsProductMeta{
-			sku:         sku,
-			category:    category,
-			regionGroup: regionGroup,
-			region:      region,
-			displayName: displayName,
-			kubernetesAttrs: domain.KubernetesAttributes{
-				Tier: tier,
-			},
-		}, nil
+		return normalizeKubernetesProduct(prod, serviceCode, sku, fetchedAt, sink)
 	}
 
 	if isDatabaseProduct(prod, prod.Attributes) {
@@ -1053,17 +968,4 @@ func parseAWSStorageFamily(volumeType string) string {
 	default:
 		return "ssd"
 	}
-}
-
-func isKubernetesProduct(product awsProduct, attrs map[string]string) bool {
-	if attrs == nil {
-		return false
-	}
-	if attrs["servicecode"] == "AmazonEKS" {
-		return true
-	}
-	if strings.Contains(attrs["usagetype"], "AmazonEKS") || strings.Contains(attrs["group"], "AmazonEKS") {
-		return true
-	}
-	return false
 }

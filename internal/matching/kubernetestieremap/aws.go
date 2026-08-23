@@ -3,9 +3,11 @@ package kubernetestieremap
 import (
 	"fmt"
 	"strings"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
-var awsTierMap = map[string]string{
+var awsTierMap = map[string]domain.KubernetesTier{
 	"standard":                        TierStandard,
 	"amazoneks":                       TierStandard,
 	"amazoneks-hours":                 TierStandard,
@@ -21,8 +23,8 @@ var awsTierMap = map[string]string{
 	"clustersupport": TierExtendedSupport,
 }
 
-// MapAWSTier maps an AWS EKS tier or usage type string to a canonical tier identifier.
-func MapAWSTier(rawTier string) (string, error) {
+// MapAWSTier maps an AWS EKS tier, usage type, or operation string to a canonical tier identifier.
+func MapAWSTier(rawTier string) (domain.KubernetesTier, error) {
 	key := strings.ToLower(strings.TrimSpace(rawTier))
 	canonical, ok := awsTierMap[key]
 	if !ok {

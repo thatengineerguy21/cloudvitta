@@ -160,6 +160,10 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 				continue
 			}
 
+			if len(catResult.Warnings) > 0 {
+				warnings = append(warnings, catResult.Warnings...)
+			}
+
 			categoriesMap[category] = CalculateCategoryResult{
 				SkuID:               catResult.MatchResult.Observation.SkuID,
 				MatchQuality:        catResult.MatchResult.MatchQuality,

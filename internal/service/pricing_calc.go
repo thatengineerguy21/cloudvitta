@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strings"
 
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
@@ -47,19 +46,20 @@ func CalculateIOPSHourlyCost(unitPrice decimal.Decimal, iops int64) decimal.Deci
 	return CalculateIOPSMonthlyCost(unitPrice, iops).Div(HoursInMonth)
 }
 
-// CategoryPricingResult contains the match result along with computed costs.
+// CategoryPricingResult contains the match result along with computed costs and warnings.
 type CategoryPricingResult struct {
 	MatchResult *MatchResult
 	HourlyCost  decimal.Decimal
 	MonthlyCost decimal.Decimal
 	Unit        string
 	Stale       bool
+	Warnings    []CalculateWarning
 }
 
 // CategoryPricingHandler encapsulates category-specific matching and cost arithmetic.
 type CategoryPricingHandler struct {
 	Match          func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error)
-	CalculateCosts func(match *MatchResult, target MatchTarget) (hourlyCost, monthlyCost decimal.Decimal, unit string)
+	CalculateCosts func(match *MatchResult, target MatchTarget) (hourlyCost, monthlyCost decimal.Decimal, unit string, warnings []CalculateWarning)
 }
 
 var categoryPricingHandlers = map[string]CategoryPricingHandler{}
@@ -78,14 +78,14 @@ func init() {
 			}
 			return res, nil
 		},
-		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
 			hourlyCost := match.Observation.PriceAmount
 			monthlyCost := hourlyCost.Mul(HoursInMonth)
 			unit := match.Observation.Unit
 			if unit == "" {
 				unit = "hour"
 			}
-			return hourlyCost, monthlyCost, unit
+			return hourlyCost, monthlyCost, unit, nil
 		},
 	})
 
@@ -97,7 +97,7 @@ func init() {
 			}
 			return res, nil
 		},
-		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
 			sizeGB := decimal.NewFromFloat(target.SizeGB)
 			if sizeGB.LessThanOrEqual(decimal.Zero) {
 				sizeGB = decimal.NewFromInt(1)
@@ -108,7 +108,7 @@ func init() {
 			if unit == "" {
 				unit = "GB-Mo"
 			}
-			return hourlyCost, monthlyCost, unit
+			return hourlyCost, monthlyCost, unit, nil
 		},
 	})
 
@@ -120,7 +120,7 @@ func init() {
 			}
 			return res, nil
 		},
-		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
 			egressGB := decimal.NewFromFloat(target.EgressGB)
 			if egressGB.LessThanOrEqual(decimal.Zero) {
 				egressGB = decimal.NewFromInt(1)
@@ -131,7 +131,7 @@ func init() {
 			if unit == "" {
 				unit = "GB"
 			}
-			return hourlyCost, monthlyCost, unit
+			return hourlyCost, monthlyCost, unit, nil
 		},
 	})
 
@@ -139,14 +139,14 @@ func init() {
 		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
 			return MatchDatabaseObservations(obsList, target, thresholds)
 		},
-		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
 			hourlyCost := match.Observation.PriceAmount
 			monthlyCost := hourlyCost.Mul(HoursInMonth)
 			unit := match.Observation.Unit
 			if unit == "" {
 				unit = "hour"
 			}
-			return hourlyCost, monthlyCost, unit
+			return hourlyCost, monthlyCost, unit, nil
 		},
 	})
 
@@ -154,14 +154,14 @@ func init() {
 		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
 			return MatchNoSQLObservations(obsList, target, thresholds)
 		},
-		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
 			hourlyCost := match.Observation.PriceAmount
 			monthlyCost := hourlyCost.Mul(HoursInMonth)
 			unit := match.Observation.Unit
 			if unit == "" {
 				unit = "hour"
 			}
-			return hourlyCost, monthlyCost, unit
+			return hourlyCost, monthlyCost, unit, nil
 		},
 	})
 
@@ -169,27 +169,14 @@ func init() {
 		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
 			return MatchKubernetesObservations(obsList, target, thresholds)
 		},
-		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
-			hourlyCost := match.Observation.PriceAmount
-
-			// Conditional GKE credit modeling:
-			// GCP provides a $74.40/month credit per billing account.
-			// Applied when cluster_topology is "zonal" or "autopilot" (or empty/default), not when "regional".
-			if match.Observation.Provider == "gcp" {
-				topology := strings.ToLower(strings.TrimSpace(target.ClusterTopology))
-				if topology == "" || topology == "zonal" || topology == "autopilot" {
-					monthlyCredit := decimal.NewFromFloat(74.40)
-					hourlyCredit := monthlyCredit.Div(HoursInMonth)
-					hourlyCost = decimal.Max(decimal.Zero, hourlyCost.Sub(hourlyCredit))
-				}
-			}
-
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string, []CalculateWarning) {
+			hourlyCost, warnings := AdjustKubernetesCost(match.Observation.Provider, match.Observation.PriceAmount, target)
 			monthlyCost := hourlyCost.Mul(HoursInMonth)
 			unit := match.Observation.Unit
 			if unit == "" {
 				unit = "hour"
 			}
-			return hourlyCost, monthlyCost, unit
+			return hourlyCost, monthlyCost, unit, warnings
 		},
 	})
 }
@@ -222,7 +209,7 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		return nil, ErrNoMatchFound
 	}
 
-	hourlyCost, monthlyCost, unit := handler.CalculateCosts(matchResult, target)
+	hourlyCost, monthlyCost, unit, warnings := handler.CalculateCosts(matchResult, target)
 
 	var isStale bool
 	if s.freshnessSvc != nil {
@@ -235,5 +222,6 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		MonthlyCost: monthlyCost,
 		Unit:        unit,
 		Stale:       isStale,
+		Warnings:    warnings,
 	}, nil
 }

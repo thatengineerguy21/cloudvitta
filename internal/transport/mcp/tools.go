@@ -11,6 +11,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -139,6 +140,36 @@ type NetworkComparisonResponse struct {
 	Warnings []ProviderWarning    `json:"warnings"`
 }
 
+// KubernetesQueryMeta represents strongly-typed query parameters in kubernetes comparison responses.
+type KubernetesQueryMeta struct {
+	Category        string `json:"category"`
+	Region          string `json:"region"`
+	Currency        string `json:"currency"`
+	Tier            string `json:"tier,omitempty"`
+	ClusterTopology string `json:"cluster_topology,omitempty"`
+}
+
+// KubernetesResultEntry represents a single provider kubernetes result item.
+type KubernetesResultEntry struct {
+	Provider            string                      `json:"provider"`
+	SkuID               string                      `json:"sku_id"`
+	MatchedSpec         domain.KubernetesAttributes `json:"matched_spec"`
+	MatchQuality        string                      `json:"match_quality"`
+	MatchDeltaPct       float64                     `json:"match_delta_pct"`
+	MissingAttributes   []string                    `json:"missing_attributes"`
+	Price               PriceDetail                 `json:"price"`
+	NormalizedHourlyUSD decimal.Decimal             `json:"normalized_hourly_usd"`
+	FetchedAt           time.Time                   `json:"fetched_at"`
+	Stale               bool                        `json:"stale"`
+}
+
+// KubernetesComparisonResponse represents the full kubernetes comparison response envelope.
+type KubernetesComparisonResponse struct {
+	Meta     ResponseMeta            `json:"meta"`
+	Results  []KubernetesResultEntry `json:"results"`
+	Warnings []ProviderWarning       `json:"warnings"`
+}
+
 // CalculateCategoryResult represents a single category result inside a provider.
 type CalculateCategoryResult struct {
 	SkuID               string          `json:"sku_id"`
@@ -191,6 +222,14 @@ type CompareNetworkInput struct {
 	TransferType string   `json:"transfer_type,omitempty" jsonschema:"Canonical transfer type (intra_region, inter_region, internet_egress)"`
 	Region       string   `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
 	Currency     string   `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
+}
+
+// CompareKubernetesInput defines parameters for compare_kubernetes tool.
+type CompareKubernetesInput struct {
+	Tier            string `json:"tier,omitempty" jsonschema:"Requested Kubernetes control plane tier (free, standard, extended_support)"`
+	ClusterTopology string `json:"cluster_topology,omitempty" jsonschema:"GCP cluster topology (zonal, regional, autopilot)"`
+	Region          string `json:"region,omitempty" jsonschema:"Canonical region group (default: us-east)"`
+	Currency        string `json:"currency,omitempty" jsonschema:"Target currency code (default: USD)"`
 }
 
 // ComputeRequirements defines compute requirements for calculate_workload.
@@ -602,6 +641,116 @@ func handleCompareNetwork(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 	}
 }
 
+// handleCompareKubernetes creates the tool handler for compare_kubernetes.
+func handleCompareKubernetes(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CompareKubernetesInput, any] {
+	return func(ctx context.Context, req *sdk.CallToolRequest, input CompareKubernetesInput) (*sdk.CallToolResult, any, error) {
+		if pricingSvc == nil {
+			return nil, nil, errors.New("pricing service unavailable")
+		}
+
+		region := input.Region
+		if region == "" {
+			region = "us-east"
+		}
+
+		warnings := defaultStage3Warnings()
+
+		currency := input.Currency
+		reqCurrency := currency
+		if reqCurrency == "" {
+			reqCurrency = "USD"
+		}
+		if currency != "" && currency != "USD" {
+			warnings = append(warnings, ProviderWarning{
+				Provider: "system",
+				Code:     "currency_conversion_not_yet_supported",
+				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
+			})
+		}
+		currency = "USD"
+
+		rawTier := strings.TrimSpace(input.Tier)
+		canonicalTier := kubernetestieremap.TierStandard
+		if rawTier != "" {
+			resolved, err := kubernetestieremap.ResolveCanonicalTier(rawTier)
+			if err != nil || !kubernetestieremap.IsSupportedStageTier(resolved) {
+				return nil, nil, MapServiceError(fmt.Errorf("%w: tier must be a supported Kubernetes tier (free, standard, extended_support)", service.ErrInvalidParameters))
+			}
+			canonicalTier = resolved
+		}
+
+		rawTopology := strings.ToLower(strings.TrimSpace(input.ClusterTopology))
+		var clusterTopology domain.ClusterTopology
+		if rawTopology != "" {
+			switch domain.ClusterTopology(rawTopology) {
+			case domain.ClusterTopologyZonal, domain.ClusterTopologyRegional, domain.ClusterTopologyAutopilot:
+				clusterTopology = domain.ClusterTopology(rawTopology)
+			default:
+				return nil, nil, MapServiceError(fmt.Errorf("%w: cluster_topology must be one of: zonal, regional, autopilot", service.ErrInvalidParameters))
+			}
+		}
+
+		target := service.MatchTarget{
+			Category:        "kubernetes",
+			KubernetesTier:  canonicalTier,
+			ClusterTopology: clusterTopology,
+		}
+
+		compRes, err := pricingSvc.Compare(ctx, "kubernetes", region, target)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
+
+		for _, w := range compRes.Warnings {
+			warnings = append(warnings, ProviderWarning{
+				Provider: w.Provider,
+				Code:     w.Code,
+				Message:  w.Message,
+			})
+		}
+
+		var results []KubernetesResultEntry
+		for _, item := range compRes.Results {
+			results = append(results, KubernetesResultEntry{
+				Provider:          item.Provider,
+				SkuID:             item.SkuID,
+				MatchedSpec:       item.MatchedKubernetes,
+				MatchQuality:      item.MatchQuality,
+				MatchDeltaPct:     item.MatchDeltaPct,
+				MissingAttributes: item.MissingAttributes,
+				Price: PriceDetail{
+					Amount:   item.PriceAmount,
+					Unit:     item.Unit,
+					Currency: currency,
+				},
+				NormalizedHourlyUSD: item.HourlyCost,
+				FetchedAt:           item.FetchedAt,
+				Stale:               item.Stale,
+			})
+		}
+
+		queryMeta := KubernetesQueryMeta{
+			Category:        "kubernetes",
+			Region:          region,
+			Currency:        reqCurrency,
+			Tier:            string(canonicalTier),
+			ClusterTopology: string(clusterTopology),
+		}
+
+		resp := &KubernetesComparisonResponse{
+			Meta: ResponseMeta{
+				APIVersion:  "v1",
+				GeneratedAt: time.Now().UTC(),
+				Query:       queryMeta,
+			},
+			Results:  results,
+			Warnings: warnings,
+		}
+
+		return nil, resp, nil
+	}
+}
+
 // handleCalculateWorkload creates the tool handler for calculate_workload.
 func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CalculateWorkloadInput, any] {
 	maxStorageF, _ := maxAllowedStorageSizeGB.Float64()
@@ -656,7 +805,7 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 			currency = "USD"
 		}
 
-		var warnings []ProviderWarning
+		warnings := defaultStage3Warnings()
 		if currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
@@ -711,8 +860,6 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 				Message:  w.Message,
 			})
 		}
-
-		warnings = append(warnings, defaultStage3Warnings()...)
 
 		var mappedResults []CalculateProviderResult
 		for _, pr := range svcRes.Results {
@@ -788,6 +935,11 @@ func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, fresh
 		Name:        "compare_network",
 		Description: "Compare outbound network data transfer pricing across cloud providers for specified egress volume.",
 	}, instrumentTool("compare_network", cfg, handleCompareNetwork(pricingSvc)))
+
+	sdk.AddTool(server, &sdk.Tool{
+		Name:        "compare_kubernetes",
+		Description: "Compare managed Kubernetes control plane pricing across cloud providers for requested tier and cluster topology.",
+	}, instrumentTool("compare_kubernetes", cfg, handleCompareKubernetes(pricingSvc)))
 
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "calculate_workload",

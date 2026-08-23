@@ -159,8 +159,8 @@ func TestMarshalUnmarshalOtherCategoryAttributes(t *testing.T) {
 	k8s := domain.PriceObservation{
 		ServiceCategory: "kubernetes",
 		KubernetesAttributes: domain.KubernetesAttributes{
-			Tier:            "standard",
-			ClusterTopology: "zonal",
+			Tier:            domain.KubernetesTierStandard,
+			ClusterTopology: domain.ClusterTopologyZonal,
 		},
 	}
 	k8sBytes, err := domain.MarshalAttributes(k8s)
@@ -172,8 +172,8 @@ func TestMarshalUnmarshalOtherCategoryAttributes(t *testing.T) {
 	if err := domain.UnmarshalAttributes(&k8sTarget, k8sBytes); err != nil {
 		t.Fatalf("UnmarshalAttributes(kubernetes) failed: %v", err)
 	}
-	if k8sTarget.KubernetesAttributes.Tier != "standard" ||
-		k8sTarget.KubernetesAttributes.ClusterTopology != "zonal" {
+	if k8sTarget.KubernetesAttributes.Tier != domain.KubernetesTierStandard ||
+		k8sTarget.KubernetesAttributes.ClusterTopology != domain.ClusterTopologyZonal {
 		t.Errorf("unexpected kubernetes attributes: %+v", k8sTarget.KubernetesAttributes)
 	}
 }

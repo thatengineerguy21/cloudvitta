@@ -3,12 +3,14 @@ package kubernetestieremap
 import (
 	"errors"
 	"testing"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
 func TestMapAWSTier(t *testing.T) {
 	tests := []struct {
 		rawTier  string
-		wantTier string
+		wantTier domain.KubernetesTier
 		wantErr  error
 	}{
 		{"AmazonEKS", TierStandard, nil},
@@ -39,7 +41,7 @@ func TestMapAWSTier(t *testing.T) {
 func TestMapAzureTier(t *testing.T) {
 	tests := []struct {
 		rawTier  string
-		wantTier string
+		wantTier domain.KubernetesTier
 		wantErr  error
 	}{
 		{"Free", TierFree, nil},
@@ -72,13 +74,16 @@ func TestMapAzureTier(t *testing.T) {
 func TestMapGCPTier(t *testing.T) {
 	tests := []struct {
 		rawTier  string
-		wantTier string
+		wantTier domain.KubernetesTier
 		wantErr  error
 	}{
 		{"standard", TierStandard, nil},
 		{"Standard Tier", TierStandard, nil},
 		{"Cluster Management", TierStandard, nil},
 		{"Cluster Management Fee", TierStandard, nil},
+		{"Kubernetes Engine Cluster Management Fee", TierStandard, nil},
+		{"GKE Cluster Management Fee", TierStandard, nil},
+		{"GKE Standard", TierStandard, nil},
 		{"GKE", TierStandard, nil},
 		{"Kubernetes Engine", TierStandard, nil},
 		{"unknown_tier", "", ErrUnmappedTier},
@@ -123,7 +128,7 @@ func TestNormalizeTier(t *testing.T) {
 func TestResolveCanonicalTier(t *testing.T) {
 	tests := []struct {
 		input       string
-		wantTier    string
+		wantTier    domain.KubernetesTier
 		wantStageOk bool
 		wantErr     bool
 	}{
@@ -163,7 +168,7 @@ func TestSupportedCanonicalTiers(t *testing.T) {
 	if len(tiers) != 3 {
 		t.Fatalf("expected 3 supported canonical tiers, got %d", len(tiers))
 	}
-	expected := map[string]bool{
+	expected := map[domain.KubernetesTier]bool{
 		TierFree:            true,
 		TierStandard:        true,
 		TierExtendedSupport: true,

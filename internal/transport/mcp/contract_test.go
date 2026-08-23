@@ -668,6 +668,120 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east4"), gcpObs, cache.DefaultTTL)
 }
 
+func seedContractKubernetesObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
+	t.Helper()
+
+	awsRegionGroup, err := regionmap.MapRegion("aws", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(aws, us-east-1) failed: %v", err)
+	}
+	azureRegionGroup, err := regionmap.MapRegion("azure", "eastus")
+	if err != nil {
+		t.Fatalf("MapRegion(azure, eastus) failed: %v", err)
+	}
+	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
+	if err != nil {
+		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:             "aws",
+			ServiceCategory:      "kubernetes",
+			SkuID:                "SKU-AWS-EKS-STANDARD",
+			DisplayName:          "Amazon EKS Standard",
+			Region:               "us-east-1",
+			RegionGroup:          awsRegionGroup,
+			Unit:                 "Hrs",
+			PriceAmount:          decimal.RequireFromString("0.1000"),
+			PriceCurrency:        "USD",
+			PricingModel:         "OnDemand",
+			KubernetesAttributes: domain.KubernetesAttributes{Tier: domain.KubernetesTierStandard},
+			FetchedAt:            baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:             "aws",
+			ServiceCategory:      "kubernetes",
+			SkuID:                "SKU-AWS-EKS-EXTENDED",
+			DisplayName:          "Amazon EKS Extended Support",
+			Region:               "us-east-1",
+			RegionGroup:          awsRegionGroup,
+			Unit:                 "Hrs",
+			PriceAmount:          decimal.RequireFromString("0.6000"),
+			PriceCurrency:        "USD",
+			PricingModel:         "OnDemand",
+			KubernetesAttributes: domain.KubernetesAttributes{Tier: domain.KubernetesTierExtendedSupport},
+			FetchedAt:            baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	azureObs := []domain.PriceObservation{
+		{
+			Provider:             "azure",
+			ServiceCategory:      "kubernetes",
+			SkuID:                "SKU-AZURE-AKS-FREE",
+			DisplayName:          "Azure Kubernetes Service Free",
+			Region:               "eastus",
+			RegionGroup:          azureRegionGroup,
+			Unit:                 "Hrs",
+			PriceAmount:          decimal.Zero,
+			PriceCurrency:        "USD",
+			PricingModel:         "OnDemand",
+			KubernetesAttributes: domain.KubernetesAttributes{Tier: domain.KubernetesTierFree},
+			FetchedAt:            baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:             "azure",
+			ServiceCategory:      "kubernetes",
+			SkuID:                "SKU-AZURE-AKS-STANDARD",
+			DisplayName:          "Azure Kubernetes Service Standard",
+			Region:               "eastus",
+			RegionGroup:          azureRegionGroup,
+			Unit:                 "Hrs",
+			PriceAmount:          decimal.RequireFromString("0.1000"),
+			PriceCurrency:        "USD",
+			PricingModel:         "OnDemand",
+			KubernetesAttributes: domain.KubernetesAttributes{Tier: domain.KubernetesTierStandard},
+			FetchedAt:            baseTime.Add(-1 * time.Hour),
+		},
+		{
+			Provider:             "azure",
+			ServiceCategory:      "kubernetes",
+			SkuID:                "SKU-AZURE-AKS-EXTENDED",
+			DisplayName:          "Azure Kubernetes Service Extended Support",
+			Region:               "eastus",
+			RegionGroup:          azureRegionGroup,
+			Unit:                 "Hrs",
+			PriceAmount:          decimal.RequireFromString("0.6000"),
+			PriceCurrency:        "USD",
+			PricingModel:         "OnDemand",
+			KubernetesAttributes: domain.KubernetesAttributes{Tier: domain.KubernetesTierExtendedSupport},
+			FetchedAt:            baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	gcpObs := []domain.PriceObservation{
+		{
+			Provider:             "gcp",
+			ServiceCategory:      "kubernetes",
+			SkuID:                "SKU-GCP-GKE-STANDARD",
+			DisplayName:          "GKE Standard Cluster Management Fee",
+			Region:               "us-east4",
+			RegionGroup:          gcpRegionGroup,
+			Unit:                 "hour",
+			PriceAmount:          decimal.RequireFromString("0.1000"),
+			PriceCurrency:        "USD",
+			PricingModel:         "OnDemand",
+			KubernetesAttributes: domain.KubernetesAttributes{Tier: domain.KubernetesTierStandard},
+			FetchedAt:            baseTime.Add(-1 * time.Hour),
+		},
+	}
+
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "kubernetes", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "kubernetes", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "kubernetes", "us-east4"), gcpObs, cache.DefaultTTL)
+}
+
 // --- Asymmetric Invocation Helpers ---
 
 func invokeREST[T any](t *testing.T, handler http.Handler, method, target string, body any, bearerToken string) (T, int, string) {
@@ -936,6 +1050,58 @@ func assertNetworkParity(t *testing.T, restResp rest.NetworkComparisonResponse, 
 	}
 
 	assertWarningsParity(t, "network", restResp.Warnings, mcpResp.Warnings)
+}
+
+func assertKubernetesParity(t *testing.T, restResp rest.KubernetesComparisonResponse, mcpResp mcp.KubernetesComparisonResponse) {
+	t.Helper()
+
+	if len(restResp.Results) != len(mcpResp.Results) {
+		t.Fatalf("result count mismatch: REST=%d, MCP=%d", len(restResp.Results), len(mcpResp.Results))
+	}
+
+	for i := range restResp.Results {
+		restItem := restResp.Results[i]
+		mcpItem := mcpResp.Results[i]
+
+		if restItem.Provider != mcpItem.Provider {
+			t.Errorf("item[%d] provider mismatch: REST=%s, MCP=%s", i, restItem.Provider, mcpItem.Provider)
+		}
+		if restItem.SkuID != mcpItem.SkuID {
+			t.Errorf("item[%d] sku_id mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.SkuID, mcpItem.SkuID)
+		}
+		if restItem.MatchedSpec != mcpItem.MatchedSpec {
+			t.Errorf("item[%d] matched_spec mismatch for %s: REST=%+v, MCP=%+v", i, restItem.Provider, restItem.MatchedSpec, mcpItem.MatchedSpec)
+		}
+		if restItem.MatchQuality != mcpItem.MatchQuality {
+			t.Errorf("item[%d] match_quality mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.MatchQuality, mcpItem.MatchQuality)
+		}
+		if math.Abs(restItem.MatchDeltaPct-mcpItem.MatchDeltaPct) > 0.0001 {
+			t.Errorf("item[%d] match_delta_pct mismatch for %s: REST=%f, MCP=%f", i, restItem.Provider, restItem.MatchDeltaPct, mcpItem.MatchDeltaPct)
+		}
+		if !reflect.DeepEqual(restItem.MissingAttributes, mcpItem.MissingAttributes) {
+			t.Errorf("item[%d] missing_attributes mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.MissingAttributes, mcpItem.MissingAttributes)
+		}
+		if !restItem.Price.Amount.Equal(mcpItem.Price.Amount) {
+			t.Errorf("item[%d] price.amount mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Amount, mcpItem.Price.Amount)
+		}
+		if restItem.Price.Unit != mcpItem.Price.Unit {
+			t.Errorf("item[%d] price.unit mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Unit, mcpItem.Price.Unit)
+		}
+		if restItem.Price.Currency != mcpItem.Price.Currency {
+			t.Errorf("item[%d] price.currency mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.Price.Currency, mcpItem.Price.Currency)
+		}
+		if !restItem.NormalizedHourlyUSD.Equal(mcpItem.NormalizedHourlyUSD) {
+			t.Errorf("item[%d] normalized_hourly_usd mismatch for %s: REST=%s, MCP=%s", i, restItem.Provider, restItem.NormalizedHourlyUSD, mcpItem.NormalizedHourlyUSD)
+		}
+		if restItem.Stale != mcpItem.Stale {
+			t.Errorf("item[%d] stale flag mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.Stale, mcpItem.Stale)
+		}
+		if !restItem.FetchedAt.Equal(mcpItem.FetchedAt) {
+			t.Errorf("item[%d] fetched_at mismatch for %s: REST=%v, MCP=%v", i, restItem.Provider, restItem.FetchedAt, mcpItem.FetchedAt)
+		}
+	}
+
+	assertWarningsParity(t, "kubernetes", restResp.Warnings, mcpResp.Warnings)
 }
 
 func assertCalculateParity(t *testing.T, restResp rest.CalculateResponse, mcpResp mcp.CalculateResponse) {
@@ -1596,7 +1762,228 @@ func TestContractParity_Network(t *testing.T) {
 	})
 }
 
-// 5. Composite Workload Contract Parity Suite
+// 5. Kubernetes Contract Parity Suite
+func TestContractParity_Kubernetes(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractKubernetesObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	t.Run("StandardTierMatch", func(t *testing.T) {
+		tier := "standard"
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.KubernetesComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/kubernetes?tier=%s&region=%s", tier, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.KubernetesComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_kubernetes",
+			mcp.CompareKubernetesInput{
+				Tier:   tier,
+				Region: region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertKubernetesParity(t, restResp, mcpResp)
+	})
+
+	t.Run("FreeTierMatch", func(t *testing.T) {
+		tier := "free"
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.KubernetesComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/kubernetes?tier=%s&region=%s", tier, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.KubernetesComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_kubernetes",
+			mcp.CompareKubernetesInput{
+				Tier:   tier,
+				Region: region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertKubernetesParity(t, restResp, mcpResp)
+	})
+
+	t.Run("ExtendedSupportTierMatch", func(t *testing.T) {
+		tier := "extended_support"
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.KubernetesComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/kubernetes?tier=%s&region=%s", tier, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.KubernetesComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_kubernetes",
+			mcp.CompareKubernetesInput{
+				Tier:   tier,
+				Region: region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertKubernetesParity(t, restResp, mcpResp)
+	})
+
+	t.Run("GKECreditZonalTopology", func(t *testing.T) {
+		tier := "standard"
+		topology := "zonal"
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.KubernetesComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/kubernetes?tier=%s&cluster_topology=%s&region=%s", tier, topology, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.KubernetesComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_kubernetes",
+			mcp.CompareKubernetesInput{
+				Tier:            tier,
+				ClusterTopology: topology,
+				Region:          region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertKubernetesParity(t, restResp, mcpResp)
+	})
+
+	t.Run("UnspecifiedClusterTopologyWarning", func(t *testing.T) {
+		tier := "standard"
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.KubernetesComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/kubernetes?tier=%s&region=%s", tier, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.KubernetesComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_kubernetes",
+			mcp.CompareKubernetesInput{
+				Tier:   tier,
+				Region: region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertKubernetesParity(t, restResp, mcpResp)
+
+		hasTopologyWarnREST := false
+		for _, w := range restResp.Warnings {
+			if w.Code == "cluster_topology_unspecified" && w.Provider == "gcp" {
+				hasTopologyWarnREST = true
+				break
+			}
+		}
+		if !hasTopologyWarnREST {
+			t.Error("expected cluster_topology_unspecified warning for GCP in REST response")
+		}
+	})
+
+	t.Run("NonUSDCurrencyWarning", func(t *testing.T) {
+		tier := "standard"
+		currency := "EUR"
+		region := "us-east"
+
+		restResp, code, body := invokeREST[rest.KubernetesComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			fmt.Sprintf("/api/v1/prices/kubernetes?tier=%s&currency=%s&region=%s", tier, currency, region),
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST returned status %d: %s", code, body)
+		}
+
+		mcpResp, err := invokeMCP[mcp.KubernetesComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_kubernetes",
+			mcp.CompareKubernetesInput{
+				Tier:     tier,
+				Currency: currency,
+				Region:   region,
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP invoke failed: %v", err)
+		}
+
+		assertKubernetesParity(t, restResp, mcpResp)
+
+		hasWarnREST := false
+		for _, w := range restResp.Warnings {
+			if w.Code == "currency_conversion_not_yet_supported" {
+				hasWarnREST = true
+				break
+			}
+		}
+		if !hasWarnREST {
+			t.Error("expected currency_conversion_not_yet_supported warning in REST response")
+		}
+	})
+
+	t.Run("ValidationRejection", func(t *testing.T) {
+		// Invalid tier
+		_, codeREST, _ := invokeREST[rest.KubernetesComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/kubernetes?tier=quantum_tier", nil, harness.bearerToken)
+		if codeREST != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for invalid tier, got %d", codeREST)
+		}
+
+		_, errMCP := invokeMCP[mcp.KubernetesComparisonResponse](ctx, t, harness.mcpClient, "compare_kubernetes", mcp.CompareKubernetesInput{Tier: "quantum_tier"})
+		if errMCP == nil {
+			t.Error("expected MCP tool error for invalid tier, got nil")
+		}
+
+		// Invalid cluster_topology
+		_, codeTopo, _ := invokeREST[rest.KubernetesComparisonResponse](t, harness.restRouter, http.MethodGet, "/api/v1/prices/kubernetes?cluster_topology=invalid_topology", nil, harness.bearerToken)
+		if codeTopo != http.StatusBadRequest {
+			t.Errorf("expected REST 400 for invalid topology, got %d", codeTopo)
+		}
+
+		_, errMCPTopo := invokeMCP[mcp.KubernetesComparisonResponse](ctx, t, harness.mcpClient, "compare_kubernetes", mcp.CompareKubernetesInput{ClusterTopology: "invalid_topology"})
+		if errMCPTopo == nil {
+			t.Error("expected MCP tool error for invalid topology, got nil")
+		}
+	})
+}
+
+// 6. Composite Workload Contract Parity Suite
 func TestContractParity_Calculate(t *testing.T) {
 	harness := setupContractParityTest(t)
 	defer harness.Close()

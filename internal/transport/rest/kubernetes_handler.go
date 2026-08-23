@@ -80,26 +80,7 @@ func (h *KubernetesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		region = "us-east"
 	}
 
-	warnings := []ProviderWarning{
-		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
-		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
-		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
-		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
-	}
-
-	currency := q.Get("currency")
-	reqCurrency := currency
-	if reqCurrency == "" {
-		reqCurrency = "USD"
-	}
-	if currency != "" && currency != "USD" {
-		warnings = append(warnings, ProviderWarning{
-			Provider: "system",
-			Code:     "currency_conversion_not_yet_supported",
-			Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
-		})
-	}
-	currency = "USD"
+	reqCurrency, _, warnings := NormalizeCurrencyAndWarnings(q.Get("currency"))
 
 	rawTier := strings.TrimSpace(q.Get("tier"))
 	canonicalTier := kubernetestieremap.TierStandard
@@ -113,11 +94,11 @@ func (h *KubernetesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rawTopology := strings.ToLower(strings.TrimSpace(q.Get("cluster_topology")))
-	clusterTopology := "zonal"
+	var clusterTopology domain.ClusterTopology
 	if rawTopology != "" {
-		switch rawTopology {
-		case "zonal", "regional", "autopilot":
-			clusterTopology = rawTopology
+		switch domain.ClusterTopology(rawTopology) {
+		case domain.ClusterTopologyZonal, domain.ClusterTopologyRegional, domain.ClusterTopologyAutopilot:
+			clusterTopology = domain.ClusterTopology(rawTopology)
 		default:
 			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", "cluster_topology must be one of: zonal, regional, autopilot")
 			return

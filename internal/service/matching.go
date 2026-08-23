@@ -51,8 +51,8 @@ type MatchTarget struct {
 	NoSQLMultiRegion bool    // Multi-Region replication requested
 
 	// Kubernetes dimensions
-	KubernetesTier  string // canonical: free, standard, extended_support
-	ClusterTopology string // GCP-specific: zonal, regional, autopilot
+	KubernetesTier  domain.KubernetesTier  // canonical: free, standard, extended_support
+	ClusterTopology domain.ClusterTopology // GCP-specific: zonal, regional, autopilot
 
 	// Cross-category controls
 	StrictFamily bool   // default true — only match within same family tier

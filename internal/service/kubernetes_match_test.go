@@ -21,7 +21,7 @@ func TestKubernetesScorer_ExactMatch(t *testing.T) {
 		Provider:        "aws",
 		ServiceCategory: "kubernetes",
 		SkuID:           "SKU-AWS-EKS-STD",
-		PriceAmount:     decimal.NewFromFloat(0.10),
+		PriceAmount:     decimal.RequireFromString("0.10"),
 		KubernetesAttributes: domain.KubernetesAttributes{
 			Tier: kubernetestieremap.TierStandard,
 		},
@@ -77,7 +77,7 @@ func TestMatchKubernetesObservations_TieBreak(t *testing.T) {
 			Provider:        "aws",
 			ServiceCategory: "kubernetes",
 			SkuID:           "SKU-Z-EKS",
-			PriceAmount:     decimal.NewFromFloat(0.10),
+			PriceAmount:     decimal.RequireFromString("0.10"),
 			KubernetesAttributes: domain.KubernetesAttributes{
 				Tier: kubernetestieremap.TierStandard,
 			},
@@ -86,7 +86,7 @@ func TestMatchKubernetesObservations_TieBreak(t *testing.T) {
 			Provider:        "aws",
 			ServiceCategory: "kubernetes",
 			SkuID:           "SKU-A-EKS",
-			PriceAmount:     decimal.NewFromFloat(0.10),
+			PriceAmount:     decimal.RequireFromString("0.10"),
 			KubernetesAttributes: domain.KubernetesAttributes{
 				Tier: kubernetestieremap.TierStandard,
 			},
@@ -151,7 +151,7 @@ func TestPricingService_KubernetesConditionalGKECredit(t *testing.T) {
 	resZonal, err := svc.MatchAndCalculate(ctx, "gcp", "kubernetes", regionGroup, service.MatchTarget{
 		Category:        "kubernetes",
 		KubernetesTier:  kubernetestieremap.TierStandard,
-		ClusterTopology: "zonal",
+		ClusterTopology: domain.ClusterTopologyZonal,
 	})
 	if err != nil {
 		t.Fatalf("MatchAndCalculate (zonal) failed: %v", err)
@@ -162,12 +162,15 @@ func TestPricingService_KubernetesConditionalGKECredit(t *testing.T) {
 	if !resZonal.MonthlyCost.IsZero() {
 		t.Errorf("expected zonal monthly cost 0.00, got %s", resZonal.MonthlyCost)
 	}
+	if len(resZonal.Warnings) != 0 {
+		t.Errorf("expected 0 warnings for zonal topology, got %v", resZonal.Warnings)
+	}
 
 	// 2. Autopilot cluster topology -> GKE credit applied -> hourlyCost = $0.00
 	resAutopilot, err := svc.MatchAndCalculate(ctx, "gcp", "kubernetes", regionGroup, service.MatchTarget{
 		Category:        "kubernetes",
 		KubernetesTier:  kubernetestieremap.TierStandard,
-		ClusterTopology: "autopilot",
+		ClusterTopology: domain.ClusterTopologyAutopilot,
 	})
 	if err != nil {
 		t.Fatalf("MatchAndCalculate (autopilot) failed: %v", err)
@@ -175,12 +178,15 @@ func TestPricingService_KubernetesConditionalGKECredit(t *testing.T) {
 	if !resAutopilot.HourlyCost.IsZero() {
 		t.Errorf("expected autopilot hourly cost 0.00 (credit applied), got %s", resAutopilot.HourlyCost)
 	}
+	if len(resAutopilot.Warnings) != 0 {
+		t.Errorf("expected 0 warnings for autopilot topology, got %v", resAutopilot.Warnings)
+	}
 
 	// 3. Regional cluster topology -> GKE credit NOT applied -> hourlyCost = $0.10
 	resRegional, err := svc.MatchAndCalculate(ctx, "gcp", "kubernetes", regionGroup, service.MatchTarget{
 		Category:        "kubernetes",
 		KubernetesTier:  kubernetestieremap.TierStandard,
-		ClusterTopology: "regional",
+		ClusterTopology: domain.ClusterTopologyRegional,
 	})
 	if err != nil {
 		t.Fatalf("MatchAndCalculate (regional) failed: %v", err)
@@ -192,6 +198,35 @@ func TestPricingService_KubernetesConditionalGKECredit(t *testing.T) {
 	expectedMonthly := expectedHourly.Mul(service.HoursInMonth)
 	if !resRegional.MonthlyCost.Equal(expectedMonthly) {
 		t.Errorf("expected regional monthly cost %s, got %s", expectedMonthly, resRegional.MonthlyCost)
+	}
+	if len(resRegional.Warnings) != 0 {
+		t.Errorf("expected 0 warnings for regional topology, got %v", resRegional.Warnings)
+	}
+
+	// 4. Unspecified cluster topology ("") -> GKE credit NOT applied -> hourlyCost = $0.10, warning cluster_topology_unspecified present
+	resUnspecified, err := svc.MatchAndCalculate(ctx, "gcp", "kubernetes", regionGroup, service.MatchTarget{
+		Category:        "kubernetes",
+		KubernetesTier:  kubernetestieremap.TierStandard,
+		ClusterTopology: "",
+	})
+	if err != nil {
+		t.Fatalf("MatchAndCalculate (unspecified) failed: %v", err)
+	}
+	if !resUnspecified.HourlyCost.Equal(expectedHourly) {
+		t.Errorf("expected unspecified topology hourly cost 0.10 (no credit), got %s", resUnspecified.HourlyCost)
+	}
+	if !resUnspecified.MonthlyCost.Equal(expectedMonthly) {
+		t.Errorf("expected unspecified topology monthly cost %s, got %s", expectedMonthly, resUnspecified.MonthlyCost)
+	}
+	foundWarning := false
+	for _, w := range resUnspecified.Warnings {
+		if w.Code == "cluster_topology_unspecified" && w.Provider == "gcp" {
+			foundWarning = true
+			break
+		}
+	}
+	if !foundWarning {
+		t.Errorf("expected cluster_topology_unspecified warning for GCP query without topology, got %v", resUnspecified.Warnings)
 	}
 }
 

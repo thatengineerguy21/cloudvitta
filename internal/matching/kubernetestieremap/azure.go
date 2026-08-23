@@ -3,9 +3,11 @@ package kubernetestieremap
 import (
 	"fmt"
 	"strings"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
-var azureTierMap = map[string]string{
+var azureTierMap = map[string]domain.KubernetesTier{
 	"free":               TierFree,
 	"free tier":          TierFree,
 	"freetier":           TierFree,
@@ -23,7 +25,7 @@ var azureTierMap = map[string]string{
 }
 
 // MapAzureTier maps an Azure AKS tier, meter name, or SKU name to a canonical tier identifier.
-func MapAzureTier(rawTier string) (string, error) {
+func MapAzureTier(rawTier string) (domain.KubernetesTier, error) {
 	key := strings.ToLower(strings.TrimSpace(rawTier))
 	canonical, ok := azureTierMap[key]
 	if !ok {

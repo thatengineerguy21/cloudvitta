@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
 )
@@ -38,7 +39,7 @@ func (s KubernetesScorer) Score(candidate domain.PriceObservation, target MatchT
 	}
 
 	var distance float64
-	if !strings.EqualFold(candTier, targetTier) {
+	if !strings.EqualFold(string(candTier), string(targetTier)) {
 		distance = PenaltyKubernetesTier
 	}
 
@@ -57,4 +58,47 @@ func MatchKubernetesObservations(obsList []domain.PriceObservation, target Match
 	}
 
 	return res, nil
+}
+
+// GKEMonthlyCredit is the exact $74.40/month billing credit applied per Google Cloud billing account.
+var GKEMonthlyCredit = decimal.RequireFromString("74.40")
+
+// KubernetesCostAdjuster is a strategy function that calculates provider-specific pricing adjustments or discounts.
+type KubernetesCostAdjuster func(baseHourlyCost decimal.Decimal, target MatchTarget) (decimal.Decimal, []CalculateWarning)
+
+// gcpKubernetesCostAdjuster implements GCP's conditional GKE control plane credit.
+// If cluster_topology is "zonal" or "autopilot", the monthly credit is amortized hourly and deducted.
+// If cluster_topology is empty (""), no credit is applied and a warning is added.
+// If cluster_topology is "regional" (or any other topology), no credit is applied.
+func gcpKubernetesCostAdjuster(baseHourlyCost decimal.Decimal, target MatchTarget) (decimal.Decimal, []CalculateWarning) {
+	var warnings []CalculateWarning
+	topology := domain.ClusterTopology(strings.ToLower(strings.TrimSpace(string(target.ClusterTopology))))
+
+	switch topology {
+	case domain.ClusterTopologyZonal, domain.ClusterTopologyAutopilot:
+		hourlyCredit := GKEMonthlyCredit.Div(HoursInMonth)
+		adjusted := decimal.Max(decimal.Zero, baseHourlyCost.Sub(hourlyCredit))
+		return adjusted, nil
+	case "":
+		warnings = append(warnings, CalculateWarning{
+			Provider: "gcp",
+			Code:     "cluster_topology_unspecified",
+			Message:  "Cluster topology was not specified; assuming regional deployment without monthly management credit.",
+		})
+		return baseHourlyCost, warnings
+	default:
+		return baseHourlyCost, nil
+	}
+}
+
+var kubernetesCostAdjusters = map[string]KubernetesCostAdjuster{
+	"gcp": gcpKubernetesCostAdjuster,
+}
+
+// AdjustKubernetesCost applies any registered provider-specific cost adjustments.
+func AdjustKubernetesCost(provider string, baseHourlyCost decimal.Decimal, target MatchTarget) (decimal.Decimal, []CalculateWarning) {
+	if adjuster, ok := kubernetesCostAdjusters[strings.ToLower(strings.TrimSpace(provider))]; ok {
+		return adjuster(baseHourlyCost, target)
+	}
+	return baseHourlyCost, nil
 }

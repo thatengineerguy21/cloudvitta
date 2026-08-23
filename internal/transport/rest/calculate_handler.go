@@ -135,23 +135,11 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if region == "" {
 		region = "us-east"
 	}
-	currency := reqBody.Currency
-	if currency == "" {
-		currency = "USD"
-	}
-
-	var warnings []ProviderWarning
-	if currency != "USD" {
-		warnings = append(warnings, ProviderWarning{
-			Provider: "system",
-			Code:     "currency_conversion_not_yet_supported",
-			Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
-		})
-	}
+	_, currency, warnings := NormalizeCurrencyAndWarnings(reqBody.Currency)
 
 	svcReq := service.CalculateRequest{
 		Region:       region,
-		Currency:     "USD",
+		Currency:     currency,
 		StrictFamily: strictFamily,
 		Compute:      reqBody.Compute,
 		Storage:      reqBody.Storage,
@@ -176,14 +164,6 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Message:  w.Message,
 		})
 	}
-
-	// Add static warnings for unsupported providers from stage 3
-	warnings = append(warnings, []ProviderWarning{
-		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
-		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
-		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
-		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
-	}...)
 
 	var mappedResults []CalculateProviderResult
 	for _, pr := range svcRes.Results {

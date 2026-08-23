@@ -4,21 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 )
 
 // Canonical Kubernetes cluster tier taxonomy constants.
 const (
-	TierFree            = "free"
-	TierStandard        = "standard"
-	TierExtendedSupport = "extended_support"
+	TierFree            = domain.KubernetesTierFree
+	TierStandard        = domain.KubernetesTierStandard
+	TierExtendedSupport = domain.KubernetesTierExtendedSupport
 )
 
 // ErrUnmappedTier is returned when a raw tier value cannot be mapped to canonical taxonomy.
 var ErrUnmappedTier = errors.New("kubernetestieremap: unmapped tier")
 
 // SupportedCanonicalTiers returns the list of canonical Kubernetes tiers active in the current stage.
-func SupportedCanonicalTiers() []string {
-	return []string{
+func SupportedCanonicalTiers() []domain.KubernetesTier {
+	return []domain.KubernetesTier{
 		TierFree,
 		TierStandard,
 		TierExtendedSupport,
@@ -26,8 +28,8 @@ func SupportedCanonicalTiers() []string {
 }
 
 // IsSupportedStageTier returns true if the tier is active in the current stage.
-func IsSupportedStageTier(tier string) bool {
-	switch strings.ToLower(strings.TrimSpace(tier)) {
+func IsSupportedStageTier(tier domain.KubernetesTier) bool {
+	switch domain.KubernetesTier(strings.ToLower(strings.TrimSpace(string(tier)))) {
 	case TierFree, TierStandard, TierExtendedSupport:
 		return true
 	default:
@@ -38,13 +40,13 @@ func IsSupportedStageTier(tier string) bool {
 // ResolveCanonicalTier maps a user-supplied tier string to a canonical Kubernetes tier.
 // It checks canonical constants first, then tries provider-specific mappings across AWS, Azure, and GCP.
 // If rawTier cannot be mapped, ErrUnmappedTier is returned.
-func ResolveCanonicalTier(rawTier string) (string, error) {
+func ResolveCanonicalTier(rawTier string) (domain.KubernetesTier, error) {
 	trimmed := strings.TrimSpace(rawTier)
 	if trimmed == "" {
 		return "", nil
 	}
 
-	lower := strings.ToLower(trimmed)
+	lower := domain.KubernetesTier(strings.ToLower(trimmed))
 	switch lower {
 	case TierFree, TierStandard, TierExtendedSupport:
 		return lower, nil
@@ -60,7 +62,7 @@ func ResolveCanonicalTier(rawTier string) (string, error) {
 }
 
 // NormalizeTier resolves a provider-specific raw tier name to a canonical Kubernetes tier.
-func NormalizeTier(provider, rawTier string) (string, error) {
+func NormalizeTier(provider, rawTier string) (domain.KubernetesTier, error) {
 	switch provider {
 	case "aws":
 		return MapAWSTier(rawTier)

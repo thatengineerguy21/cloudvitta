@@ -91,6 +91,10 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 			continue
 		}
 
+		if len(catResult.Warnings) > 0 {
+			warnings = append(warnings, catResult.Warnings...)
+		}
+
 		obs := catResult.MatchResult.Observation
 		results = append(results, CategoryComparisonItem{
 			Provider:          obs.Provider,
