@@ -35,7 +35,7 @@ tasks:
       - go test -race ./... {{.CLI_ARGS}}
 
   test:fast:
-    desc: Run all tests without race detector (faster iteration)
+    desc: Run all tests without race detector — LOCAL ITERATION ONLY, never use to gate CI or merges (see 04-CODING-STANDARDS.md)
     cmds:
       - go test ./... {{.CLI_ARGS}}
 
@@ -46,9 +46,9 @@ tasks:
       - go tool cover -func=coverage.out
 
   lint:
-    desc: Check formatting and run go vet
+    desc: Run gofmt check and go vet
     cmds:
-      - gofmt -l .
+      - test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - go vet ./...
 
   fmt:
@@ -59,7 +59,10 @@ tasks:
   swagger:
     desc: Regenerate OpenAPI / Swagger documentation
     sources:
+      - internal/domain/**/*.go
       - internal/transport/rest/**/*.go
+    exclude:
+      - internal/transport/rest/openapi/**
     generates:
       - internal/transport/rest/openapi/swagger.json
       - internal/transport/rest/openapi/swagger.yaml

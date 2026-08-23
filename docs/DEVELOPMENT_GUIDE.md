@@ -22,14 +22,17 @@ Before starting, ensure the following tools are installed on your development ma
 - `task`: List all available project commands.
 - `task build`: Build all binaries (`api`, `ingest`, `migrate`, `quarantine-digest`).
 - `task dev:api`: Start API server locally.
-- `task dev:ingest`: Run ingestion job once locally.
-- `task test`: Run test suite with race detector (`go test -race ./...`).
-- `task test:fast`: Run test suite quickly without race detector.
+- `task dev:ingest`: Run pricing ingestion worker locally.
+- `task dev:quarantine`: Run quarantine digest processor locally.
+- `task test`: Run all tests with race detector enabled (`go test -race ./...`).
+- `task test:fast`: Run all tests without race detector (local iteration only, never gate CI or merges).
+- `task test:cover`: Run all tests with race detector and generate coverage report.
 - `task lint`: Run formatting check and `go vet`.
 - `task fmt`: Auto-format all Go source files.
 - `task swagger`: Regenerate OpenAPI Swagger documentation.
 - `task sqlc`: Regenerate type-safe SQL store queries via SQLC.
 - `task db:migrate`: Run database migrations forward.
+- `task clean`: Clean Go build cache and test artifacts.
 
 ---
 

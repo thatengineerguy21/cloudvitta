@@ -52,7 +52,7 @@ jobs:
 
       - name: Verify Swagger Docs Freshness
         run: |
-          task swagger
+          task swagger --force
           git diff --exit-code internal/transport/rest/openapi/
 
       - name: Cache Tern
