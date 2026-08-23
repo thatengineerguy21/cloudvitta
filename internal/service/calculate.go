@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
@@ -120,14 +121,20 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 
 			catResult, err := s.MatchAndCalculate(ctx, prov, category, region, target)
 			if err != nil {
-				switch err {
-				case ErrCategoryNotSupported:
+				switch {
+				case errors.Is(err, ErrCategoryNotSupported):
 					warnings = append(warnings, CalculateWarning{
 						Provider: prov,
 						Code:     "category_not_supported",
 						Message:  category + " category is not supported by " + prov,
 					})
-				case ErrNoMatchFound:
+				case errors.Is(err, ErrEngineMismatch):
+					warnings = append(warnings, CalculateWarning{
+						Provider: prov,
+						Code:     "engine_mismatch_excluded",
+						Message:  "Database candidate was excluded due to engine mismatch.",
+					})
+				case errors.Is(err, ErrNoMatchFound):
 					warnings = append(warnings, CalculateWarning{
 						Provider: prov,
 						Code:     "no_match",

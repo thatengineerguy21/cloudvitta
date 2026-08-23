@@ -67,6 +67,21 @@ func TestDatabaseHandler_InvalidParameters_ReturnsRFC7807(t *testing.T) {
 			query:      "iops=-100",
 			wantDetail: "iops must be a positive integer",
 		},
+		{
+			name:       "unmapped database engine",
+			query:      "engine=foobar_db",
+			wantDetail: "engine must be a supported database engine",
+		},
+		{
+			name:       "gated mariadb engine (stage 3.1)",
+			query:      "engine=mariadb",
+			wantDetail: "engine must be a supported database engine",
+		},
+		{
+			name:       "gated oracle engine (stage 3.1)",
+			query:      "engine=oracle",
+			wantDetail: "engine must be a supported database engine",
+		},
 	}
 
 	for _, tt := range tests {
@@ -267,5 +282,90 @@ func TestDatabaseHandler_Success(t *testing.T) {
 		if res.Price.Currency != "USD" {
 			t.Errorf("expected currency USD, got %s", res.Price.Currency)
 		}
+	}
+}
+
+// TestDatabaseHandler_EngineMismatchWarning verifies that candidates present with mismatched engine
+// yield warnings[].code: "engine_mismatch_excluded" rather than generic "no_match" (Item 3).
+func TestDatabaseHandler_EngineMismatchWarning(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	now := time.Now().UTC()
+
+	// Seed cache with AWS database observations (PostgreSQL only)
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
+			Region:          "us-east-1",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.NewFromFloat(0.26),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				MultiAZ:        false,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: now,
+		},
+	}
+
+	awsKey := cache.BuildKey(cache.SchemaVersion, "aws", "database_rdbms", "us-east-1")
+	if err := cache.Warm(context.Background(), rdb, awsKey, awsObs, 10*time.Minute); err != nil {
+		t.Fatalf("failed to warm aws cache: %v", err)
+	}
+
+	pricingSvc := service.NewPricingService(nil, rdb)
+	handler := rest.NewDatabaseHandler(pricingSvc)
+
+	// Request MySQL when only PostgreSQL candidate is in cache
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/prices/database?engine=mysql&vcpu=4&ram_gb=16&storage_gb=100&region=us-east", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 OK, body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp rest.DatabaseComparisonResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response JSON: %v", err)
+	}
+
+	if len(resp.Results) != 0 {
+		t.Errorf("expected 0 results due to engine mismatch, got %d", len(resp.Results))
+	}
+
+	var hasMismatchWarning bool
+	var hasBareNoMatch bool
+	for _, w := range resp.Warnings {
+		if w.Provider == "aws" {
+			if w.Code == "engine_mismatch_excluded" {
+				hasMismatchWarning = true
+			}
+			if w.Code == "no_match" {
+				hasBareNoMatch = true
+			}
+		}
+	}
+
+	if !hasMismatchWarning {
+		t.Errorf("expected warnings[].code 'engine_mismatch_excluded' for aws, got warnings: %+v", resp.Warnings)
+	}
+	if hasBareNoMatch {
+		t.Errorf("expected no bare 'no_match' warning when candidate was excluded for engine mismatch, got warnings: %+v", resp.Warnings)
 	}
 }

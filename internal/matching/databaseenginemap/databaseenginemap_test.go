@@ -106,3 +106,43 @@ func TestNormalizeEngine(t *testing.T) {
 		t.Errorf("NormalizeEngine(unmapped_provider, PostgreSQL) expected error, got nil")
 	}
 }
+
+func TestResolveCanonicalEngine(t *testing.T) {
+	tests := []struct {
+		input       string
+		wantEngine  string
+		wantStageOk bool
+		wantErr     bool
+	}{
+		{"postgresql", "postgresql", true, false},
+		{"postgres", "postgresql", true, false},
+		{"aurora-postgresql", "postgresql", true, false},
+		{"Cloud SQL for PostgreSQL", "postgresql", true, false},
+		{"mysql", "mysql", true, false},
+		{"Azure Database for MySQL", "mysql", true, false},
+		{"sqlserver", "sqlserver", true, false},
+		{"SQL Server", "sqlserver", true, false},
+		{"mariadb", "mariadb", false, false}, // Gated off for Stage 3.1
+		{"oracle", "oracle", false, false},   // Gated off for Stage 3.1
+		{"mongodb", "", false, true},
+		{"redis", "", false, true},
+		{"", "", false, false},
+	}
+
+	for _, tt := range tests {
+		got, err := ResolveCanonicalEngine(tt.input)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("ResolveCanonicalEngine(%q) expected error, got nil", tt.input)
+			}
+		} else {
+			if err != nil || got != tt.wantEngine {
+				t.Errorf("ResolveCanonicalEngine(%q) = (%q, %v), want (%q, nil)", tt.input, got, err, tt.wantEngine)
+			}
+			stageOk := IsSupportedStageEngine(got)
+			if stageOk != tt.wantStageOk {
+				t.Errorf("IsSupportedStageEngine(%q) = %v, want %v", got, stageOk, tt.wantStageOk)
+			}
+		}
+	}
+}

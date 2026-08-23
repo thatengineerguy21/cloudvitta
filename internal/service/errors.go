@@ -15,6 +15,8 @@ var (
 	ErrNoMatchFound = errors.New("no match found")
 	// ErrCategoryNotSupported is returned when a provider does not support the requested category.
 	ErrCategoryNotSupported = errors.New("category not supported by provider")
+	// ErrEngineMismatch is returned when database candidates were excluded due to engine mismatch.
+	ErrEngineMismatch = errors.New("database candidate excluded due to engine mismatch")
 	// ErrNoCategoriesRequested is returned when a composite calculate request specifies no categories.
 	ErrNoCategoriesRequested = errors.New("no categories requested")
 	// ErrUserAlreadyExists is returned when attempting to signup with an existing email.

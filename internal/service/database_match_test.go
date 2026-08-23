@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -165,9 +167,9 @@ func TestMatchDatabaseObservations_QueryTimeJoin(t *testing.T) {
 	}
 
 	thresholds := ThresholdsForCategory("database_rdbms")
-	res := MatchDatabaseObservations(obsList, target, thresholds)
-	if res == nil {
-		t.Fatalf("expected match result, got nil")
+	res, err := MatchDatabaseObservations(obsList, target, thresholds)
+	if err != nil || res == nil {
+		t.Fatalf("expected match result, got nil (err: %v)", err)
 	}
 
 	if res.MatchQuality != "exact" {
@@ -221,9 +223,9 @@ func TestMatchDatabaseObservations_ThresholdsTiers(t *testing.T) {
 		MultiAZ:           false,
 		Category:          "database_rdbms",
 	}
-	resExact := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetExact, thresholds)
-	if resExact == nil || resExact.MatchQuality != "exact" {
-		t.Errorf("expected exact match, got %+v", resExact)
+	resExact, err := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetExact, thresholds)
+	if err != nil || resExact == nil || resExact.MatchQuality != "exact" {
+		t.Errorf("expected exact match, got %+v (err: %v)", resExact, err)
 	}
 
 	// 2. Close match: Requested 4 vCPU, 14 GB RAM -> RAM delta = |16-14|/14 = 0.1428 <= 0.20
@@ -235,9 +237,9 @@ func TestMatchDatabaseObservations_ThresholdsTiers(t *testing.T) {
 		MultiAZ:           false,
 		Category:          "database_rdbms",
 	}
-	resClose := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetClose, thresholds)
-	if resClose == nil || resClose.MatchQuality != "close" {
-		t.Errorf("expected close match, got %+v", resClose)
+	resClose, err := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetClose, thresholds)
+	if err != nil || resClose == nil || resClose.MatchQuality != "close" {
+		t.Errorf("expected close match, got %+v (err: %v)", resClose, err)
 	}
 
 	// 3. Approximate match: Requested 4 vCPU, 11 GB RAM -> RAM delta = |16-11|/11 = 0.4545 <= 0.50
@@ -249,9 +251,9 @@ func TestMatchDatabaseObservations_ThresholdsTiers(t *testing.T) {
 		MultiAZ:           false,
 		Category:          "database_rdbms",
 	}
-	resApprox := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetApprox, thresholds)
-	if resApprox == nil || resApprox.MatchQuality != "approximate" {
-		t.Errorf("expected approximate match, got %+v", resApprox)
+	resApprox, err := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetApprox, thresholds)
+	if err != nil || resApprox == nil || resApprox.MatchQuality != "approximate" {
+		t.Errorf("expected approximate match, got %+v (err: %v)", resApprox, err)
 	}
 
 	// 4. Exceeding cutoff: Requested 4 vCPU, 8 GB RAM -> RAM delta = |16-8|/8 = 1.0 > 0.50 -> dropped
@@ -263,8 +265,213 @@ func TestMatchDatabaseObservations_ThresholdsTiers(t *testing.T) {
 		MultiAZ:           false,
 		Category:          "database_rdbms",
 	}
-	resNone := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetNone, thresholds)
+	resNone, err := MatchDatabaseObservations([]domain.PriceObservation{inst}, targetNone, thresholds)
 	if resNone != nil {
 		t.Errorf("expected candidate exceeding cutoff to be omitted (nil), got %+v", resNone)
+	}
+	if !errors.Is(err, ErrNoMatchFound) {
+		t.Errorf("expected ErrNoMatchFound, got %v", err)
+	}
+}
+
+// TestDatabaseRDBMSScorer_IOPSDistanceScoring verifies that candidate IOPS is scored against target IOPS
+// without being overwritten, properly computing Δiops and missing_attributes (Item 1).
+func TestDatabaseRDBMSScorer_IOPSDistanceScoring(t *testing.T) {
+	scorer := DatabaseRDBMSScorer{}
+	thresholds := ThresholdsForCategory("database_rdbms")
+
+	candIOPS := 1000
+	reqIOPS := 3000
+
+	cand := domain.PriceObservation{
+		Provider:        "aws",
+		ServiceCategory: "database_rdbms",
+		SkuID:           "AWS-RDS-PG-M6G-XLARGE-IOPS1000",
+		PriceAmount:     decimal.NewFromFloat(0.26),
+		DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+			Engine:         "postgresql",
+			VCPU:           4,
+			RAMGB:          16,
+			StorageGB:      100,
+			IOPS:           &candIOPS,
+			MultiAZ:        false,
+			DeploymentTier: "standard",
+			ComponentType:  "instance",
+		},
+	}
+
+	target := MatchTarget{
+		Engine:            "postgresql",
+		VCPU:              4,
+		RAMGB:             16,
+		DatabaseStorageGB: 100,
+		DatabaseIOPS:      &reqIOPS,
+		MultiAZ:           false,
+		Category:          "database_rdbms",
+	}
+
+	// Score directly
+	dist, missing, eligible := scorer.Score(cand, target)
+	if !eligible {
+		t.Fatalf("expected candidate to be eligible")
+	}
+
+	// Expected distance: w_iops * |1000 - 3000| / 3000 = 0.5 * 2000 / 3000 = 0.3333333333333333
+	expectedDist := 0.5 * (2000.0 / 3000.0)
+	if math.Abs(dist-expectedDist) > 1e-6 {
+		t.Errorf("expected distance %f, got %f (IOPS distance scoring must be active)", expectedDist, dist)
+	}
+	if len(missing) != 0 {
+		t.Errorf("expected 0 missing attributes when candidate has IOPS, got %v", missing)
+	}
+
+	// Match through MatchDatabaseObservations
+	res, err := MatchDatabaseObservations([]domain.PriceObservation{cand}, target, thresholds)
+	if err != nil || res == nil {
+		t.Fatalf("expected match result, got nil (err: %v)", err)
+	}
+	// Distance is ~0.3333, which is > 0.20 (close threshold) and <= 0.50 (approximate threshold)
+	if res.MatchQuality != "approximate" {
+		t.Errorf("expected match quality 'approximate' for IOPS mismatch, got %s", res.MatchQuality)
+	}
+	if res.MatchDeltaPct == 0.0 {
+		t.Errorf("expected non-zero match_delta_pct, got 0.0")
+	}
+
+	// Test missing attribute when candidate has nil IOPS
+	candNoIOPS := cand
+	candNoIOPS.DatabaseRDBMSAttributes.IOPS = nil
+	distNoIOPS, missingNoIOPS, eligibleNoIOPS := scorer.Score(candNoIOPS, target)
+	if !eligibleNoIOPS {
+		t.Fatalf("expected candidate without IOPS to be eligible")
+	}
+	if distNoIOPS != 0.0 {
+		t.Errorf("expected 0 distance when candidate has nil IOPS, got %f", distNoIOPS)
+	}
+	if len(missingNoIOPS) != 1 || missingNoIOPS[0] != "iops" {
+		t.Errorf("expected missing_attributes ['iops'], got %v", missingNoIOPS)
+	}
+}
+
+// TestMatchDatabaseObservations_CombinedIOPSPriced verifies that the joined hourly price
+// includes all three terms: Price_instance + (StorageGB * Price_storage_hourly) + (IOPS * Price_iops_hourly) (Item 2).
+func TestMatchDatabaseObservations_CombinedIOPSPriced(t *testing.T) {
+	now := time.Now().UTC()
+	reqIOPS := 3000
+
+	obsList := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
+			Region:          "us-east-1",
+			PriceAmount:     decimal.NewFromFloat(0.2600), // Instance: $0.26 / hr
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "postgresql",
+				VCPU:          4,
+				RAMGB:         16,
+				MultiAZ:       false,
+				ComponentType: "instance",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-STORAGE-GP3",
+			Region:          "us-east-1",
+			PriceAmount:     decimal.NewFromFloat(0.115), // Storage: $0.115 / GB-mo -> 100 GB = $0.0157534 / hr
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "any",
+				StorageGB:     1,
+				MultiAZ:       false,
+				StorageFamily: "gp3",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-IOPS-GP3",
+			Region:          "us-east-1",
+			PriceAmount:     decimal.NewFromFloat(0.010), // IOPS: $0.010 / IOPS-mo -> 3000 IOPS = $30/mo = $0.04109589 / hr
+			Unit:            "IOPS-Mo",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "any",
+				MultiAZ:       false,
+				StorageFamily: "gp3",
+				ComponentType: "iops",
+			},
+			FetchedAt: now,
+		},
+	}
+
+	target := MatchTarget{
+		Engine:            "postgresql",
+		VCPU:              4,
+		RAMGB:             16,
+		DatabaseStorageGB: 100,
+		DatabaseIOPS:      &reqIOPS,
+		MultiAZ:           false,
+		Category:          "database_rdbms",
+	}
+
+	thresholds := ThresholdsForCategory("database_rdbms")
+	res, err := MatchDatabaseObservations(obsList, target, thresholds)
+	if err != nil || res == nil {
+		t.Fatalf("expected match result, got nil (err: %v)", err)
+	}
+
+	// Expected three-term total:
+	// Instance: $0.26
+	// Storage: 100 * 0.115 / 730 = ~$0.0157534
+	// IOPS: 3000 * 0.010 / 730 = ~$0.0410959
+	// Total: ~$0.3168493 / hr
+	expectedMinHourly := decimal.NewFromFloat(0.31)
+	expectedMaxHourly := decimal.NewFromFloat(0.32)
+	if res.Observation.PriceAmount.LessThan(expectedMinHourly) || res.Observation.PriceAmount.GreaterThan(expectedMaxHourly) {
+		t.Fatalf("expected combined price between %s and %s (including IOPS rate), got %s",
+			expectedMinHourly, expectedMaxHourly, res.Observation.PriceAmount)
+	}
+}
+
+// TestMatchDatabaseObservations_EngineMismatchExcluded verifies that when candidates exist
+// but none match the requested engine, ErrEngineMismatch is returned (Item 3).
+func TestMatchDatabaseObservations_EngineMismatchExcluded(t *testing.T) {
+	now := time.Now().UTC()
+	thresholds := ThresholdsForCategory("database_rdbms")
+
+	obsList := []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
+			Region:          "us-east-1",
+			PriceAmount:     decimal.NewFromFloat(0.26),
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "postgresql",
+				VCPU:          4,
+				RAMGB:         16,
+				ComponentType: "instance",
+			},
+			FetchedAt: now,
+		},
+	}
+
+	targetMySQL := MatchTarget{
+		Engine:            "mysql",
+		VCPU:              4,
+		RAMGB:             16,
+		DatabaseStorageGB: 100,
+		Category:          "database_rdbms",
+	}
+
+	res, err := MatchDatabaseObservations(obsList, targetMySQL, thresholds)
+	if res != nil {
+		t.Errorf("expected res to be nil on engine mismatch, got %+v", res)
+	}
+	if !errors.Is(err, ErrEngineMismatch) {
+		t.Fatalf("expected ErrEngineMismatch, got %v", err)
 	}
 }

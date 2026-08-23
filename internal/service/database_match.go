@@ -84,26 +84,30 @@ func (s DatabaseRDBMSScorer) Score(candidate domain.PriceObservation, target Mat
 	return distance, missingAttrs, true
 }
 
-// MatchDatabaseObservations orchestrates dynamic query-time join between compute instance
-// and storage observations, scores the composite candidates, and picks the best match.
-func MatchDatabaseObservations(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) *MatchResult {
+// MatchDatabaseObservations orchestrates dynamic query-time join between compute instance,
+// storage, and provisioned IOPS observations, scores the composite candidates, and picks the best match.
+func MatchDatabaseObservations(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
 	if len(obsList) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var instances []domain.PriceObservation
 	var storages []domain.PriceObservation
+	var iopsRows []domain.PriceObservation
 
 	for _, obs := range obsList {
-		if obs.DatabaseRDBMSAttributes.ComponentType == "storage" {
+		compType := obs.DatabaseRDBMSAttributes.ComponentType
+		if compType == "storage" {
 			storages = append(storages, obs)
+		} else if compType == "iops" || strings.EqualFold(obs.Unit, "IOPS-Mo") || strings.EqualFold(obs.Unit, "IOPS") {
+			iopsRows = append(iopsRows, obs)
 		} else {
 			instances = append(instances, obs)
 		}
 	}
 
 	if len(instances) == 0 {
-		return nil
+		return nil, ErrNoMatchFound
 	}
 
 	type scoredCandidate struct {
@@ -113,6 +117,7 @@ func MatchDatabaseObservations(obsList []domain.PriceObservation, target MatchTa
 	}
 
 	var candidates []scoredCandidate
+	var engineMismatches int
 	scorer := DatabaseRDBMSScorer{}
 
 	requestedStorageGB := target.DatabaseStorageGB
@@ -121,20 +126,51 @@ func MatchDatabaseObservations(obsList []domain.PriceObservation, target MatchTa
 	}
 
 	for _, inst := range instances {
+		// If target engine is specified, check engine match
+		if target.Engine != "" && inst.DatabaseRDBMSAttributes.Engine != "" {
+			if !strings.EqualFold(inst.DatabaseRDBMSAttributes.Engine, target.Engine) {
+				engineMismatches++
+				continue
+			}
+		}
+
 		// Find best matching storage row for query-time join
 		bestStorage := findMatchingStorage(inst, storages, target)
 
 		joinedObs := inst
 		joinedObs.DatabaseRDBMSAttributes.StorageGB = requestedStorageGB
-		if target.DatabaseIOPS != nil {
-			joinedObs.DatabaseRDBMSAttributes.IOPS = target.DatabaseIOPS
+
+		// If candidate instance has no IOPS but storage carries IOPS, inherit it
+		if joinedObs.DatabaseRDBMSAttributes.IOPS == nil && bestStorage != nil && bestStorage.DatabaseRDBMSAttributes.IOPS != nil {
+			joinedObs.DatabaseRDBMSAttributes.IOPS = bestStorage.DatabaseRDBMSAttributes.IOPS
 		}
 
+		var storageHourly decimal.Decimal
 		if bestStorage != nil {
 			joinedObs.DatabaseRDBMSAttributes.StorageFamily = bestStorage.DatabaseRDBMSAttributes.StorageFamily
-			storageHourly := CalculateStorageHourlyCost(bestStorage.PriceAmount, decimal.NewFromFloat(requestedStorageGB))
-			joinedObs.PriceAmount = inst.PriceAmount.Add(storageHourly)
+			storageHourly = CalculateStorageHourlyCost(bestStorage.PriceAmount, decimal.NewFromFloat(requestedStorageGB))
 		}
+
+		// Calculate provisioned IOPS hourly cost if matching IOPS pricing row is available
+		var iopsHourly decimal.Decimal
+		bestIOPS := findMatchingIOPS(inst, iopsRows, target)
+		if bestIOPS != nil {
+			var iopsCount int64
+			if target.DatabaseIOPS != nil && *target.DatabaseIOPS > 0 {
+				iopsCount = int64(*target.DatabaseIOPS)
+			} else if joinedObs.DatabaseRDBMSAttributes.IOPS != nil && *joinedObs.DatabaseRDBMSAttributes.IOPS > 0 {
+				iopsCount = int64(*joinedObs.DatabaseRDBMSAttributes.IOPS)
+			}
+			if iopsCount > 0 {
+				if strings.EqualFold(bestIOPS.Unit, "hour") || strings.EqualFold(bestIOPS.Unit, "IOPS-Hour") || strings.EqualFold(bestIOPS.Unit, "Hrs") {
+					iopsHourly = bestIOPS.PriceAmount.Mul(decimal.NewFromInt(iopsCount))
+				} else {
+					iopsHourly = CalculateIOPSHourlyCost(bestIOPS.PriceAmount, iopsCount)
+				}
+			}
+		}
+
+		joinedObs.PriceAmount = inst.PriceAmount.Add(storageHourly).Add(iopsHourly)
 
 		dist, missing, eligible := scorer.Score(joinedObs, target)
 		if !eligible {
@@ -149,7 +185,10 @@ func MatchDatabaseObservations(obsList []domain.PriceObservation, target MatchTa
 	}
 
 	if len(candidates) == 0 {
-		return nil
+		if engineMismatches > 0 && engineMismatches == len(instances) {
+			return nil, ErrEngineMismatch
+		}
+		return nil, ErrNoMatchFound
 	}
 
 	// Sort: lowest distance first, then lexicographic SKU ID for deterministic tie-breaking.
@@ -163,7 +202,7 @@ func MatchDatabaseObservations(obsList []domain.PriceObservation, target MatchTa
 	best := candidates[0]
 	quality := classifyTier(best.distance, thresholds)
 	if quality == "none" {
-		return nil
+		return nil, ErrNoMatchFound
 	}
 
 	missing := best.missingAttrs
@@ -176,7 +215,7 @@ func MatchDatabaseObservations(obsList []domain.PriceObservation, target MatchTa
 		MatchQuality:      quality,
 		MatchDeltaPct:     roundTo2(best.distance * 100),
 		MissingAttributes: missing,
-	}
+	}, nil
 }
 
 // findMatchingStorage finds the most suitable storage observation to join with an instance candidate.
@@ -220,6 +259,53 @@ func findMatchingStorage(inst domain.PriceObservation, storages []domain.PriceOb
 		if score > bestScore {
 			bestScore = score
 			best = stor
+		}
+	}
+
+	return best
+}
+
+// findMatchingIOPS finds the most suitable provisioned IOPS pricing observation to join with an instance candidate.
+func findMatchingIOPS(inst domain.PriceObservation, iopsList []domain.PriceObservation, target MatchTarget) *domain.PriceObservation {
+	if len(iopsList) == 0 {
+		return nil
+	}
+
+	var best *domain.PriceObservation
+	var bestScore = -1
+
+	for i := range iopsList {
+		iopsObs := &iopsList[i]
+
+		// Region and provider must match
+		if iopsObs.Provider != inst.Provider || iopsObs.Region != inst.Region {
+			continue
+		}
+
+		// If IOPS specifies an engine, it must match instance engine
+		if iopsObs.DatabaseRDBMSAttributes.Engine != "" && iopsObs.DatabaseRDBMSAttributes.Engine != "any" {
+			if !strings.EqualFold(iopsObs.DatabaseRDBMSAttributes.Engine, inst.DatabaseRDBMSAttributes.Engine) {
+				continue
+			}
+		}
+
+		score := 0
+
+		// Prefer matching MultiAZ
+		if iopsObs.DatabaseRDBMSAttributes.MultiAZ == inst.DatabaseRDBMSAttributes.MultiAZ {
+			score += 10
+		}
+
+		// Prefer matching StorageFamily
+		if target.StorageFamily != "" && strings.EqualFold(iopsObs.DatabaseRDBMSAttributes.StorageFamily, target.StorageFamily) {
+			score += 20
+		} else if strings.EqualFold(iopsObs.DatabaseRDBMSAttributes.StorageFamily, "gp3") || strings.EqualFold(iopsObs.DatabaseRDBMSAttributes.StorageFamily, "io1") {
+			score += 5
+		}
+
+		if score > bestScore {
+			bestScore = score
+			best = iopsObs
 		}
 	}
 

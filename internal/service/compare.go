@@ -57,6 +57,12 @@ func (s *PricingService) Compare(ctx context.Context, category, region string, t
 					Code:     "category_not_supported",
 					Message:  category + " category is not supported by " + prov,
 				})
+			case errors.Is(err, ErrEngineMismatch):
+				warnings = append(warnings, CalculateWarning{
+					Provider: prov,
+					Code:     "engine_mismatch_excluded",
+					Message:  "Database candidate was excluded due to engine mismatch.",
+				})
 			case errors.Is(err, ErrNoMatchFound):
 				warnings = append(warnings, CalculateWarning{
 					Provider: prov,

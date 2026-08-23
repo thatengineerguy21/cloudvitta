@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -112,15 +113,12 @@ func (h *DatabaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rawEngine := strings.TrimSpace(q.Get("engine"))
 	var canonicalEngine string
 	if rawEngine != "" {
-		// Attempt canonical resolution across any provider or lowercase normalization
-		canonicalEngine = strings.ToLower(rawEngine)
-		if norm, err := databaseenginemap.NormalizeEngine("aws", rawEngine); err == nil {
-			canonicalEngine = norm
-		} else if norm, err := databaseenginemap.NormalizeEngine("azure", rawEngine); err == nil {
-			canonicalEngine = norm
-		} else if norm, err := databaseenginemap.NormalizeEngine("gcp", rawEngine); err == nil {
-			canonicalEngine = norm
+		canonical, err := databaseenginemap.ResolveCanonicalEngine(rawEngine)
+		if err != nil || !databaseenginemap.IsSupportedStageEngine(canonical) {
+			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", "engine must be a supported database engine (postgresql, mysql, sqlserver)")
+			return
 		}
+		canonicalEngine = canonical
 	}
 
 	var reqVCPU float64
@@ -183,68 +181,42 @@ func (h *DatabaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Category:          "database_rdbms",
 	}
 
-	providers := service.SupportedProviders()
+	compRes, err := h.pricingSvc.Compare(r.Context(), "database_rdbms", region, target)
+	if err != nil {
+		if errors.Is(err, service.ErrProviderUnavailable) {
+			middleware.WriteJSONError(w, r, http.StatusBadGateway, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable", "All providers failed to retrieve pricing data")
+			return
+		}
+		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-error", "Internal Server Error", err.Error())
+		return
+	}
+
 	var results []DatabaseResultEntry
-	var providerErrors int
-
-	for _, prov := range providers {
-		catResult, err := h.pricingSvc.MatchAndCalculate(r.Context(), prov, "database_rdbms", region, target)
-		if err != nil {
-			switch err {
-			case service.ErrCategoryNotSupported:
-				warnings = append(warnings, ProviderWarning{
-					Provider: prov,
-					Code:     "category_not_supported",
-					Message:  "Database category is not supported by " + prov,
-				})
-			case service.ErrNoMatchFound:
-				warnings = append(warnings, ProviderWarning{
-					Provider: prov,
-					Code:     "no_match",
-					Message:  "No database SKU matched the requested spec within acceptable thresholds.",
-				})
-			default:
-				providerErrors++
-				warnings = append(warnings, ProviderWarning{
-					Provider: prov,
-					Code:     "fetch_failed",
-					Message:  err.Error(),
-				})
-			}
-			continue
-		}
-
-		if catResult == nil {
-			warnings = append(warnings, ProviderWarning{
-				Provider: prov,
-				Code:     "no_data_available",
-				Message:  "No database pricing data available for this region.",
-			})
-			continue
-		}
-
-		obs := catResult.MatchResult.Observation
+	for _, item := range compRes.Results {
 		results = append(results, DatabaseResultEntry{
-			Provider:          obs.Provider,
-			SkuID:             obs.SkuID,
-			MatchedSpec:       obs.DatabaseRDBMSAttributes,
-			MatchQuality:      catResult.MatchResult.MatchQuality,
-			MatchDeltaPct:     catResult.MatchResult.MatchDeltaPct,
-			MissingAttributes: catResult.MatchResult.MissingAttributes,
+			Provider:          item.Provider,
+			SkuID:             item.SkuID,
+			MatchedSpec:       item.MatchedDatabase,
+			MatchQuality:      item.MatchQuality,
+			MatchDeltaPct:     item.MatchDeltaPct,
+			MissingAttributes: item.MissingAttributes,
 			Price: PriceDetail{
-				Amount:   catResult.HourlyCost,
-				Unit:     catResult.Unit,
+				Amount:   item.HourlyCost,
+				Unit:     item.Unit,
 				Currency: currency,
 			},
-			NormalizedHourlyUSD: catResult.HourlyCost,
-			FetchedAt:           obs.FetchedAt,
-			Stale:               catResult.Stale,
+			NormalizedHourlyUSD: item.HourlyCost,
+			FetchedAt:           item.FetchedAt,
+			Stale:               item.Stale,
 		})
 	}
 
-	if len(results) == 0 && providerErrors == len(providers) {
-		middleware.WriteJSONError(w, r, http.StatusBadGateway, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable", "All providers failed to retrieve pricing data")
-		return
+	for _, wItem := range compRes.Warnings {
+		warnings = append(warnings, ProviderWarning{
+			Provider: wItem.Provider,
+			Code:     wItem.Code,
+			Message:  wItem.Message,
+		})
 	}
 
 	queryMeta := map[string]interface{}{
