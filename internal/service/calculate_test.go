@@ -399,7 +399,7 @@ func TestPricingService_Calculate_CurrencyWarning(t *testing.T) {
 
 	var currencyWarnFound bool
 	for _, w := range res.Warnings {
-		if w.Provider == "system" && w.Code == "currency_conversion_not_yet_supported" {
+		if w.Provider == "system" && w.Code == "non_usd_currency_unsupported" {
 			currencyWarnFound = true
 			break
 		}

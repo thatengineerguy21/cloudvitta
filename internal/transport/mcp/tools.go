@@ -698,21 +698,31 @@ func validateServerlessRequirements(req ServerlessRequirements) (*service.Server
 	if req.ExecutionDurationMS != nil {
 		rawDur = strconv.FormatFloat(*req.ExecutionDurationMS, 'f', -1, 64)
 	}
-	wl, err := service.ParseServerlessWorkload(req.Architecture, req.Tier, rawReqs, rawMem, rawDur)
+	wl, err := service.ParseRawServerlessWorkload(service.RawServerlessParams{
+		Architecture:        req.Architecture,
+		Tier:                req.Tier,
+		RequestsPerMonth:    rawReqs,
+		MemoryMB:            rawMem,
+		ExecutionDurationMS: rawDur,
+	})
 	if err != nil {
 		return nil, err
 	}
 	return &wl, nil
 }
 
-// defaultStage3Warnings returns static warnings for providers scheduled for stage 3/4.
-func defaultStage3Warnings() []ProviderWarning {
+// defaultUningestedWarnings returns static warnings for providers scheduled for stage 4.
+func defaultUningestedWarnings() []ProviderWarning {
 	return []ProviderWarning{
-		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
-		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
-		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
-		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
+		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 4."},
+		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 4."},
+		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 4."},
+		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 4."},
 	}
+}
+
+func defaultStage3Warnings() []ProviderWarning {
+	return defaultUningestedWarnings()
 }
 
 // instrumentTool wraps a tool handler with OpenTelemetry tracing spans, metrics recording, and structured slog logging.
@@ -782,7 +792,7 @@ func handleCompareCompute(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 		if currency != "" && currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}
@@ -900,7 +910,7 @@ func handleCompareStorage(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 		if currency != "" && currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}
@@ -1001,7 +1011,7 @@ func handleCompareNetwork(pricingSvc *service.PricingService) sdk.ToolHandlerFor
 		if currency != "" && currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}
@@ -1102,7 +1112,7 @@ func handleCompareDatabase(pricingSvc *service.PricingService) sdk.ToolHandlerFo
 		if currency != "" && currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}
@@ -1254,7 +1264,7 @@ func handleCompareDatabaseNoSQL(pricingSvc *service.PricingService) sdk.ToolHand
 		if currency != "" && currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}
@@ -1383,7 +1393,7 @@ func handleCompareKubernetes(pricingSvc *service.PricingService) sdk.ToolHandler
 		if currency != "" && currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}
@@ -1477,7 +1487,7 @@ func handleCompareServerless(pricingSvc *service.PricingService) sdk.ToolHandler
 		if currency != "" && currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}
@@ -1655,7 +1665,7 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 		if currency != "USD" {
 			warnings = append(warnings, ProviderWarning{
 				Provider: "system",
-				Code:     "currency_conversion_not_yet_supported",
+				Code:     "non_usd_currency_unsupported",
 				Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 			})
 		}

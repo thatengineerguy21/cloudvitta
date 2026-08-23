@@ -260,12 +260,12 @@ func TestDatabaseHandler_Success(t *testing.T) {
 	// Verify currency warning
 	var hasCurrWarning bool
 	for _, w := range resp.Warnings {
-		if w.Code == "currency_conversion_not_yet_supported" {
+		if w.Code == "non_usd_currency_unsupported" {
 			hasCurrWarning = true
 		}
 	}
 	if !hasCurrWarning {
-		t.Errorf("expected currency_conversion_not_yet_supported warning when requesting EUR")
+		t.Errorf("expected non_usd_currency_unsupported warning when requesting EUR")
 	}
 
 	// Verify results

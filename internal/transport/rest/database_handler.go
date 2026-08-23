@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -164,11 +163,12 @@ func (h *DatabaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	compRes, err := h.pricingSvc.Compare(r.Context(), "database_rdbms", region, target)
 	if err != nil {
-		if errors.Is(err, service.ErrProviderUnavailable) {
-			middleware.WriteJSONError(w, r, http.StatusBadGateway, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable", "All providers failed to retrieve pricing data")
-			return
+		status, errType, title := middleware.MapServiceError(err)
+		detail := err.Error()
+		if status == http.StatusInternalServerError {
+			detail = "An internal server error occurred while evaluating database pricing comparison"
 		}
-		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal-error", "Internal Server Error", err.Error())
+		middleware.WriteJSONError(w, r, status, errType, title, detail)
 		return
 	}
 

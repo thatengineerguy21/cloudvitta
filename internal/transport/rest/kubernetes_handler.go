@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -113,11 +112,12 @@ func (h *KubernetesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	compResult, err := h.pricingSvc.Compare(r.Context(), "kubernetes", region, target)
 	if err != nil {
-		if errors.Is(err, service.ErrProviderUnavailable) {
-			middleware.WriteJSONError(w, r, http.StatusServiceUnavailable, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable", "All providers are currently unavailable for this region.")
-			return
+		status, errType, title := middleware.MapServiceError(err)
+		detail := err.Error()
+		if status == http.StatusInternalServerError {
+			detail = "An internal server error occurred while evaluating Kubernetes pricing comparison"
 		}
-		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal", "Internal Server Error", "An error occurred while evaluating Kubernetes pricing comparison.")
+		middleware.WriteJSONError(w, r, status, errType, title, detail)
 		return
 	}
 

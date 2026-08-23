@@ -353,12 +353,12 @@ func TestDatabaseNoSQLHandler_CurrencyWarning(t *testing.T) {
 
 	var hasCurrencyWarning bool
 	for _, w := range resp.Warnings {
-		if w.Code == "currency_conversion_not_yet_supported" {
+		if w.Code == "non_usd_currency_unsupported" {
 			hasCurrencyWarning = true
 			break
 		}
 	}
 	if !hasCurrencyWarning {
-		t.Errorf("expected currency_conversion_not_yet_supported warning when requesting EUR")
+		t.Errorf("expected non_usd_currency_unsupported warning when requesting EUR")
 	}
 }

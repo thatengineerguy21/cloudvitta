@@ -408,22 +408,22 @@ func TestFreshnessService_GetProviderStatus_StaleAll(t *testing.T) {
 	}
 }
 
-func TestFreshnessService_GetProviderStatus_Stage3Providers(t *testing.T) {
+func TestFreshnessService_GetProviderStatus_Stage4Providers(t *testing.T) {
 	svc := service.NewFreshnessService(nil, nil)
 
-	stage3 := []struct {
+	stage4 := []struct {
 		provider string
 		msg      string
 	}{
-		{"oracle", "Oracle OCI ingestion lands in stage 3."},
-		{"ibm", "IBM Cloud ingestion lands in stage 3."},
-		{"alibaba", "Alibaba Cloud ingestion lands in stage 3."},
-		{"digitalocean", "DigitalOcean ingestion lands in stage 3."},
+		{"oracle", "Oracle OCI ingestion lands in stage 4."},
+		{"ibm", "IBM Cloud ingestion lands in stage 4."},
+		{"alibaba", "Alibaba Cloud ingestion lands in stage 4."},
+		{"digitalocean", "DigitalOcean ingestion lands in stage 4."},
 	}
 
-	for _, s3 := range stage3 {
-		t.Run(s3.provider, func(t *testing.T) {
-			status, err := svc.GetProviderStatus(context.Background(), s3.provider)
+	for _, s4 := range stage4 {
+		t.Run(s4.provider, func(t *testing.T) {
+			status, err := svc.GetProviderStatus(context.Background(), s4.provider)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -431,13 +431,16 @@ func TestFreshnessService_GetProviderStatus_Stage3Providers(t *testing.T) {
 				t.Errorf("expected status 'not_yet_ingested', got %s", status.Status)
 			}
 			if !status.Stale {
-				t.Errorf("expected Stale=true for stage 3 provider")
+				t.Errorf("expected Stale=true for stage 4 provider")
 			}
 			if len(status.Warnings) != 1 {
 				t.Fatalf("expected 1 warning, got %d", len(status.Warnings))
 			}
-			if status.Warnings[0].Code != "not_yet_ingested" || status.Warnings[0].Message != s3.msg {
-				t.Errorf("unexpected warning: %+v", status.Warnings[0])
+			if status.Warnings[0].Code != "not_yet_ingested" {
+				t.Errorf("expected warning code 'not_yet_ingested', got %s", status.Warnings[0].Code)
+			}
+			if status.Warnings[0].Message != s4.msg {
+				t.Errorf("expected message %q, got %q", s4.msg, status.Warnings[0].Message)
 			}
 		})
 	}

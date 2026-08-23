@@ -101,16 +101,16 @@ func (s *FreshnessService) IsStale(provider, category string, fetchedAt time.Tim
 	return now().Sub(fetchedAt) > threshold
 }
 
-func stage3WarningMessage(provider string) (string, bool) {
+func futureStageWarningMessage(provider string) (string, bool) {
 	switch provider {
 	case "oracle":
-		return "Oracle OCI ingestion lands in stage 3.", true
+		return "Oracle OCI ingestion lands in stage 4.", true
 	case "ibm":
-		return "IBM Cloud ingestion lands in stage 3.", true
+		return "IBM Cloud ingestion lands in stage 4.", true
 	case "alibaba":
-		return "Alibaba Cloud ingestion lands in stage 3.", true
+		return "Alibaba Cloud ingestion lands in stage 4.", true
 	case "digitalocean":
-		return "DigitalOcean ingestion lands in stage 3.", true
+		return "DigitalOcean ingestion lands in stage 4.", true
 	default:
 		return "", false
 	}
@@ -119,7 +119,7 @@ func stage3WarningMessage(provider string) (string, bool) {
 // GetProviderStatus builds the complete operational and freshness status for a provider.
 func (s *FreshnessService) GetProviderStatus(ctx context.Context, provider string) (*domain.ProviderStatus, error) {
 	p := strings.ToLower(strings.TrimSpace(provider))
-	if msg, ok := stage3WarningMessage(p); ok {
+	if msg, ok := futureStageWarningMessage(p); ok {
 		return &domain.ProviderStatus{
 			Provider:   p,
 			Status:     "not_yet_ingested",

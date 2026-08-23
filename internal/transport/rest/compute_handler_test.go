@@ -239,7 +239,7 @@ func TestComputeHandler_CurrencyWarning(t *testing.T) {
 
 	foundWarning := false
 	for _, w := range resp.Warnings {
-		if w.Code == "currency_conversion_not_yet_supported" {
+		if w.Code == "non_usd_currency_unsupported" {
 			foundWarning = true
 			break
 		}

@@ -257,7 +257,13 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if reqBody.Serverless.ExecutionDurationMS != nil {
 			rawDur = reqBody.Serverless.ExecutionDurationMS.String()
 		}
-		wl, err := service.ParseServerlessWorkload(reqBody.Serverless.Architecture, reqBody.Serverless.Tier, rawReqs, rawMem, rawDur)
+		wl, err := service.ParseRawServerlessWorkload(service.RawServerlessParams{
+			Architecture:        reqBody.Serverless.Architecture,
+			Tier:                reqBody.Serverless.Tier,
+			RequestsPerMonth:    rawReqs,
+			MemoryMB:            rawMem,
+			ExecutionDurationMS: rawDur,
+		})
 		if err != nil {
 			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", err.Error())
 			return

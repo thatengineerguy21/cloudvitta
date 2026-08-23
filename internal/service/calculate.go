@@ -213,7 +213,7 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 	if req.Currency != "" && req.Currency != "USD" {
 		warnings = append(warnings, CalculateWarning{
 			Provider: "system",
-			Code:     "currency_conversion_not_yet_supported",
+			Code:     "non_usd_currency_unsupported",
 			Message:  "Only USD is currently supported. Returning results in USD.",
 		})
 	}

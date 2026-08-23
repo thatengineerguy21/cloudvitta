@@ -278,12 +278,12 @@ func TestKubernetesHandler_NonUSDCurrencyWarning(t *testing.T) {
 
 	var foundCurrencyWarning bool
 	for _, w := range resp.Warnings {
-		if w.Code == "currency_conversion_not_yet_supported" {
+		if w.Code == "non_usd_currency_unsupported" {
 			foundCurrencyWarning = true
 			break
 		}
 	}
 	if !foundCurrencyWarning {
-		t.Errorf("expected currency_conversion_not_yet_supported warning")
+		t.Errorf("expected non_usd_currency_unsupported warning")
 	}
 }

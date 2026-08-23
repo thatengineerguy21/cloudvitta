@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
@@ -84,13 +83,13 @@ func (h *ServerlessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	reqCurrency, _, warnings := NormalizeCurrencyAndWarnings(q.Get("currency"))
 
-	workload, err := service.ParseServerlessWorkload(
-		q.Get("architecture"),
-		q.Get("tier"),
-		q.Get("requests_per_month"),
-		q.Get("memory_mb"),
-		q.Get("execution_duration_ms"),
-	)
+	workload, err := service.ParseRawServerlessWorkload(service.RawServerlessParams{
+		Architecture:        q.Get("architecture"),
+		Tier:                q.Get("tier"),
+		RequestsPerMonth:    q.Get("requests_per_month"),
+		MemoryMB:            q.Get("memory_mb"),
+		ExecutionDurationMS: q.Get("execution_duration_ms"),
+	})
 	if err != nil {
 		middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", err.Error())
 		return
@@ -103,11 +102,12 @@ func (h *ServerlessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	compResult, err := h.pricingSvc.Compare(r.Context(), "serverless", region, target)
 	if err != nil {
-		if errors.Is(err, service.ErrProviderUnavailable) {
-			middleware.WriteJSONError(w, r, http.StatusServiceUnavailable, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable", "All providers are currently unavailable for this region.")
-			return
+		status, errType, title := middleware.MapServiceError(err)
+		detail := err.Error()
+		if status == http.StatusInternalServerError {
+			detail = "An internal server error occurred while evaluating Serverless pricing comparison"
 		}
-		middleware.WriteJSONError(w, r, http.StatusInternalServerError, "https://cloudvitta.dev/errors/internal", "Internal Server Error", "An error occurred while evaluating Serverless pricing comparison.")
+		middleware.WriteJSONError(w, r, status, errType, title, detail)
 		return
 	}
 

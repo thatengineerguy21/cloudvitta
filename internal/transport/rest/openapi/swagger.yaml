@@ -548,7 +548,7 @@ definitions:
         example: not_yet_ingested
         type: string
       message:
-        example: Oracle OCI ingestion lands in stage 3.
+        example: Oracle OCI ingestion lands in stage 4.
         type: string
       provider:
         example: oracle

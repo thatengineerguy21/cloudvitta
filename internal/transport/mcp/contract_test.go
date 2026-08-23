@@ -2207,13 +2207,13 @@ func TestContractParity_Compute(t *testing.T) {
 		// Assert currency warning presence on both
 		hasWarnREST := false
 		for _, w := range restResp.Warnings {
-			if w.Code == "currency_conversion_not_yet_supported" {
+			if w.Code == "non_usd_currency_unsupported" {
 				hasWarnREST = true
 				break
 			}
 		}
 		if !hasWarnREST {
-			t.Error("expected currency_conversion_not_yet_supported warning in REST response")
+			t.Error("expected non_usd_currency_unsupported warning in REST response")
 		}
 	})
 
@@ -2919,13 +2919,13 @@ func TestContractParity_Kubernetes(t *testing.T) {
 
 		hasWarnREST := false
 		for _, w := range restResp.Warnings {
-			if w.Code == "currency_conversion_not_yet_supported" {
+			if w.Code == "non_usd_currency_unsupported" {
 				hasWarnREST = true
 				break
 			}
 		}
 		if !hasWarnREST {
-			t.Error("expected currency_conversion_not_yet_supported warning in REST response")
+			t.Error("expected non_usd_currency_unsupported warning in REST response")
 		}
 	})
 
@@ -3067,13 +3067,13 @@ func TestContractParity_Serverless(t *testing.T) {
 
 		hasWarnREST := false
 		for _, w := range restResp.Warnings {
-			if w.Code == "currency_conversion_not_yet_supported" {
+			if w.Code == "non_usd_currency_unsupported" {
 				hasWarnREST = true
 				break
 			}
 		}
 		if !hasWarnREST {
-			t.Error("expected currency_conversion_not_yet_supported warning in REST response")
+			t.Error("expected non_usd_currency_unsupported warning in REST response")
 		}
 	})
 

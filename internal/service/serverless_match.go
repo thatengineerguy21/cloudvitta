@@ -81,25 +81,34 @@ func (s ServerlessScorer) Score(candidate domain.PriceObservation, target MatchT
 	return distance, []string{}, true
 }
 
-// ParseServerlessWorkload extracts and validates serverless workload parameters from raw string inputs.
-func ParseServerlessWorkload(rawArch, rawTier, rawReqs, rawMem, rawDur string) (ServerlessWorkload, error) {
+// RawServerlessParams bundles unparsed query strings for serverless workload definition.
+type RawServerlessParams struct {
+	Architecture        string
+	Tier                string
+	RequestsPerMonth    string
+	MemoryMB            string
+	ExecutionDurationMS string
+}
+
+// ParseRawServerlessWorkload validates and converts bundled raw string parameters into a ServerlessWorkload.
+func ParseRawServerlessWorkload(params RawServerlessParams) (ServerlessWorkload, error) {
 	arch := domain.ArchitectureX86_64
-	if strings.TrimSpace(rawArch) != "" {
-		resolved, err := serverlessarchmap.ResolveCanonicalArchitecture(rawArch)
+	if strings.TrimSpace(params.Architecture) != "" {
+		resolved, err := serverlessarchmap.ResolveCanonicalArchitecture(params.Architecture)
 		if err != nil || !serverlessarchmap.IsSupportedStageArchitecture(resolved) {
 			return ServerlessWorkload{}, fmt.Errorf("%w: architecture must be a supported CPU architecture (x86_64, arm64)", ErrInvalidParameters)
 		}
 		arch = resolved
 	}
 
-	tier := strings.ToLower(strings.TrimSpace(rawTier))
+	tier := strings.ToLower(strings.TrimSpace(params.Tier))
 	if tier == "" {
 		tier = domain.ServerlessTierConsumption
 	}
 
 	requestsPerMonth := decimal.RequireFromString("1000000")
-	if strings.TrimSpace(rawReqs) != "" {
-		val, err := decimal.NewFromString(strings.TrimSpace(rawReqs))
+	if strings.TrimSpace(params.RequestsPerMonth) != "" {
+		val, err := decimal.NewFromString(strings.TrimSpace(params.RequestsPerMonth))
 		if err != nil || val.IsNegative() {
 			return ServerlessWorkload{}, fmt.Errorf("%w: requests_per_month must be a non-negative number", ErrInvalidParameters)
 		}
@@ -107,8 +116,8 @@ func ParseServerlessWorkload(rawArch, rawTier, rawReqs, rawMem, rawDur string) (
 	}
 
 	memoryMB := decimal.RequireFromString("512")
-	if strings.TrimSpace(rawMem) != "" {
-		val, err := decimal.NewFromString(strings.TrimSpace(rawMem))
+	if strings.TrimSpace(params.MemoryMB) != "" {
+		val, err := decimal.NewFromString(strings.TrimSpace(params.MemoryMB))
 		if err != nil || val.LessThan(decimal.RequireFromString("128")) || val.GreaterThan(decimal.RequireFromString("10240")) {
 			return ServerlessWorkload{}, fmt.Errorf("%w: memory_mb must be between 128 and 10240 MB", ErrInvalidParameters)
 		}
@@ -116,8 +125,8 @@ func ParseServerlessWorkload(rawArch, rawTier, rawReqs, rawMem, rawDur string) (
 	}
 
 	executionDurationMS := decimal.RequireFromString("200")
-	if strings.TrimSpace(rawDur) != "" {
-		val, err := decimal.NewFromString(strings.TrimSpace(rawDur))
+	if strings.TrimSpace(params.ExecutionDurationMS) != "" {
+		val, err := decimal.NewFromString(strings.TrimSpace(params.ExecutionDurationMS))
 		if err != nil || val.LessThan(decimal.RequireFromString("1")) || val.GreaterThan(decimal.RequireFromString("900000")) {
 			return ServerlessWorkload{}, fmt.Errorf("%w: execution_duration_ms must be between 1 and 900000 ms", ErrInvalidParameters)
 		}
@@ -131,6 +140,17 @@ func ParseServerlessWorkload(rawArch, rawTier, rawReqs, rawMem, rawDur string) (
 		MemoryMB:            memoryMB,
 		ExecutionDurationMS: executionDurationMS,
 	}, nil
+}
+
+// ParseServerlessWorkload extracts and validates serverless workload parameters from raw string inputs.
+func ParseServerlessWorkload(rawArch, rawTier, rawReqs, rawMem, rawDur string) (ServerlessWorkload, error) {
+	return ParseRawServerlessWorkload(RawServerlessParams{
+		Architecture:        rawArch,
+		Tier:                rawTier,
+		RequestsPerMonth:    rawReqs,
+		MemoryMB:            rawMem,
+		ExecutionDurationMS: rawDur,
+	})
 }
 
 // MatchServerlessObservations joins multi-component serverless observations (requests and compute duration),

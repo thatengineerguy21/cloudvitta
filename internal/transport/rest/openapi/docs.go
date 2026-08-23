@@ -1707,7 +1707,7 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string",
-                    "example": "Oracle OCI ingestion lands in stage 3."
+                    "example": "Oracle OCI ingestion lands in stage 4."
                 },
                 "provider": {
                     "type": "string",

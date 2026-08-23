@@ -2,21 +2,26 @@ package rest
 
 import "strings"
 
-// DefaultStage3Warnings returns the static warnings for providers scheduled for ingestion in Stage 3.
-func DefaultStage3Warnings() []ProviderWarning {
+// DefaultUningestedWarnings returns the static warnings for providers scheduled for ingestion in Stage 4.
+func DefaultUningestedWarnings() []ProviderWarning {
 	return []ProviderWarning{
-		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 3."},
-		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 3."},
-		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 3."},
-		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 3."},
+		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 4."},
+		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 4."},
+		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 4."},
+		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 4."},
 	}
 }
 
+// DefaultStage3Warnings is a backward-compatible alias for DefaultUningestedWarnings.
+func DefaultStage3Warnings() []ProviderWarning {
+	return DefaultUningestedWarnings()
+}
+
 // NormalizeCurrencyAndWarnings extracts and normalizes the currency parameter, returning the raw requested currency,
-// active pricing currency (always "USD"), and initial warnings slice containing standard stage 3 notices and
+// active pricing currency (always "USD"), and initial warnings slice containing standard uningested provider notices and
 // any unsupported currency warning.
 func NormalizeCurrencyAndWarnings(rawCurrency string) (reqCurrency string, effectiveCurrency string, warnings []ProviderWarning) {
-	warnings = DefaultStage3Warnings()
+	warnings = DefaultUningestedWarnings()
 	reqCurrency = strings.TrimSpace(rawCurrency)
 	if reqCurrency == "" {
 		reqCurrency = "USD"
@@ -24,7 +29,7 @@ func NormalizeCurrencyAndWarnings(rawCurrency string) (reqCurrency string, effec
 	if reqCurrency != "USD" {
 		warnings = append(warnings, ProviderWarning{
 			Provider: "system",
-			Code:     "currency_conversion_not_yet_supported",
+			Code:     "non_usd_currency_unsupported",
 			Message:  "Currency conversion is not yet supported. Prices are returned in USD.",
 		})
 	}
