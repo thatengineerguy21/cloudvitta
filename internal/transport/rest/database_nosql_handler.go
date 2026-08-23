@@ -109,7 +109,7 @@ func (h *DatabaseNoSQLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	if rawPricingMode == "" {
 		rawPricingMode = "provisioned"
 	}
-	if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" && rawPricingMode != "ondemand" {
+	if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" {
 		middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid query parameter", "pricing_mode must be provisioned, on_demand, or serverless")
 		return
 	}

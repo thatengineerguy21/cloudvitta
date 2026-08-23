@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -403,8 +402,8 @@ type NetworkRequirements struct {
 	TransferType string  `json:"transfer_type,omitempty" jsonschema:"Requested transfer type (e.g. internet_egress, intra_region)"`
 }
 
-// DatabaseRequirements defines relational database requirements for calculate_workload.
-type DatabaseRequirements struct {
+// DatabaseRDBMSRequirements defines relational database requirements for calculate_workload.
+type DatabaseRDBMSRequirements struct {
 	Engine        string  `json:"engine,omitempty" jsonschema:"Requested database engine (e.g. postgresql, mysql, sqlserver)"`
 	VCPU          float64 `json:"vcpu,omitempty" jsonschema:"Requested vCPU count (e.g. 2, 4, 8)"`
 	RAMGB         float64 `json:"ram_gb,omitempty" jsonschema:"Requested RAM in gigabytes (e.g. 8, 16, 32)"`
@@ -413,6 +412,9 @@ type DatabaseRequirements struct {
 	MultiAZ       bool    `json:"multi_az,omitempty" jsonschema:"High Availability / Multi-AZ deployment (default: false)"`
 	StorageFamily string  `json:"storage_family,omitempty" jsonschema:"Storage family preference (e.g. gp3, ssd)"`
 }
+
+// DatabaseRequirements is an alias for DatabaseRDBMSRequirements.
+type DatabaseRequirements = DatabaseRDBMSRequirements
 
 // DatabaseNoSQLRequirements defines NoSQL database requirements for calculate_workload.
 type DatabaseNoSQLRequirements struct {
@@ -448,8 +450,8 @@ type CalculateWorkloadInput struct {
 	Compute       *ComputeRequirements       `json:"compute,omitempty" jsonschema:"Compute requirements (vcpu, ram_gb, family)"`
 	Storage       *StorageRequirements       `json:"storage,omitempty" jsonschema:"Storage requirements (size_gb, storage_class)"`
 	Network       *NetworkRequirements       `json:"network,omitempty" jsonschema:"Network requirements (egress_gb, transfer_type)"`
-	DatabaseRDBMS *DatabaseRequirements      `json:"database_rdbms,omitempty" jsonschema:"Relational database requirements (engine, vcpu, ram_gb, storage_gb, iops, multi_az, storage_family)"`
-	Database      *DatabaseRequirements      `json:"database,omitempty" jsonschema:"Alias for database_rdbms"`
+	DatabaseRDBMS *DatabaseRDBMSRequirements `json:"database_rdbms,omitempty" jsonschema:"Relational database requirements (engine, vcpu, ram_gb, storage_gb, iops, multi_az, storage_family)"`
+	Database      *DatabaseRDBMSRequirements `json:"database,omitempty" jsonschema:"Alias for database_rdbms"`
 	DatabaseNoSQL *DatabaseNoSQLRequirements `json:"database_nosql,omitempty" jsonschema:"NoSQL database requirements (data_model, pricing_mode, read_units, write_units, storage_gb, storage_class, multi_region)"`
 	Kubernetes    *KubernetesRequirements    `json:"kubernetes,omitempty" jsonschema:"Kubernetes requirements (tier, cluster_topology)"`
 	Serverless    *ServerlessRequirements    `json:"serverless,omitempty" jsonschema:"Serverless requirements (architecture, tier, requests_per_month, memory_mb, execution_duration_ms)"`
@@ -458,6 +460,249 @@ type CalculateWorkloadInput struct {
 // GetProviderStatusInput defines parameters for get_provider_status tool.
 type GetProviderStatusInput struct {
 	Provider string `json:"provider" jsonschema:"Cloud provider identifier (e.g. aws, azure, gcp, oracle, ibm, alibaba, digitalocean)"`
+}
+
+// validateComputeRequirements validates compute requirements for calculate_workload.
+func validateComputeRequirements(req ComputeRequirements) (*domain.ComputeAttributes, error) {
+	if req.VCPU <= 0 {
+		return nil, fmt.Errorf("%w: compute.vcpu must be a positive number", service.ErrInvalidParameters)
+	}
+	if req.RAMGB <= 0 {
+		return nil, fmt.Errorf("%w: compute.ram_gb must be a positive number", service.ErrInvalidParameters)
+	}
+	return &domain.ComputeAttributes{
+		VCPU:   req.VCPU,
+		RAMGB:  req.RAMGB,
+		Family: req.Family,
+	}, nil
+}
+
+// validateStorageRequirements validates storage requirements for calculate_workload.
+func validateStorageRequirements(req StorageRequirements) (*domain.StorageAttributes, error) {
+	if req.SizeGB <= 0 {
+		return nil, fmt.Errorf("%w: storage.size_gb must be a positive number", service.ErrInvalidParameters)
+	}
+	maxStorageF, _ := maxAllowedStorageSizeGB.Float64()
+	if req.SizeGB > maxStorageF {
+		return nil, fmt.Errorf("%w: storage.size_gb exceeds maximum limit of %s GB (1 PB)", service.ErrInvalidParameters, maxAllowedStorageSizeGB.String())
+	}
+	return &domain.StorageAttributes{
+		SizeGB:       req.SizeGB,
+		StorageClass: req.StorageClass,
+	}, nil
+}
+
+// validateNetworkRequirements validates network requirements for calculate_workload.
+func validateNetworkRequirements(req NetworkRequirements) (*domain.NetworkAttributes, error) {
+	if req.EgressGB < 0 {
+		return nil, fmt.Errorf("%w: network.egress_gb cannot be negative", service.ErrInvalidParameters)
+	}
+	maxNetworkF, _ := maxAllowedNetworkEgressGB.Float64()
+	if req.EgressGB > maxNetworkF {
+		return nil, fmt.Errorf("%w: network.egress_gb exceeds maximum limit of %s GB (10 PB)", service.ErrInvalidParameters, maxAllowedNetworkEgressGB.String())
+	}
+	return &domain.NetworkAttributes{
+		EgressGB:     req.EgressGB,
+		TransferType: req.TransferType,
+	}, nil
+}
+
+// validateDatabaseRDBMSParams validates database parameters and resolves canonical engine.
+func validateDatabaseRDBMSParams(engine string, vcpu, ramgb, storageGB float64, iops *int, multiAZ bool, storageFamily, prefix string) (*domain.DatabaseRDBMSAttributes, error) {
+	rawEngine := strings.TrimSpace(engine)
+	var canonicalEngine string
+	if rawEngine != "" {
+		canonical, err := databaseenginemap.ResolveCanonicalEngine(rawEngine)
+		if err != nil || !databaseenginemap.IsSupportedStageEngine(canonical) {
+			param := "engine"
+			if prefix != "" {
+				param = prefix + ".engine"
+			}
+			return nil, fmt.Errorf("%w: %s must be a supported database engine (postgresql, mysql, sqlserver)", service.ErrInvalidParameters, param)
+		}
+		canonicalEngine = canonical
+	}
+
+	if vcpu <= 0 {
+		param := "vcpu"
+		if prefix != "" {
+			param = prefix + ".vcpu"
+		}
+		return nil, fmt.Errorf("%w: %s must be a positive number", service.ErrInvalidParameters, param)
+	}
+	if ramgb <= 0 {
+		param := "ram_gb"
+		if prefix != "" {
+			param = prefix + ".ram_gb"
+		}
+		return nil, fmt.Errorf("%w: %s must be a positive number", service.ErrInvalidParameters, param)
+	}
+	if storageGB <= 0 {
+		param := "storage_gb"
+		if prefix != "" {
+			param = prefix + ".storage_gb"
+		}
+		return nil, fmt.Errorf("%w: %s must be a positive number", service.ErrInvalidParameters, param)
+	}
+	if storageGB > maxAllowedDatabaseStorageGB {
+		param := "storage_gb"
+		if prefix != "" {
+			param = prefix + ".storage_gb"
+		}
+		if prefix != "" {
+			return nil, fmt.Errorf("%w: %s exceeds maximum limit of 1,000,000 GB (1 PB)", service.ErrInvalidParameters, param)
+		}
+		return nil, fmt.Errorf("%w: %s must be a positive number up to 1000000", service.ErrInvalidParameters, param)
+	}
+	if iops != nil && *iops <= 0 {
+		param := "iops"
+		if prefix != "" {
+			param = prefix + ".iops"
+		}
+		return nil, fmt.Errorf("%w: %s must be a positive integer", service.ErrInvalidParameters, param)
+	}
+
+	return &domain.DatabaseRDBMSAttributes{
+		Engine:        canonicalEngine,
+		VCPU:          vcpu,
+		RAMGB:         ramgb,
+		StorageGB:     storageGB,
+		IOPS:          iops,
+		MultiAZ:       multiAZ,
+		StorageFamily: storageFamily,
+	}, nil
+}
+
+// validateDatabaseRDBMSRequirements validates DatabaseRDBMSRequirements for calculate_workload.
+func validateDatabaseRDBMSRequirements(req DatabaseRDBMSRequirements) (*domain.DatabaseRDBMSAttributes, error) {
+	return validateDatabaseRDBMSParams(req.Engine, req.VCPU, req.RAMGB, req.StorageGB, req.IOPS, req.MultiAZ, req.StorageFamily, "database_rdbms")
+}
+
+// validateDatabaseNoSQLParams validates NoSQL database parameters and resolves canonical data model and pricing mode.
+func validateDatabaseNoSQLParams(dataModel, pricingMode string, readUnits, writeUnits, storageGB float64, storageClass string, multiRegion bool, prefix string) (*domain.DatabaseNoSQLAttributes, error) {
+	rawModel := strings.TrimSpace(dataModel)
+	var canonicalModel string
+	if rawModel != "" {
+		canonical, err := nosqldatamodelmap.ResolveCanonicalDataModel(rawModel)
+		if err != nil || !nosqldatamodelmap.IsSupportedStageDataModel(canonical) {
+			param := "data_model"
+			if prefix != "" {
+				param = prefix + ".data_model"
+			}
+			return nil, fmt.Errorf("%w: %s must be a supported NoSQL data model (document, key_value, wide_column, graph, multi_model)", service.ErrInvalidParameters, param)
+		}
+		canonicalModel = canonical
+	}
+
+	rawPricingMode := strings.ToLower(strings.TrimSpace(pricingMode))
+	if rawPricingMode == "" {
+		rawPricingMode = "provisioned"
+	}
+	if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" {
+		param := "pricing_mode"
+		if prefix != "" {
+			param = prefix + ".pricing_mode"
+		}
+		return nil, fmt.Errorf("%w: %s must be provisioned, on_demand, or serverless", service.ErrInvalidParameters, param)
+	}
+
+	if readUnits < 0 || readUnits > maxAllowedNoSQLThroughput {
+		param := "read_units"
+		if prefix != "" {
+			param = prefix + ".read_units"
+		}
+		return nil, fmt.Errorf("%w: %s must be a non-negative number up to 10000000", service.ErrInvalidParameters, param)
+	}
+	if writeUnits < 0 || writeUnits > maxAllowedNoSQLThroughput {
+		param := "write_units"
+		if prefix != "" {
+			param = prefix + ".write_units"
+		}
+		return nil, fmt.Errorf("%w: %s must be a non-negative number up to 10000000", service.ErrInvalidParameters, param)
+	}
+	if storageGB < 0 || storageGB > maxAllowedNoSQLStorageGB {
+		param := "storage_gb"
+		if prefix != "" {
+			param = prefix + ".storage_gb"
+		}
+		return nil, fmt.Errorf("%w: %s must be a non-negative number up to 1000000", service.ErrInvalidParameters, param)
+	}
+
+	return &domain.DatabaseNoSQLAttributes{
+		DataModel:    canonicalModel,
+		PricingMode:  rawPricingMode,
+		ReadUnits:    readUnits,
+		WriteUnits:   writeUnits,
+		StorageGB:    storageGB,
+		StorageClass: storageClass,
+		MultiRegion:  multiRegion,
+	}, nil
+}
+
+// validateDatabaseNoSQLRequirements validates DatabaseNoSQLRequirements for calculate_workload.
+func validateDatabaseNoSQLRequirements(req DatabaseNoSQLRequirements) (*domain.DatabaseNoSQLAttributes, error) {
+	return validateDatabaseNoSQLParams(req.DataModel, req.PricingMode, req.ReadUnits, req.WriteUnits, req.StorageGB, req.StorageClass, req.MultiRegion, "database_nosql")
+}
+
+// validateKubernetesParams validates Kubernetes control plane parameters and resolves canonical tier.
+func validateKubernetesParams(tier, clusterTopology, prefix string) (*domain.KubernetesAttributes, error) {
+	rawTier := strings.TrimSpace(tier)
+	canonicalTier := kubernetestieremap.TierStandard
+	if rawTier != "" {
+		resolved, err := kubernetestieremap.ResolveCanonicalTier(rawTier)
+		if err != nil || !kubernetestieremap.IsSupportedStageTier(resolved) {
+			param := "tier"
+			if prefix != "" {
+				param = prefix + ".tier"
+			}
+			return nil, fmt.Errorf("%w: %s must be a supported Kubernetes tier (free, standard, extended_support)", service.ErrInvalidParameters, param)
+		}
+		canonicalTier = resolved
+	}
+
+	rawTopology := strings.ToLower(strings.TrimSpace(clusterTopology))
+	var topo domain.ClusterTopology
+	if rawTopology != "" {
+		switch domain.ClusterTopology(rawTopology) {
+		case domain.ClusterTopologyZonal, domain.ClusterTopologyRegional, domain.ClusterTopologyAutopilot:
+			topo = domain.ClusterTopology(rawTopology)
+		default:
+			param := "cluster_topology"
+			if prefix != "" {
+				param = prefix + ".cluster_topology"
+			}
+			return nil, fmt.Errorf("%w: %s must be one of: zonal, regional, autopilot", service.ErrInvalidParameters, param)
+		}
+	}
+
+	return &domain.KubernetesAttributes{
+		Tier:            canonicalTier,
+		ClusterTopology: topo,
+	}, nil
+}
+
+// validateKubernetesRequirements validates KubernetesRequirements for calculate_workload.
+func validateKubernetesRequirements(req KubernetesRequirements) (*domain.KubernetesAttributes, error) {
+	return validateKubernetesParams(req.Tier, req.ClusterTopology, "kubernetes")
+}
+
+// validateServerlessRequirements validates serverless compute requirements.
+func validateServerlessRequirements(req ServerlessRequirements) (*service.ServerlessWorkload, error) {
+	var rawReqs, rawMem, rawDur string
+	if req.RequestsPerMonth != nil {
+		rawReqs = strconv.FormatFloat(*req.RequestsPerMonth, 'f', -1, 64)
+	}
+	if req.MemoryMB != nil {
+		rawMem = strconv.FormatFloat(*req.MemoryMB, 'f', -1, 64)
+	}
+	if req.ExecutionDurationMS != nil {
+		rawDur = strconv.FormatFloat(*req.ExecutionDurationMS, 'f', -1, 64)
+	}
+	wl, err := service.ParseServerlessWorkload(req.Architecture, req.Tier, rawReqs, rawMem, rawDur)
+	if err != nil {
+		return nil, err
+	}
+	return &wl, nil
 }
 
 // defaultStage3Warnings returns static warnings for providers scheduled for stage 3/4.
@@ -1015,64 +1260,36 @@ func handleCompareDatabaseNoSQL(pricingSvc *service.PricingService) sdk.ToolHand
 		}
 		currency = "USD"
 
-		rawModel := strings.TrimSpace(input.DataModel)
-		var canonicalModel string
-		if rawModel != "" {
-			canonical, err := nosqldatamodelmap.ResolveCanonicalDataModel(rawModel)
-			if err != nil || !nosqldatamodelmap.IsSupportedStageDataModel(canonical) {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: data_model must be a supported NoSQL data model (document, key_value, wide_column, graph, multi_model)", service.ErrInvalidParameters))
-			}
-			canonicalModel = canonical
-		}
-
-		rawPricingMode := strings.ToLower(strings.TrimSpace(input.PricingMode))
-		if rawPricingMode == "" {
-			rawPricingMode = "provisioned"
-		}
-		if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" && rawPricingMode != "ondemand" {
-			return nil, nil, MapServiceError(fmt.Errorf("%w: pricing_mode must be provisioned, on_demand, or serverless", service.ErrInvalidParameters))
-		}
-		if rawPricingMode == "ondemand" {
-			rawPricingMode = "on_demand"
-		}
-
 		var reqReads float64
 		if input.ReadUnits != nil {
-			if *input.ReadUnits < 0 || *input.ReadUnits > maxAllowedNoSQLThroughput {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: read_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
-			}
 			reqReads = *input.ReadUnits
 		}
-
 		var reqWrites float64
 		if input.WriteUnits != nil {
-			if *input.WriteUnits < 0 || *input.WriteUnits > maxAllowedNoSQLThroughput {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: write_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
-			}
 			reqWrites = *input.WriteUnits
 		}
-
 		var reqStorageGB float64
 		if input.StorageGB != nil {
-			if *input.StorageGB < 0 || *input.StorageGB > maxAllowedNoSQLStorageGB {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: storage_gb must be a non-negative number up to 1000000", service.ErrInvalidParameters))
-			}
 			reqStorageGB = *input.StorageGB
 		}
-
 		var multiRegion bool
 		if input.MultiRegion != nil {
 			multiRegion = *input.MultiRegion
 		}
 
+		nosqlAttr, err := validateDatabaseNoSQLParams(input.DataModel, input.PricingMode, reqReads, reqWrites, reqStorageGB, input.StorageClass, multiRegion, "")
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
+
 		target := service.MatchTarget{
-			DataModel:        canonicalModel,
-			PricingMode:      rawPricingMode,
-			ReadUnits:        reqReads,
-			WriteUnits:       reqWrites,
-			NoSQLStorageGB:   reqStorageGB,
-			StorageClass:     input.StorageClass,
-			NoSQLMultiRegion: multiRegion,
+			DataModel:        nosqlAttr.DataModel,
+			PricingMode:      nosqlAttr.PricingMode,
+			ReadUnits:        nosqlAttr.ReadUnits,
+			WriteUnits:       nosqlAttr.WriteUnits,
+			NoSQLStorageGB:   nosqlAttr.StorageGB,
+			StorageClass:     nosqlAttr.StorageClass,
+			NoSQLMultiRegion: nosqlAttr.MultiRegion,
 			Category:         "database_nosql",
 		}
 
@@ -1113,8 +1330,8 @@ func handleCompareDatabaseNoSQL(pricingSvc *service.PricingService) sdk.ToolHand
 			Category:     "database_nosql",
 			Region:       region,
 			Currency:     reqCurrency,
-			DataModel:    canonicalModel,
-			PricingMode:  rawPricingMode,
+			DataModel:    nosqlAttr.DataModel,
+			PricingMode:  nosqlAttr.PricingMode,
 			StorageClass: input.StorageClass,
 		}
 		if input.ReadUnits != nil {
@@ -1172,31 +1389,15 @@ func handleCompareKubernetes(pricingSvc *service.PricingService) sdk.ToolHandler
 		}
 		currency = "USD"
 
-		rawTier := strings.TrimSpace(input.Tier)
-		canonicalTier := kubernetestieremap.TierStandard
-		if rawTier != "" {
-			resolved, err := kubernetestieremap.ResolveCanonicalTier(rawTier)
-			if err != nil || !kubernetestieremap.IsSupportedStageTier(resolved) {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: tier must be a supported Kubernetes tier (free, standard, extended_support)", service.ErrInvalidParameters))
-			}
-			canonicalTier = resolved
-		}
-
-		rawTopology := strings.ToLower(strings.TrimSpace(input.ClusterTopology))
-		var clusterTopology domain.ClusterTopology
-		if rawTopology != "" {
-			switch domain.ClusterTopology(rawTopology) {
-			case domain.ClusterTopologyZonal, domain.ClusterTopologyRegional, domain.ClusterTopologyAutopilot:
-				clusterTopology = domain.ClusterTopology(rawTopology)
-			default:
-				return nil, nil, MapServiceError(fmt.Errorf("%w: cluster_topology must be one of: zonal, regional, autopilot", service.ErrInvalidParameters))
-			}
+		k8sAttr, err := validateKubernetesParams(input.Tier, input.ClusterTopology, "")
+		if err != nil {
+			return nil, nil, MapServiceError(err)
 		}
 
 		target := service.MatchTarget{
 			Category:        "kubernetes",
-			KubernetesTier:  canonicalTier,
-			ClusterTopology: clusterTopology,
+			KubernetesTier:  k8sAttr.Tier,
+			ClusterTopology: k8sAttr.ClusterTopology,
 		}
 
 		compRes, err := pricingSvc.Compare(ctx, "kubernetes", region, target)
@@ -1236,8 +1437,8 @@ func handleCompareKubernetes(pricingSvc *service.PricingService) sdk.ToolHandler
 			Category:        "kubernetes",
 			Region:          region,
 			Currency:        reqCurrency,
-			Tier:            string(canonicalTier),
-			ClusterTopology: string(clusterTopology),
+			Tier:            string(k8sAttr.Tier),
+			ClusterTopology: string(k8sAttr.ClusterTopology),
 		}
 
 		resp := &KubernetesComparisonResponse{
@@ -1282,25 +1483,20 @@ func handleCompareServerless(pricingSvc *service.PricingService) sdk.ToolHandler
 		}
 		currency = "USD"
 
-		var rawReqs, rawMem, rawDur string
-		if input.RequestsPerMonth != nil {
-			rawReqs = strconv.FormatFloat(*input.RequestsPerMonth, 'f', -1, 64)
-		}
-		if input.MemoryMB != nil {
-			rawMem = strconv.FormatFloat(*input.MemoryMB, 'f', -1, 64)
-		}
-		if input.ExecutionDurationMS != nil {
-			rawDur = strconv.FormatFloat(*input.ExecutionDurationMS, 'f', -1, 64)
-		}
-
-		workload, err := service.ParseServerlessWorkload(input.Architecture, input.Tier, rawReqs, rawMem, rawDur)
+		workload, err := validateServerlessRequirements(ServerlessRequirements{
+			Architecture:        input.Architecture,
+			Tier:                input.Tier,
+			RequestsPerMonth:    input.RequestsPerMonth,
+			MemoryMB:            input.MemoryMB,
+			ExecutionDurationMS: input.ExecutionDurationMS,
+		})
 		if err != nil {
 			return nil, nil, MapServiceError(err)
 		}
 
 		target := service.MatchTarget{
 			Category:           "serverless",
-			ServerlessWorkload: workload,
+			ServerlessWorkload: *workload,
 		}
 
 		compRes, err := pricingSvc.Compare(ctx, "serverless", region, target)
@@ -1364,24 +1560,15 @@ func handleCompareServerless(pricingSvc *service.PricingService) sdk.ToolHandler
 
 // handleCalculateWorkload creates the tool handler for calculate_workload.
 func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandlerFor[CalculateWorkloadInput, any] {
-	maxStorageF, _ := maxAllowedStorageSizeGB.Float64()
-	maxNetworkF, _ := maxAllowedNetworkEgressGB.Float64()
-
 	return func(ctx context.Context, req *sdk.CallToolRequest, input CalculateWorkloadInput) (*sdk.CallToolResult, any, error) {
 		if pricingSvc == nil {
 			return nil, nil, errors.New("pricing service unavailable")
 		}
 
 		// Alias-conflict validation: Database vs DatabaseRDBMS
-		dbReq := input.DatabaseRDBMS
-		if input.Database != nil {
-			if dbReq != nil {
-				if !reflect.DeepEqual(input.Database, input.DatabaseRDBMS) {
-					return nil, nil, MapServiceError(fmt.Errorf("%w: both 'database' and 'database_rdbms' were provided with conflicting values; provide only one when values differ", service.ErrInvalidParameters))
-				}
-			} else {
-				dbReq = input.Database
-			}
+		dbReq, err := service.ResolveAliasedField(input.Database, input.DatabaseRDBMS, "database", "database_rdbms")
+		if err != nil {
+			return nil, nil, MapServiceError(err)
 		}
 
 		if input.Compute == nil && input.Storage == nil && input.Network == nil && dbReq == nil && input.DatabaseNoSQL == nil && input.Kubernetes == nil && input.Serverless == nil {
@@ -1390,173 +1577,65 @@ func handleCalculateWorkload(pricingSvc *service.PricingService) sdk.ToolHandler
 
 		var computeAttr *domain.ComputeAttributes
 		if input.Compute != nil {
-			if input.Compute.VCPU <= 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: compute.vcpu must be a positive number", service.ErrInvalidParameters))
-			}
-			if input.Compute.RAMGB <= 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: compute.ram_gb must be a positive number", service.ErrInvalidParameters))
-			}
-			computeAttr = &domain.ComputeAttributes{
-				VCPU:   input.Compute.VCPU,
-				RAMGB:  input.Compute.RAMGB,
-				Family: input.Compute.Family,
+			var err error
+			computeAttr, err = validateComputeRequirements(*input.Compute)
+			if err != nil {
+				return nil, nil, MapServiceError(err)
 			}
 		}
 
 		var storageAttr *domain.StorageAttributes
 		if input.Storage != nil {
-			if input.Storage.SizeGB <= 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: storage.size_gb must be a positive number", service.ErrInvalidParameters))
-			}
-			if input.Storage.SizeGB > maxStorageF {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: storage.size_gb exceeds maximum limit of %s GB (1 PB)", service.ErrInvalidParameters, maxAllowedStorageSizeGB.String()))
-			}
-			storageAttr = &domain.StorageAttributes{
-				SizeGB:       input.Storage.SizeGB,
-				StorageClass: input.Storage.StorageClass,
+			var err error
+			storageAttr, err = validateStorageRequirements(*input.Storage)
+			if err != nil {
+				return nil, nil, MapServiceError(err)
 			}
 		}
 
 		var networkAttr *domain.NetworkAttributes
 		if input.Network != nil {
-			if input.Network.EgressGB < 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: network.egress_gb cannot be negative", service.ErrInvalidParameters))
-			}
-			if input.Network.EgressGB > maxNetworkF {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: network.egress_gb exceeds maximum limit of %s GB (10 PB)", service.ErrInvalidParameters, maxAllowedNetworkEgressGB.String()))
-			}
-			networkAttr = &domain.NetworkAttributes{
-				EgressGB:     input.Network.EgressGB,
-				TransferType: input.Network.TransferType,
+			var err error
+			networkAttr, err = validateNetworkRequirements(*input.Network)
+			if err != nil {
+				return nil, nil, MapServiceError(err)
 			}
 		}
 
 		var dbAttr *domain.DatabaseRDBMSAttributes
 		if dbReq != nil {
-			rawEngine := strings.TrimSpace(dbReq.Engine)
-			canonicalEngine := ""
-			if rawEngine != "" {
-				canonical, err := databaseenginemap.ResolveCanonicalEngine(rawEngine)
-				if err != nil || !databaseenginemap.IsSupportedStageEngine(canonical) {
-					return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.engine must be a supported database engine (postgresql, mysql, sqlserver)", service.ErrInvalidParameters))
-				}
-				canonicalEngine = canonical
-			}
-			if dbReq.VCPU <= 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.vcpu must be a positive number", service.ErrInvalidParameters))
-			}
-			if dbReq.RAMGB <= 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.ram_gb must be a positive number", service.ErrInvalidParameters))
-			}
-			if dbReq.StorageGB <= 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.storage_gb must be a positive number", service.ErrInvalidParameters))
-			}
-			if dbReq.StorageGB > maxAllowedDatabaseStorageGB {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.storage_gb exceeds maximum limit of 1,000,000 GB (1 PB)", service.ErrInvalidParameters))
-			}
-			if dbReq.IOPS != nil && *dbReq.IOPS <= 0 {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_rdbms.iops must be a positive integer", service.ErrInvalidParameters))
-			}
-			dbAttr = &domain.DatabaseRDBMSAttributes{
-				Engine:        canonicalEngine,
-				VCPU:          dbReq.VCPU,
-				RAMGB:         dbReq.RAMGB,
-				StorageGB:     dbReq.StorageGB,
-				IOPS:          dbReq.IOPS,
-				MultiAZ:       dbReq.MultiAZ,
-				StorageFamily: dbReq.StorageFamily,
+			var err error
+			dbAttr, err = validateDatabaseRDBMSRequirements(*dbReq)
+			if err != nil {
+				return nil, nil, MapServiceError(err)
 			}
 		}
 
 		var nosqlAttr *domain.DatabaseNoSQLAttributes
 		if input.DatabaseNoSQL != nil {
-			rawModel := strings.TrimSpace(input.DatabaseNoSQL.DataModel)
-			canonicalModel := ""
-			if rawModel != "" {
-				canonical, err := nosqldatamodelmap.ResolveCanonicalDataModel(rawModel)
-				if err != nil || !nosqldatamodelmap.IsSupportedStageDataModel(canonical) {
-					return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.data_model must be a supported NoSQL data model (document, key_value, wide_column, graph, multi_model)", service.ErrInvalidParameters))
-				}
-				canonicalModel = canonical
-			}
-
-			rawPricingMode := strings.ToLower(strings.TrimSpace(input.DatabaseNoSQL.PricingMode))
-			if rawPricingMode == "" {
-				rawPricingMode = "provisioned"
-			}
-			if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" && rawPricingMode != "ondemand" {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.pricing_mode must be provisioned, on_demand, or serverless", service.ErrInvalidParameters))
-			}
-			if rawPricingMode == "ondemand" {
-				rawPricingMode = "on_demand"
-			}
-
-			if input.DatabaseNoSQL.ReadUnits < 0 || input.DatabaseNoSQL.ReadUnits > maxAllowedNoSQLThroughput {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.read_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
-			}
-			if input.DatabaseNoSQL.WriteUnits < 0 || input.DatabaseNoSQL.WriteUnits > maxAllowedNoSQLThroughput {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.write_units must be a non-negative number up to 10000000", service.ErrInvalidParameters))
-			}
-			if input.DatabaseNoSQL.StorageGB < 0 || input.DatabaseNoSQL.StorageGB > maxAllowedNoSQLStorageGB {
-				return nil, nil, MapServiceError(fmt.Errorf("%w: database_nosql.storage_gb must be a non-negative number up to 1000000", service.ErrInvalidParameters))
-			}
-
-			nosqlAttr = &domain.DatabaseNoSQLAttributes{
-				DataModel:    canonicalModel,
-				PricingMode:  rawPricingMode,
-				ReadUnits:    input.DatabaseNoSQL.ReadUnits,
-				WriteUnits:   input.DatabaseNoSQL.WriteUnits,
-				StorageGB:    input.DatabaseNoSQL.StorageGB,
-				StorageClass: input.DatabaseNoSQL.StorageClass,
-				MultiRegion:  input.DatabaseNoSQL.MultiRegion,
+			var err error
+			nosqlAttr, err = validateDatabaseNoSQLRequirements(*input.DatabaseNoSQL)
+			if err != nil {
+				return nil, nil, MapServiceError(err)
 			}
 		}
 
 		var k8sAttr *domain.KubernetesAttributes
 		if input.Kubernetes != nil {
-			rawTier := strings.TrimSpace(input.Kubernetes.Tier)
-			canonicalTier := kubernetestieremap.TierStandard
-			if rawTier != "" {
-				resolved, err := kubernetestieremap.ResolveCanonicalTier(rawTier)
-				if err != nil || !kubernetestieremap.IsSupportedStageTier(resolved) {
-					return nil, nil, MapServiceError(fmt.Errorf("%w: kubernetes.tier must be a supported Kubernetes tier (free, standard, extended_support)", service.ErrInvalidParameters))
-				}
-				canonicalTier = resolved
-			}
-
-			rawTopology := strings.ToLower(strings.TrimSpace(input.Kubernetes.ClusterTopology))
-			var clusterTopology domain.ClusterTopology
-			if rawTopology != "" {
-				switch domain.ClusterTopology(rawTopology) {
-				case domain.ClusterTopologyZonal, domain.ClusterTopologyRegional, domain.ClusterTopologyAutopilot:
-					clusterTopology = domain.ClusterTopology(rawTopology)
-				default:
-					return nil, nil, MapServiceError(fmt.Errorf("%w: kubernetes.cluster_topology must be one of: zonal, regional, autopilot", service.ErrInvalidParameters))
-				}
-			}
-			k8sAttr = &domain.KubernetesAttributes{
-				Tier:            canonicalTier,
-				ClusterTopology: clusterTopology,
+			var err error
+			k8sAttr, err = validateKubernetesRequirements(*input.Kubernetes)
+			if err != nil {
+				return nil, nil, MapServiceError(err)
 			}
 		}
 
 		var serverlessWorkload *service.ServerlessWorkload
 		if input.Serverless != nil {
-			var rawReqs, rawMem, rawDur string
-			if input.Serverless.RequestsPerMonth != nil {
-				rawReqs = strconv.FormatFloat(*input.Serverless.RequestsPerMonth, 'f', -1, 64)
-			}
-			if input.Serverless.MemoryMB != nil {
-				rawMem = strconv.FormatFloat(*input.Serverless.MemoryMB, 'f', -1, 64)
-			}
-			if input.Serverless.ExecutionDurationMS != nil {
-				rawDur = strconv.FormatFloat(*input.Serverless.ExecutionDurationMS, 'f', -1, 64)
-			}
-			wl, err := service.ParseServerlessWorkload(input.Serverless.Architecture, input.Serverless.Tier, rawReqs, rawMem, rawDur)
+			var err error
+			serverlessWorkload, err = validateServerlessRequirements(*input.Serverless)
 			if err != nil {
 				return nil, nil, MapServiceError(err)
 			}
-			serverlessWorkload = &wl
 		}
 
 		strictFamily := true

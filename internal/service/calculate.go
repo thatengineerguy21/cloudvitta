@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
 
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
@@ -54,34 +56,150 @@ type CalculateResult struct {
 	Warnings []CalculateWarning
 }
 
+// CalculateCategoryTargetBuilder extracts a MatchTarget from CalculateRequest if present.
+type CalculateCategoryTargetBuilder func(req CalculateRequest) (MatchTarget, bool)
+
+type calculateCategoryEntry struct {
+	category    string
+	buildTarget CalculateCategoryTargetBuilder
+}
+
+var calculateCategoryRegistry []calculateCategoryEntry
+
+// RegisterCalculateCategory registers a category and its MatchTarget builder for composite workload calculations.
+func RegisterCalculateCategory(category string, builder CalculateCategoryTargetBuilder) {
+	calculateCategoryRegistry = append(calculateCategoryRegistry, calculateCategoryEntry{
+		category:    category,
+		buildTarget: builder,
+	})
+}
+
+func init() {
+	RegisterCalculateCategory("compute", func(req CalculateRequest) (MatchTarget, bool) {
+		if req.Compute == nil {
+			return MatchTarget{}, false
+		}
+		return MatchTarget{
+			VCPU:         req.Compute.VCPU,
+			RAMGB:        req.Compute.RAMGB,
+			Family:       req.Compute.Family,
+			StrictFamily: req.StrictFamily,
+			Category:     "compute",
+		}, true
+	})
+
+	RegisterCalculateCategory("storage", func(req CalculateRequest) (MatchTarget, bool) {
+		if req.Storage == nil {
+			return MatchTarget{}, false
+		}
+		return MatchTarget{
+			SizeGB:       req.Storage.SizeGB,
+			StorageClass: req.Storage.StorageClass,
+			Category:     "storage",
+		}, true
+	})
+
+	RegisterCalculateCategory("network", func(req CalculateRequest) (MatchTarget, bool) {
+		if req.Network == nil {
+			return MatchTarget{}, false
+		}
+		return MatchTarget{
+			EgressGB:     req.Network.EgressGB,
+			TransferType: req.Network.TransferType,
+			Category:     "network",
+		}, true
+	})
+
+	RegisterCalculateCategory("database_rdbms", func(req CalculateRequest) (MatchTarget, bool) {
+		if req.DatabaseRDBMS == nil {
+			return MatchTarget{}, false
+		}
+		return MatchTarget{
+			Engine:            req.DatabaseRDBMS.Engine,
+			VCPU:              req.DatabaseRDBMS.VCPU,
+			RAMGB:             req.DatabaseRDBMS.RAMGB,
+			DatabaseStorageGB: req.DatabaseRDBMS.StorageGB,
+			DatabaseIOPS:      req.DatabaseRDBMS.IOPS,
+			MultiAZ:           req.DatabaseRDBMS.MultiAZ,
+			StorageFamily:     req.DatabaseRDBMS.StorageFamily,
+			Category:          "database_rdbms",
+		}, true
+	})
+
+	RegisterCalculateCategory("database_nosql", func(req CalculateRequest) (MatchTarget, bool) {
+		if req.DatabaseNoSQL == nil {
+			return MatchTarget{}, false
+		}
+		return MatchTarget{
+			DataModel:        req.DatabaseNoSQL.DataModel,
+			PricingMode:      req.DatabaseNoSQL.PricingMode,
+			ReadUnits:        req.DatabaseNoSQL.ReadUnits,
+			WriteUnits:       req.DatabaseNoSQL.WriteUnits,
+			NoSQLStorageGB:   req.DatabaseNoSQL.StorageGB,
+			StorageClass:     req.DatabaseNoSQL.StorageClass,
+			NoSQLMultiRegion: req.DatabaseNoSQL.MultiRegion,
+			Category:         "database_nosql",
+		}, true
+	})
+
+	RegisterCalculateCategory("kubernetes", func(req CalculateRequest) (MatchTarget, bool) {
+		if req.Kubernetes == nil {
+			return MatchTarget{}, false
+		}
+		return MatchTarget{
+			KubernetesTier:  req.Kubernetes.Tier,
+			ClusterTopology: req.Kubernetes.ClusterTopology,
+			Category:        "kubernetes",
+		}, true
+	})
+
+	RegisterCalculateCategory("serverless", func(req CalculateRequest) (MatchTarget, bool) {
+		if req.Serverless == nil {
+			return MatchTarget{}, false
+		}
+		return MatchTarget{
+			ServerlessWorkload: *req.Serverless,
+			Category:           "serverless",
+		}, true
+	})
+}
+
+// ResolveAliasedField resolves an alias pointer and canonical pointer into a single canonical value,
+// rejecting requests where both fields are provided with conflicting values.
+func ResolveAliasedField[T any](alias, canonical *T, aliasName, canonicalName string) (*T, error) {
+	switch {
+	case alias != nil && canonical != nil:
+		if !reflect.DeepEqual(alias, canonical) {
+			return nil, fmt.Errorf("%w: both '%s' and '%s' were provided with conflicting values; provide only one when values differ", ErrConflictingFields, aliasName, canonicalName)
+		}
+		return canonical, nil
+	case canonical != nil:
+		return canonical, nil
+	default:
+		return alias, nil
+	}
+}
+
 // Calculate orchestrates per-category matching and pricing across cloud providers,
 // computing a composite normalized hourly total server-side while strictly enforcing
 // the ADR 0022 honesty contract for partial provider totals.
 func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*CalculateResult, error) {
-	var requestedCategories []string
-	if req.Compute != nil {
-		requestedCategories = append(requestedCategories, "compute")
-	}
-	if req.Storage != nil {
-		requestedCategories = append(requestedCategories, "storage")
-	}
-	if req.Network != nil {
-		requestedCategories = append(requestedCategories, "network")
-	}
-	if req.DatabaseRDBMS != nil {
-		requestedCategories = append(requestedCategories, "database_rdbms")
-	}
-	if req.DatabaseNoSQL != nil {
-		requestedCategories = append(requestedCategories, "database_nosql")
-	}
-	if req.Kubernetes != nil {
-		requestedCategories = append(requestedCategories, "kubernetes")
-	}
-	if req.Serverless != nil {
-		requestedCategories = append(requestedCategories, "serverless")
+	type requestedCategory struct {
+		name   string
+		target MatchTarget
 	}
 
-	if len(requestedCategories) == 0 {
+	var requested []requestedCategory
+	for _, entry := range calculateCategoryRegistry {
+		if target, ok := entry.buildTarget(req); ok {
+			requested = append(requested, requestedCategory{
+				name:   entry.category,
+				target: target,
+			})
+		}
+	}
+
+	if len(requested) == 0 {
 		return nil, ErrNoCategoriesRequested
 	}
 
@@ -110,63 +228,9 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 		var categoryErrors int
 		var matchedCategories int
 
-		for _, category := range requestedCategories {
-			var target MatchTarget
-			switch category {
-			case "compute":
-				target = MatchTarget{
-					VCPU:         req.Compute.VCPU,
-					RAMGB:        req.Compute.RAMGB,
-					Family:       req.Compute.Family,
-					StrictFamily: req.StrictFamily,
-					Category:     "compute",
-				}
-			case "storage":
-				target = MatchTarget{
-					SizeGB:       req.Storage.SizeGB,
-					StorageClass: req.Storage.StorageClass,
-					Category:     "storage",
-				}
-			case "network":
-				target = MatchTarget{
-					EgressGB:     req.Network.EgressGB,
-					TransferType: req.Network.TransferType,
-					Category:     "network",
-				}
-			case "database_rdbms":
-				target = MatchTarget{
-					Engine:            req.DatabaseRDBMS.Engine,
-					VCPU:              req.DatabaseRDBMS.VCPU,
-					RAMGB:             req.DatabaseRDBMS.RAMGB,
-					DatabaseStorageGB: req.DatabaseRDBMS.StorageGB,
-					DatabaseIOPS:      req.DatabaseRDBMS.IOPS,
-					MultiAZ:           req.DatabaseRDBMS.MultiAZ,
-					StorageFamily:     req.DatabaseRDBMS.StorageFamily,
-					Category:          "database_rdbms",
-				}
-			case "database_nosql":
-				target = MatchTarget{
-					DataModel:        req.DatabaseNoSQL.DataModel,
-					PricingMode:      req.DatabaseNoSQL.PricingMode,
-					ReadUnits:        req.DatabaseNoSQL.ReadUnits,
-					WriteUnits:       req.DatabaseNoSQL.WriteUnits,
-					NoSQLStorageGB:   req.DatabaseNoSQL.StorageGB,
-					StorageClass:     req.DatabaseNoSQL.StorageClass,
-					NoSQLMultiRegion: req.DatabaseNoSQL.MultiRegion,
-					Category:         "database_nosql",
-				}
-			case "kubernetes":
-				target = MatchTarget{
-					KubernetesTier:  req.Kubernetes.Tier,
-					ClusterTopology: req.Kubernetes.ClusterTopology,
-					Category:        "kubernetes",
-				}
-			case "serverless":
-				target = MatchTarget{
-					ServerlessWorkload: *req.Serverless,
-					Category:           "serverless",
-				}
-			}
+		for _, item := range requested {
+			category := item.name
+			target := item.target
 
 			catResult, err := s.MatchAndCalculate(ctx, prov, category, region, target)
 			if err != nil {
@@ -231,7 +295,7 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 			matchedCategories++
 		}
 
-		if categoryErrors == len(requestedCategories) {
+		if categoryErrors == len(requested) {
 			totalProviderFailures++
 		}
 
@@ -239,7 +303,7 @@ func (s *PricingService) Calculate(ctx context.Context, req CalculateRequest) (*
 			continue
 		}
 
-		if matchedCategories == len(requestedCategories) {
+		if matchedCategories == len(requested) {
 			totalCopy := providerTotal
 			results = append(results, CalculateProviderResult{
 				Provider:                        prov,

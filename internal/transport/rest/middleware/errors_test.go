@@ -21,6 +21,11 @@ func TestMapServiceError(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 		},
 		{
+			name:       "Conflicting Fields",
+			err:        service.ErrConflictingFields,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
 			name:       "Provider Unavailable",
 			err:        service.ErrProviderUnavailable,
 			wantStatus: http.StatusBadGateway,

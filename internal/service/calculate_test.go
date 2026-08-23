@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -767,4 +768,71 @@ func TestPricingService_Calculate_ArchitectureUnsupportedWarning(t *testing.T) {
 	if !gcpArchWarnFound {
 		t.Errorf("expected warning 'architecture_unsupported_excluded' for GCP, got: %+v", res.Warnings)
 	}
+}
+
+func TestResolveAliasedField(t *testing.T) {
+	type spec struct {
+		Name  string
+		Value int
+	}
+
+	t.Run("BothNil_ReturnsNil", func(t *testing.T) {
+		res, err := service.ResolveAliasedField[spec](nil, nil, "alias", "canonical")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res != nil {
+			t.Errorf("expected nil, got %+v", res)
+		}
+	})
+
+	t.Run("CanonicalOnly_ReturnsCanonical", func(t *testing.T) {
+		canon := &spec{Name: "postgres", Value: 10}
+		res, err := service.ResolveAliasedField[spec](nil, canon, "alias", "canonical")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res != canon {
+			t.Errorf("expected canon %+v, got %+v", canon, res)
+		}
+	})
+
+	t.Run("AliasOnly_ReturnsAlias", func(t *testing.T) {
+		alias := &spec{Name: "postgres", Value: 10}
+		res, err := service.ResolveAliasedField[spec](alias, nil, "alias", "canonical")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res != alias {
+			t.Errorf("expected alias %+v, got %+v", alias, res)
+		}
+	})
+
+	t.Run("BothIdentical_ReturnsCanonical", func(t *testing.T) {
+		alias := &spec{Name: "postgres", Value: 10}
+		canon := &spec{Name: "postgres", Value: 10}
+		res, err := service.ResolveAliasedField[spec](alias, canon, "alias", "canonical")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res != canon {
+			t.Errorf("expected canon %+v, got %+v", canon, res)
+		}
+	})
+
+	t.Run("BothDiffering_ReturnsConflictingFieldsError", func(t *testing.T) {
+		alias := &spec{Name: "mysql", Value: 5}
+		canon := &spec{Name: "postgres", Value: 10}
+		res, err := service.ResolveAliasedField[spec](alias, canon, "database", "database_rdbms")
+		if err == nil {
+			t.Fatalf("expected error for conflicting fields, got result %+v", res)
+		}
+		if !errors.Is(err, service.ErrConflictingFields) {
+			t.Errorf("expected error wrapping ErrConflictingFields, got: %v", err)
+		}
+		expectedMsg := "conflicting category fields: both 'database' and 'database_rdbms' were provided with conflicting values; provide only one when values differ"
+		if err.Error() != expectedMsg {
+			t.Errorf("expected error message %q, got %q", expectedMsg, err.Error())
+		}
+	})
 }

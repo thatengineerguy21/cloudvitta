@@ -357,6 +357,11 @@ func TestCalculateHandler_ParameterBoundsValidation(t *testing.T) {
 			wantDetail: "database_nosql.pricing_mode must be provisioned, on_demand, or serverless",
 		},
 		{
+			name:       "database_nosql ondemand pricing mode rejected",
+			body:       `{"database_nosql": {"data_model": "document", "pricing_mode": "ondemand"}}`,
+			wantDetail: "database_nosql.pricing_mode must be provisioned, on_demand, or serverless",
+		},
+		{
 			name:       "database_nosql negative read units",
 			body:       `{"database_nosql": {"data_model": "document", "pricing_mode": "provisioned", "read_units": -10}}`,
 			wantDetail: "database_nosql.read_units must be a non-negative number",

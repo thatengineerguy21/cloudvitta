@@ -849,6 +849,20 @@ func TestMCP_CompareDatabaseNoSQL_Success(t *testing.T) {
 	if resp.Results[0].Provider != "aws" {
 		t.Errorf("Provider = %q, want aws", resp.Results[0].Provider)
 	}
+
+	t.Run("OndemandPricingModeRejected", func(t *testing.T) {
+		errRes, callErr := clientSession.CallTool(ctx, &sdk.CallToolParams{
+			Name: "compare_database_nosql",
+			Arguments: map[string]any{
+				"data_model":   "document",
+				"pricing_mode": "ondemand",
+				"region":       "us-east",
+			},
+		})
+		if callErr == nil && !errRes.IsError {
+			t.Fatal("expected error for invalid pricing_mode 'ondemand', got success")
+		}
+	})
 }
 
 func TestMCP_CalculateWorkload_AliasConflictValidation(t *testing.T) {

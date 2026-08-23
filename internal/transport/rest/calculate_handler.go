@@ -3,7 +3,6 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
-	"reflect"
 	"strings"
 	"time"
 
@@ -109,16 +108,11 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Alias-conflict validation: database vs database_rdbms
-	dbReq := reqBody.DatabaseRDBMS
-	if reqBody.Database != nil {
-		if dbReq != nil {
-			if !reflect.DeepEqual(reqBody.Database, reqBody.DatabaseRDBMS) {
-				middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/conflicting-fields", "Conflicting Category Fields", "both 'database' and 'database_rdbms' were provided with conflicting values; provide only one when values differ")
-				return
-			}
-		} else {
-			dbReq = reqBody.Database
-		}
+	dbReq, err := service.ResolveAliasedField(reqBody.Database, reqBody.DatabaseRDBMS, "database", "database_rdbms")
+	if err != nil {
+		status, errType, title := middleware.MapServiceError(err)
+		middleware.WriteJSONError(w, r, status, errType, title, err.Error())
+		return
 	}
 
 	if reqBody.Compute == nil && reqBody.Storage == nil && reqBody.Network == nil && dbReq == nil && reqBody.DatabaseNoSQL == nil && reqBody.Kubernetes == nil && reqBody.Serverless == nil {
@@ -206,12 +200,9 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if rawPricingMode == "" {
 			rawPricingMode = "provisioned"
 		}
-		if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" && rawPricingMode != "ondemand" {
+		if rawPricingMode != "provisioned" && rawPricingMode != "on_demand" && rawPricingMode != "serverless" {
 			middleware.WriteJSONError(w, r, http.StatusBadRequest, "https://cloudvitta.dev/errors/invalid-parameter", "Invalid Parameters", "database_nosql.pricing_mode must be provisioned, on_demand, or serverless")
 			return
-		}
-		if rawPricingMode == "ondemand" {
-			rawPricingMode = "on_demand"
 		}
 		reqBody.DatabaseNoSQL.PricingMode = rawPricingMode
 

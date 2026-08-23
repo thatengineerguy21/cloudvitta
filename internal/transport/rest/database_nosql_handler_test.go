@@ -77,6 +77,11 @@ func TestDatabaseNoSQLHandler_InvalidParameters_ReturnsRFC7807(t *testing.T) {
 			query:      "pricing_mode=unsupported_mode",
 			wantDetail: "pricing_mode must be provisioned, on_demand, or serverless",
 		},
+		{
+			name:       "ondemand pricing mode rejected",
+			query:      "pricing_mode=ondemand",
+			wantDetail: "pricing_mode must be provisioned, on_demand, or serverless",
+		},
 	}
 
 	for _, tt := range tests {

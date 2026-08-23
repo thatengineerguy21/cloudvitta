@@ -14,7 +14,8 @@ func MapServiceError(err error) error {
 	}
 
 	switch {
-	case errors.Is(err, service.ErrInvalidParameters):
+	case errors.Is(err, service.ErrInvalidParameters),
+		errors.Is(err, service.ErrConflictingFields):
 		return fmt.Errorf("invalid parameters: %w", err)
 	case errors.Is(err, service.ErrNoCategoriesRequested):
 		return errors.New("at least one category ('compute', 'storage', 'network', 'database_rdbms', 'database_nosql', 'kubernetes', or 'serverless') must be specified")
