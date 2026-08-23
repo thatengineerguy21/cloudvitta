@@ -109,9 +109,10 @@ func normalizeKubernetesProduct(prod awsProduct, serviceCode, sku string, fetche
 	}
 
 	displayName := "Amazon EKS"
-	if tier == kubernetestieremap.TierExtendedSupport {
+	switch tier {
+	case kubernetestieremap.TierExtendedSupport:
 		displayName = "Amazon EKS Extended Support"
-	} else if tier == kubernetestieremap.TierStandard {
+	case kubernetestieremap.TierStandard:
 		displayName = "Amazon EKS Cluster"
 	}
 
