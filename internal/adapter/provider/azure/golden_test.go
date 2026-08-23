@@ -39,6 +39,12 @@ func TestAzureNormalize_GoldenCorpus(t *testing.T) {
 			wantObsCount: 5, // PG GP 4vCore (single & HA), Storage (single & HA), SQL DB GP 4vCore
 			expectedSKUs: []string{"SKU-AZURE-PG-GP-4VCORE", "SKU-AZURE-PG-GP-4VCORE-HA", "SKU-AZURE-PG-STORAGE", "SKU-AZURE-PG-STORAGE-HA", "SKU-AZURE-SQL-GP-4VCORE"},
 		},
+		{
+			name:         "Azure NoSQL Database Golden",
+			goldenFile:   "../../../../testdata/golden/azure/database_nosql.json",
+			wantObsCount: 4, // 100 RU/s, Serverless 1M RUs, Transactional Storage, Analytical Storage
+			expectedSKUs: []string{"SKU-AZURE-COSMOS-PROVISIONED-100RU", "SKU-AZURE-COSMOS-SERVERLESS-1MRU", "SKU-AZURE-COSMOS-STORAGE-TRANSACTIONAL", "SKU-AZURE-COSMOS-STORAGE-ANALYTICAL"},
+		},
 	}
 
 	for _, tt := range tests {

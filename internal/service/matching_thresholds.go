@@ -56,6 +56,14 @@ var (
 		CloseCutoff:       0.20,
 		ApproximateCutoff: 0.50,
 	}
+
+	// DatabaseNoSQLThresholds defines match quality boundaries for NoSQL database category.
+	// close: within 20% combined throughput+storage delta.
+	// approximate: within 50% combined delta.
+	DatabaseNoSQLThresholds = CategoryThresholds{
+		CloseCutoff:       0.20,
+		ApproximateCutoff: 0.50,
+	}
 )
 
 // ThresholdsForCategory returns the per-category thresholds for the given category.
@@ -69,6 +77,8 @@ func ThresholdsForCategory(category string) CategoryThresholds {
 		return NetworkThresholds
 	case "database_rdbms":
 		return DatabaseRDBMSThresholds
+	case "database_nosql":
+		return DatabaseNoSQLThresholds
 	default:
 		// Fallback to the strictest thresholds for unknown categories.
 		return ComputeThresholds

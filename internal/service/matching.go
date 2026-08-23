@@ -42,9 +42,17 @@ type MatchTarget struct {
 	MultiAZ           bool    // High Availability requested
 	StorageFamily     string  // optional: gp3, gp2, io1, ssd
 
+	// Database NoSQL dimensions
+	DataModel        string  // canonical: document, key_value, wide_column, graph, multi_model
+	PricingMode      string  // canonical: provisioned, on_demand, serverless
+	ReadUnits        float64 // requested reads/sec or RCU
+	WriteUnits       float64 // requested writes/sec or WCU
+	NoSQLStorageGB   float64 // requested storage in GB
+	NoSQLMultiRegion bool    // Multi-Region replication requested
+
 	// Cross-category controls
 	StrictFamily bool   // default true — only match within same family tier
-	Category     string // compute, storage, network, database_rdbms
+	Category     string // compute, storage, network, database_rdbms, database_nosql
 }
 
 // MatchResult holds the outcome of matching one provider's observations.

@@ -17,6 +17,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/databaseenginemap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/nosqldatamodelmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
@@ -211,6 +212,8 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 					skuObs, err = normalizeNetworkSKU(sku, category, fetchedAt, sink)
 				case "database_rdbms":
 					skuObs, err = normalizeDatabaseSKU(sku, category, fetchedAt, sink)
+				case "database_nosql":
+					skuObs, err = normalizeDatabaseNoSQLSKU(sku, category, fetchedAt, sink)
 				}
 				if err != nil {
 					return nil, "", err
@@ -791,4 +794,144 @@ func parseGCPDatabaseAttributes(description, name string) (float64, float64, str
 	}
 
 	return 2, 8, tier
+}
+
+func normalizeDatabaseNoSQLSKU(sku gcpSKU, category string, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
+	if len(sku.PricingInfo) == 0 || len(sku.PricingInfo[0].PricingExpression.TieredRates) == 0 {
+		return nil, nil
+	}
+
+	unitPrice := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice
+	priceAmount, err := extractUnitPrice(unitPrice)
+	if err != nil {
+		return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+	}
+	if priceAmount.IsZero() {
+		return nil, nil
+	}
+
+	serviceName := sku.Category.ServiceDisplayName
+	if serviceName == "" {
+		serviceName = sku.Category.ResourceFamily
+	}
+	dataModel, err := nosqldatamodelmap.MapGCPDataModel(serviceName)
+	if err != nil {
+		dataModel, err = nosqldatamodelmap.MapGCPDataModel(sku.Description)
+		if err != nil {
+			dataModel = nosqldatamodelmap.DataModelDocument
+		}
+	}
+
+	multiRegion := strings.Contains(sku.Description, "Multi-Region") ||
+		strings.Contains(sku.Description, "MultiRegion") ||
+		strings.Contains(sku.Category.ResourceGroup, "MultiRegion") ||
+		strings.Contains(sku.Category.ResourceGroup, "Multi-Region")
+
+	isStorage := strings.Contains(sku.Description, "Database Stored Data") ||
+		strings.Contains(sku.Description, "Storage") ||
+		strings.Contains(sku.Category.ResourceGroup, "DatabaseStoredData") ||
+		strings.Contains(sku.PricingInfo[0].PricingExpression.UsageUnitDescription, "month") ||
+		strings.Contains(sku.PricingInfo[0].PricingExpression.UsageUnit, "mo")
+
+	regions := sku.ServiceRegions
+	if len(regions) == 0 {
+		regions = []string{"global"}
+	}
+
+	currency := unitPrice.CurrencyCode
+	if currency == "" {
+		currency = "USD"
+	}
+
+	var results []domain.PriceObservation
+	for _, region := range regions {
+		regionGroup, err := regionmap.MapGCPRegion(region)
+		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "gcp",
+						Category:   category,
+						Kind:       "region",
+						RawValue:   region,
+						SkuID:      sku.SkuID,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("gcp normalize: skipping SKU due to unmapped region", "sku", sku.SkuID, "region", region)
+				continue
+			}
+			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+		}
+
+		if isStorage {
+			results = append(results, domain.PriceObservation{
+				Provider:        "gcp",
+				ServiceCategory: category,
+				SkuID:           sku.SkuID,
+				DisplayName:     sku.Description,
+				Region:          region,
+				RegionGroup:     regionGroup,
+				Unit:            "GB-Mo",
+				PriceAmount:     priceAmount,
+				PriceCurrency:   currency,
+				PricingModel:    "OnDemand",
+				DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+					DataModel:     dataModel,
+					PricingMode:   "provisioned",
+					ReadUnits:     0,
+					WriteUnits:    0,
+					StorageGB:     1,
+					StorageClass:  "standard",
+					MultiRegion:   multiRegion,
+					ComponentType: "storage",
+				},
+				FetchedAt: fetchedAt,
+			})
+		} else {
+			var pricingMode = "on_demand"
+			var componentType = "request_operations"
+			var readUnits float64
+			var writeUnits float64
+
+			desc := sku.Description
+			resGroup := sku.Category.ResourceGroup
+
+			switch {
+			case strings.Contains(desc, "Read") || strings.Contains(resGroup, "Reads") || strings.Contains(resGroup, "Read"):
+				readUnits = 100000
+			case strings.Contains(desc, "Write") || strings.Contains(resGroup, "Writes") || strings.Contains(resGroup, "Write"):
+				writeUnits = 100000
+			case strings.Contains(desc, "Delete") || strings.Contains(resGroup, "Deletes") || strings.Contains(resGroup, "Delete"):
+				// Delete operations
+			default:
+				continue
+			}
+
+			results = append(results, domain.PriceObservation{
+				Provider:        "gcp",
+				ServiceCategory: category,
+				SkuID:           sku.SkuID,
+				DisplayName:     sku.Description,
+				Region:          region,
+				RegionGroup:     regionGroup,
+				Unit:            "100k-ops",
+				PriceAmount:     priceAmount,
+				PriceCurrency:   currency,
+				PricingModel:    "OnDemand",
+				DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+					DataModel:     dataModel,
+					PricingMode:   pricingMode,
+					ReadUnits:     readUnits,
+					WriteUnits:    writeUnits,
+					StorageGB:     0,
+					MultiRegion:   multiRegion,
+					ComponentType: componentType,
+				},
+				FetchedAt: fetchedAt,
+			})
+		}
+	}
+
+	return results, nil
 }

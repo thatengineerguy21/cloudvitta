@@ -19,6 +19,9 @@ const DefaultNetworkRetailPricesURL = "https://prices.azure.com/api/retail/price
 // DefaultDatabaseRetailPricesURL is the standard Azure Retail Prices API URL for relational database services in eastus.
 const DefaultDatabaseRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=(serviceName%20eq%20'Azure%20Database%20for%20PostgreSQL'%20or%20serviceName%20eq%20'Azure%20Database%20for%20MySQL'%20or%20serviceName%20eq%20'SQL%20Database')%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
 
+// DefaultCosmosDBRetailPricesURL is the standard Azure Retail Prices API URL for Azure Cosmos DB in eastus.
+const DefaultCosmosDBRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Azure%20Cosmos%20DB'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
+
 // Client is an HTTP client for fetching Azure Retail Prices API data.
 type Client struct {
 	httpClient *http.Client

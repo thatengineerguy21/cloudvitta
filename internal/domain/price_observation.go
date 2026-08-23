@@ -46,6 +46,7 @@ type PriceObservation struct {
 	StorageAttributes       StorageAttributes       `json:"storage_attributes,omitempty"`
 	NetworkAttributes       NetworkAttributes       `json:"network_attributes,omitempty"`
 	DatabaseRDBMSAttributes DatabaseRDBMSAttributes `json:"database_rdbms_attributes,omitempty"`
+	DatabaseNoSQLAttributes DatabaseNoSQLAttributes `json:"database_nosql_attributes,omitempty"`
 	FetchedAt               time.Time               `json:"fetched_at"`
 }
 
@@ -128,6 +129,17 @@ func init() {
 				return nil
 			}
 			return json.Unmarshal(raw, &obs.DatabaseRDBMSAttributes)
+		},
+	)
+	RegisterCategoryAttributeCodec("database_nosql",
+		func(obs PriceObservation) ([]byte, error) {
+			return json.Marshal(obs.DatabaseNoSQLAttributes)
+		},
+		func(obs *PriceObservation, raw []byte) error {
+			if len(raw) == 0 {
+				return nil
+			}
+			return json.Unmarshal(raw, &obs.DatabaseNoSQLAttributes)
 		},
 	)
 }

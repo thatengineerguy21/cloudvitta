@@ -17,6 +17,10 @@ var gcpCatalogMap = map[string]string{
 	"AlloyDB":                "database_rdbms",
 	"9662-B51E-5089":         "database_rdbms",
 	"AlloyDB for PostgreSQL": "database_rdbms",
+	"Cloud Firestore":        "database_nosql",
+	"Firestore":              "database_nosql",
+	"Cloud Datastore":        "database_nosql",
+	"Datastore":              "database_nosql",
 }
 
 // MapGCPProduct resolves a GCP service display name or service ID to a normalized service category.

@@ -118,4 +118,40 @@ func TestMarshalUnmarshalOtherCategoryAttributes(t *testing.T) {
 	if netTarget.NetworkAttributes.EgressGB != 1000 || netTarget.NetworkAttributes.TransferType != "internet_egress" {
 		t.Errorf("unexpected network attributes: %+v", netTarget.NetworkAttributes)
 	}
+
+	// Database NoSQL
+	nosql := domain.PriceObservation{
+		ServiceCategory: "database_nosql",
+		DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+			DataModel:        "document",
+			PricingMode:      "provisioned",
+			ReadUnits:        500,
+			WriteUnits:       100,
+			StorageGB:        250,
+			StorageClass:     "standard",
+			MultiRegion:      true,
+			ReplicationZones: 2,
+			ComponentType:    "throughput",
+		},
+	}
+	nosqlBytes, err := domain.MarshalAttributes(nosql)
+	if err != nil {
+		t.Fatalf("MarshalAttributes(database_nosql) failed: %v", err)
+	}
+	var nosqlTarget domain.PriceObservation
+	nosqlTarget.ServiceCategory = "database_nosql"
+	if err := domain.UnmarshalAttributes(&nosqlTarget, nosqlBytes); err != nil {
+		t.Fatalf("UnmarshalAttributes(database_nosql) failed: %v", err)
+	}
+	if nosqlTarget.DatabaseNoSQLAttributes.DataModel != "document" ||
+		nosqlTarget.DatabaseNoSQLAttributes.PricingMode != "provisioned" ||
+		nosqlTarget.DatabaseNoSQLAttributes.ReadUnits != 500 ||
+		nosqlTarget.DatabaseNoSQLAttributes.WriteUnits != 100 ||
+		nosqlTarget.DatabaseNoSQLAttributes.StorageGB != 250 ||
+		nosqlTarget.DatabaseNoSQLAttributes.StorageClass != "standard" ||
+		!nosqlTarget.DatabaseNoSQLAttributes.MultiRegion ||
+		nosqlTarget.DatabaseNoSQLAttributes.ReplicationZones != 2 ||
+		nosqlTarget.DatabaseNoSQLAttributes.ComponentType != "throughput" {
+		t.Errorf("unexpected database_nosql attributes: %+v", nosqlTarget.DatabaseNoSQLAttributes)
+	}
 }

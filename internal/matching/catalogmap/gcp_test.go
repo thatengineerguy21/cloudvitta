@@ -73,6 +73,18 @@ func TestMapGCPProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
+			name:         "valid Cloud Firestore service display name",
+			serviceName:  "Cloud Firestore",
+			wantCategory: "database_nosql",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Cloud Datastore service display name",
+			serviceName:  "Cloud Datastore",
+			wantCategory: "database_nosql",
+			wantErr:      nil,
+		},
+		{
 			name:         "unmapped service fails loudly",
 			serviceName:  "Cloud Bigtable",
 			wantCategory: "",

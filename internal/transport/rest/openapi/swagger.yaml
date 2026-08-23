@@ -8,6 +8,33 @@ definitions:
       vcpu:
         type: number
     type: object
+  domain.DatabaseNoSQLAttributes:
+    properties:
+      component_type:
+        description: '"throughput", "request_operations", "storage", "composite"'
+        type: string
+      data_model:
+        description: '"document", "key_value", "wide_column", "graph", "multi_model"'
+        type: string
+      multi_region:
+        description: Multi-region global replication
+        type: boolean
+      pricing_mode:
+        description: '"provisioned", "on_demand", "serverless"'
+        type: string
+      read_units:
+        description: Read throughput capacity (reads/sec or RCU)
+        type: number
+      storage_class:
+        description: '"standard", "infrequent_access", "analytical"'
+        type: string
+      storage_gb:
+        description: Storage capacity in GiB
+        type: number
+      write_units:
+        description: Write throughput capacity (writes/sec or WCU)
+        type: number
+    type: object
   domain.DatabaseRDBMSAttributes:
     properties:
       component_type:
@@ -258,6 +285,54 @@ definitions:
         type: string
       matched_spec:
         $ref: '#/definitions/domain.DatabaseRDBMSAttributes'
+      missing_attributes:
+        items:
+          type: string
+        type: array
+      normalized_hourly_usd:
+        type: number
+      price:
+        $ref: '#/definitions/rest.PriceDetail'
+      provider:
+        type: string
+      sku_id:
+        type: string
+      stale:
+        type: boolean
+    type: object
+  rest.DatabaseNoSQLComparisonMeta:
+    properties:
+      api_version:
+        type: string
+      generated_at:
+        type: string
+      query:
+        additionalProperties: true
+        type: object
+    type: object
+  rest.DatabaseNoSQLComparisonResponse:
+    properties:
+      meta:
+        $ref: '#/definitions/rest.DatabaseNoSQLComparisonMeta'
+      results:
+        items:
+          $ref: '#/definitions/rest.DatabaseNoSQLResultEntry'
+        type: array
+      warnings:
+        items:
+          $ref: '#/definitions/rest.ProviderWarning'
+        type: array
+    type: object
+  rest.DatabaseNoSQLResultEntry:
+    properties:
+      fetched_at:
+        type: string
+      match_delta_pct:
+        type: number
+      match_quality:
+        type: string
+      matched_spec:
+        $ref: '#/definitions/domain.DatabaseNoSQLAttributes'
       missing_attributes:
         items:
           type: string
@@ -792,6 +867,69 @@ paths:
           schema:
             $ref: '#/definitions/middleware.RFC7807Error'
       summary: Get relational database pricing comparison
+      tags:
+      - prices
+  /api/v1/prices/database-nosql:
+    get:
+      description: Returns normalized NoSQL database pricing across cloud providers
+        (AWS DynamoDB, Azure Cosmos DB, GCP Firestore) for requested specs.
+      parameters:
+      - description: Requested NoSQL data model (e.g. document, key_value, wide_column, graph)
+        in: query
+        name: data_model
+        type: string
+      - description: 'Requested pricing mode (provisioned, on_demand, serverless; default: provisioned)'
+        in: query
+        name: pricing_mode
+        type: string
+      - description: Requested reads per second (e.g. 100)
+        in: query
+        name: read_units
+        type: number
+      - description: Requested writes per second (e.g. 20)
+        in: query
+        name: write_units
+        type: number
+      - description: Requested storage in GB (e.g. 50)
+        in: query
+        name: storage_gb
+        type: number
+      - description: Storage class preference (e.g. standard, infrequent_access, analytical)
+        in: query
+        name: storage_class
+        type: string
+      - description: 'High Availability / Multi-Region replication (default: false)'
+        in: query
+        name: multi_region
+        type: boolean
+      - description: 'Canonical region group (default: us-east)'
+        in: query
+        name: region
+        type: string
+      - description: 'Target currency code (default: USD)'
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rest.DatabaseNoSQLComparisonResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Get NoSQL database pricing comparison
       tags:
       - prices
   /api/v1/prices/network:

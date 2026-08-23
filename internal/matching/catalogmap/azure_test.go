@@ -37,8 +37,20 @@ func TestMapAzureProduct(t *testing.T) {
 			wantErr:      nil,
 		},
 		{
-			name:         "unmapped service fails loudly",
+			name:         "valid Azure Cosmos DB service",
+			serviceName:  "Azure Cosmos DB",
+			wantCategory: "database_nosql",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Cosmos DB service",
 			serviceName:  "Cosmos DB",
+			wantCategory: "database_nosql",
+			wantErr:      nil,
+		},
+		{
+			name:         "unmapped service fails loudly",
+			serviceName:  "Azure Synapse",
 			wantCategory: "",
 			wantErr:      ErrUnmappedProduct,
 		},

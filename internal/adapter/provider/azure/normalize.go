@@ -16,6 +16,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/databaseenginemap"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/nosqldatamodelmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/storageclassmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
@@ -415,6 +416,118 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 						MultiAZ:        multiAZ,
 						DeploymentTier: tier,
 						ComponentType:  "instance",
+					},
+					FetchedAt: fetchedAt,
+				}
+				observations = append(observations, obs)
+			}
+		} else if category == "database_nosql" {
+			dataModel, err := nosqldatamodelmap.MapAzureDataModel(item.ServiceName)
+			if err != nil {
+				dataModel, err = nosqldatamodelmap.MapAzureDataModel(item.ProductName)
+				if err != nil {
+					dataModel = nosqldatamodelmap.DataModelDocument
+				}
+			}
+
+			isStorage := strings.Contains(item.MeterName, "Data Stored") ||
+				strings.Contains(item.MeterName, "Storage") ||
+				strings.Contains(item.ProductName, "Storage") ||
+				strings.EqualFold(item.UnitOfMeasure, "1 GB/Month") ||
+				strings.EqualFold(item.UnitOfMeasure, "1 GB/month") ||
+				strings.EqualFold(item.UnitOfMeasure, "1 GB/Mo") ||
+				strings.EqualFold(item.UnitOfMeasure, "1 GB")
+
+			multiRegion := strings.Contains(item.MeterName, "Zone Redundant") ||
+				strings.Contains(item.SkuName, "Zone Redundant") ||
+				strings.Contains(item.MeterName, "Multi-Region") ||
+				strings.Contains(item.MeterName, "High Availability") ||
+				strings.Contains(item.ProductName, "Multi-Region")
+
+			if isStorage {
+				displayName := item.ProductName
+				if displayName == "" {
+					displayName = item.MeterName
+				}
+				storageClass := "standard"
+				if strings.Contains(strings.ToLower(item.MeterName), "analytical") || strings.Contains(strings.ToLower(item.ProductName), "analytical") {
+					storageClass = "analytical"
+				}
+
+				obs := domain.PriceObservation{
+					Provider:        "azure",
+					ServiceCategory: category,
+					SkuID:           skuID,
+					DisplayName:     displayName,
+					Region:          region,
+					RegionGroup:     regionGroup,
+					Unit:            "GB-Mo",
+					PriceAmount:     priceAmount,
+					PriceCurrency:   item.CurrencyCode,
+					PricingModel:    "OnDemand",
+					DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+						DataModel:     dataModel,
+						PricingMode:   "provisioned",
+						ReadUnits:     0,
+						WriteUnits:    0,
+						StorageGB:     1,
+						StorageClass:  storageClass,
+						MultiRegion:   multiRegion,
+						ComponentType: "storage",
+					},
+					FetchedAt: fetchedAt,
+				}
+				observations = append(observations, obs)
+			} else {
+				var pricingMode string
+				var componentType string
+				var readUnits float64
+				var writeUnits float64
+
+				displayName := item.ProductName
+				if displayName == "" {
+					displayName = item.MeterName
+				}
+
+				switch {
+				case strings.Contains(item.MeterName, "1M RUs") || strings.Contains(item.MeterName, "Serverless") || strings.Contains(item.ProductName, "Serverless"):
+					pricingMode = "on_demand"
+					componentType = "request_operations"
+					readUnits = 1000000
+					writeUnits = 200000
+				case strings.Contains(item.MeterName, "100 RU") || strings.Contains(item.MeterName, "RU/s") || strings.Contains(item.MeterName, "Request Units") || strings.Contains(item.ProductName, "Cosmos DB"):
+					pricingMode = "provisioned"
+					componentType = "throughput"
+					readUnits = 100
+					writeUnits = 20
+				default:
+					continue
+				}
+
+				unit := item.UnitOfMeasure
+				if unit == "1 Hour" || unit == "1 hour" {
+					unit = "Hrs"
+				}
+
+				obs := domain.PriceObservation{
+					Provider:        "azure",
+					ServiceCategory: category,
+					SkuID:           skuID,
+					DisplayName:     displayName,
+					Region:          region,
+					RegionGroup:     regionGroup,
+					Unit:            unit,
+					PriceAmount:     priceAmount,
+					PriceCurrency:   item.CurrencyCode,
+					PricingModel:    "OnDemand",
+					DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+						DataModel:     dataModel,
+						PricingMode:   pricingMode,
+						ReadUnits:     readUnits,
+						WriteUnits:    writeUnits,
+						StorageGB:     0,
+						MultiRegion:   multiRegion,
+						ComponentType: componentType,
 					},
 					FetchedAt: fetchedAt,
 				}

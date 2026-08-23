@@ -199,6 +199,12 @@ func TestFreshnessService_GetProviderStatus_Healthy(t *testing.T) {
 					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
 					ObservationCount: 80,
 				},
+				{
+					ServiceCategory:  "database_nosql",
+					LastFetchedAt:    pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					ObservationCount: 60,
+				},
 			}, nil
 		},
 	}
@@ -226,8 +232,8 @@ func TestFreshnessService_GetProviderStatus_Healthy(t *testing.T) {
 	if status.LastSuccessfulFetch == nil || !status.LastSuccessfulFetch.Equal(fetchTime) {
 		t.Errorf("expected LastSuccessfulFetch %v, got %v", fetchTime, status.LastSuccessfulFetch)
 	}
-	if len(status.Categories) != 4 {
-		t.Fatalf("expected 4 categories, got %d", len(status.Categories))
+	if len(status.Categories) != 5 {
+		t.Fatalf("expected 5 categories, got %d", len(status.Categories))
 	}
 	computeCat := status.Categories["compute"]
 	if computeCat.ObservationCount != 450 || computeCat.Stale || computeCat.DLQ != nil {

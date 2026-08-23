@@ -462,6 +462,100 @@
                 }
             }
         },
+        "/api/v1/prices/database-nosql": {
+            "get": {
+                "description": "Returns normalized NoSQL database pricing across cloud providers (AWS DynamoDB, Azure Cosmos DB, GCP Firestore) for requested specs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "prices"
+                ],
+                "summary": "Get NoSQL database pricing comparison",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Requested NoSQL data model (e.g. document, key_value, wide_column, graph)",
+                        "name": "data_model",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Requested pricing mode (provisioned, on_demand, serverless; default: provisioned)",
+                        "name": "pricing_mode",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Requested reads per second (e.g. 100)",
+                        "name": "read_units",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Requested writes per second (e.g. 20)",
+                        "name": "write_units",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Requested storage in GB (e.g. 50)",
+                        "name": "storage_gb",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Storage class preference (e.g. standard, infrequent_access, analytical)",
+                        "name": "storage_class",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "High Availability / Multi-Region replication (default: false)",
+                        "name": "multi_region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Canonical region group (default: us-east)",
+                        "name": "region",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency code (default: USD)",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rest.DatabaseNoSQLComparisonResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/prices/network": {
             "get": {
                 "description": "Returns normalized network / data transfer egress pricing across cloud providers (AWS, Azure, GCP) for requested specs.",
@@ -649,6 +743,43 @@
                     "type": "number"
                 },
                 "vcpu": {
+                    "type": "number"
+                }
+            }
+        },
+        "domain.DatabaseNoSQLAttributes": {
+            "type": "object",
+            "properties": {
+                "component_type": {
+                    "description": "\"throughput\", \"request_operations\", \"storage\", \"composite\"",
+                    "type": "string"
+                },
+                "data_model": {
+                    "description": "\"document\", \"key_value\", \"wide_column\", \"graph\", \"multi_model\"",
+                    "type": "string"
+                },
+                "multi_region": {
+                    "description": "Multi-region global replication",
+                    "type": "boolean"
+                },
+                "pricing_mode": {
+                    "description": "\"provisioned\", \"on_demand\", \"serverless\"",
+                    "type": "string"
+                },
+                "read_units": {
+                    "description": "Read throughput capacity (reads/sec or RCU)",
+                    "type": "number"
+                },
+                "storage_class": {
+                    "description": "\"standard\", \"infrequent_access\", \"analytical\"",
+                    "type": "string"
+                },
+                "storage_gb": {
+                    "description": "Storage capacity in GiB",
+                    "type": "number"
+                },
+                "write_units": {
+                    "description": "Write throughput capacity (writes/sec or WCU)",
                     "type": "number"
                 }
             }
@@ -1022,6 +1153,79 @@
                 },
                 "matched_spec": {
                     "$ref": "#/definitions/domain.DatabaseRDBMSAttributes"
+                },
+                "missing_attributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
+                "price": {
+                    "$ref": "#/definitions/rest.PriceDetail"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "rest.DatabaseNoSQLComparisonMeta": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "query": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "rest.DatabaseNoSQLComparisonResponse": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/rest.DatabaseNoSQLComparisonMeta"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.DatabaseNoSQLResultEntry"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.ProviderWarning"
+                    }
+                }
+            }
+        },
+        "rest.DatabaseNoSQLResultEntry": {
+            "type": "object",
+            "properties": {
+                "fetched_at": {
+                    "type": "string"
+                },
+                "match_delta_pct": {
+                    "type": "number"
+                },
+                "match_quality": {
+                    "type": "string"
+                },
+                "matched_spec": {
+                    "$ref": "#/definitions/domain.DatabaseNoSQLAttributes"
                 },
                 "missing_attributes": {
                     "type": "array",

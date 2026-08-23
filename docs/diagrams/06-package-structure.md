@@ -60,6 +60,7 @@ classDiagram
         storageclassmap
         transfertypemap
         databaseenginemap
+        nosqldatamodelmap
     }
 
     class fx {

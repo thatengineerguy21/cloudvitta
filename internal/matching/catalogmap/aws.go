@@ -15,6 +15,7 @@ var awsCatalogMap = map[string]string{
 	"AmazonRDS":        "database_rdbms",
 	"AmazonRDSStorage": "database_rdbms",
 	"AmazonAurora":     "database_rdbms",
+	"AmazonDynamoDB":   "database_nosql",
 }
 
 // MapAWSProduct resolves an AWS product code to a normalized service category.

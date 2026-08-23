@@ -148,6 +148,21 @@ func init() {
 			return hourlyCost, monthlyCost, unit
 		},
 	})
+
+	RegisterCategoryPricingHandler("database_nosql", CategoryPricingHandler{
+		Match: func(obsList []domain.PriceObservation, target MatchTarget, thresholds CategoryThresholds) (*MatchResult, error) {
+			return MatchNoSQLObservations(obsList, target, thresholds)
+		},
+		CalculateCosts: func(match *MatchResult, target MatchTarget) (decimal.Decimal, decimal.Decimal, string) {
+			hourlyCost := match.Observation.PriceAmount
+			monthlyCost := hourlyCost.Mul(HoursInMonth)
+			unit := match.Observation.Unit
+			if unit == "" {
+				unit = "hour"
+			}
+			return hourlyCost, monthlyCost, unit
+		},
+	})
 }
 
 // MatchAndCalculate encapsulates the fetch, matching, and cost calculation for any category.

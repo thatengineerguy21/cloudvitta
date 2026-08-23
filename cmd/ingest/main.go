@@ -145,6 +145,17 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsDBAdapter)
 
+	// Register AWS NoSQL database adapter with rate limiting and retry config
+	awsNoSQLDBClient := aws.NewClient(aws.WithURL(aws.DefaultDynamoDBPriceListURL))
+	awsNoSQLDBAdapter := aws.NewAdapter(awsNoSQLDBClient, rawStorage, aws.WithCategory("database_nosql"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "database_nosql",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsNoSQLDBAdapter)
+
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
 	azureAdapter := azure.NewAdapter(azureClient, rawStorage, azure.WithCategory("compute"))
@@ -188,6 +199,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureDBAdapter)
+
+	// Register Azure NoSQL database adapter with rate limiting and retry config
+	azureNoSQLDBClient := azure.NewClient(azure.WithURL(azure.DefaultCosmosDBRetailPricesURL))
+	azureNoSQLDBAdapter := azure.NewAdapter(azureNoSQLDBClient, rawStorage, azure.WithCategory("database_nosql"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "database_nosql",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureNoSQLDBAdapter)
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
@@ -251,6 +273,22 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpDBAdapter)
+
+	// Register GCP NoSQL database adapter with rate limiting and retry config
+	var gcpNoSQLDBOpts []gcp.Option
+	if cfg.GCP.APIKey != "" {
+		gcpNoSQLDBOpts = append(gcpNoSQLDBOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpNoSQLDBOpts = append(gcpNoSQLDBOpts, gcp.WithURL(gcp.DefaultNoSQLDatabaseBillingCatalogURL))
+	gcpNoSQLDBClient := gcp.NewClient(gcpNoSQLDBOpts...)
+	gcpNoSQLDBAdapter := gcp.NewAdapter(gcpNoSQLDBClient, rawStorage, gcp.WithCategory("database_nosql"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "database_nosql",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpNoSQLDBAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ
