@@ -24,6 +24,7 @@ type Config struct {
 	CORS          CORSConfig          `koanf:"cors"`
 	Observability ObservabilityConfig `koanf:"observability"`
 	GCP           GCPConfig           `koanf:"gcp"`
+	IBM           IBMConfig           `koanf:"ibm"`
 	Freshness     FreshnessConfig     `koanf:"freshness"`
 }
 
@@ -113,6 +114,10 @@ type ObservabilityConfig struct {
 }
 
 type GCPConfig struct {
+	APIKey string `koanf:"api_key"`
+}
+
+type IBMConfig struct {
 	APIKey string `koanf:"api_key"`
 }
 
@@ -244,7 +249,16 @@ func resolveEnvFallbacks(cfg *Config) error {
 		}
 	}
 
-	// 8. Resolve Auth JWT Secret fallback
+	// 8. Resolve IBM fallbacks
+	if cfg.IBM.APIKey == "" {
+		if val := os.Getenv("CLOUDVITTA_IBM_API_KEY"); val != "" {
+			cfg.IBM.APIKey = val
+		} else {
+			cfg.IBM.APIKey = os.Getenv("IBM_API_KEY")
+		}
+	}
+
+	// 9. Resolve Auth JWT Secret fallback
 	if cfg.Auth.JWTSecret == "" {
 		if val := os.Getenv("CLOUDVITTA_AUTH_JWT_SECRET"); val != "" {
 			cfg.Auth.JWTSecret = val

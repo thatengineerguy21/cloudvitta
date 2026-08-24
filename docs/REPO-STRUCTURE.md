@@ -21,6 +21,7 @@ Create directories only when their stage implementation requires them.
 │   │       ├── aws/             # AWS provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── azure/           # Azure provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── gcp/             # GCP provider adapter, fetch + normalize + supported_categories.go
+│   │       ├── ibm/             # IBM Cloud provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── oracle/          # Oracle OCI provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── factory.go       # provider adapter construction factory
 │   │       └── retry.go         # retry and backoff policies

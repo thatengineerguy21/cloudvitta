@@ -4,6 +4,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/ibm"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/oracle"
 )
 
@@ -19,6 +20,8 @@ func IsProviderCategorySupported(provider, category string) bool {
 		return gcp.IsCategorySupported(category)
 	case "oracle":
 		return oracle.IsCategorySupported(category)
+	case "ibm":
+		return ibm.IsCategorySupported(category)
 	default:
 		return false
 	}
@@ -36,6 +39,8 @@ func SupportedCategoriesForProvider(provider string) []string {
 		return []string{"compute", "storage", "network", "database_rdbms", "database_nosql", "kubernetes", "serverless"}
 	case "oracle":
 		return oracle.SupportedCategories()
+	case "ibm":
+		return ibm.SupportedCategories()
 	default:
 		return nil
 	}

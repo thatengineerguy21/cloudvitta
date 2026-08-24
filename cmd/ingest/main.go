@@ -14,6 +14,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/ibm"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/oracle"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
@@ -341,6 +342,21 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, oracleAdapter)
+
+	// Register IBM compute adapter with rate limiting and retry config
+	var ibmOpts []ibm.Option
+	if cfg.IBM.APIKey != "" {
+		ibmOpts = append(ibmOpts, ibm.WithAPIKey(cfg.IBM.APIKey))
+	}
+	ibmClient := ibm.NewClient(ibmOpts...)
+	ibmAdapter := ibm.NewAdapter(ibmClient, rawStorage, ibm.WithCategory("compute"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "ibm",
+		Category:       "compute",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, ibmAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

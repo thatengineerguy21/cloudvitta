@@ -307,3 +307,21 @@ func TestLoad_CORS_WildcardWithCredentials_Validation(t *testing.T) {
 		t.Errorf("expected AllowedOrigins ['*'], got %v", cfg.CORS.AllowedOrigins)
 	}
 }
+
+func TestLoad_IBMConfigFallback(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("IBM_API_KEY", "ibm-secret-api-key")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	if cfg.IBM.APIKey != "ibm-secret-api-key" {
+		t.Errorf("expected IBM.APIKey 'ibm-secret-api-key', got %s", cfg.IBM.APIKey)
+	}
+}
