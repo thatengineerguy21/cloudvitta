@@ -347,3 +347,21 @@ func TestLoad_AlibabaConfigFallback(t *testing.T) {
 		t.Errorf("expected Alibaba.AccessKeySecret 'ali-access-key-secret', got %s", cfg.Alibaba.AccessKeySecret)
 	}
 }
+
+func TestLoad_DigitalOceanConfigFallback(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("DIGITALOCEAN_TOKEN", "do-secret-access-token")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	if cfg.DigitalOcean.Token != "do-secret-access-token" {
+		t.Errorf("expected DigitalOcean.Token 'do-secret-access-token', got %s", cfg.DigitalOcean.Token)
+	}
+}

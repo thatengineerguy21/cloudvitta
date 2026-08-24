@@ -26,6 +26,7 @@ type Config struct {
 	GCP           GCPConfig           `koanf:"gcp"`
 	IBM           IBMConfig           `koanf:"ibm"`
 	Alibaba       AlibabaConfig       `koanf:"alibaba"`
+	DigitalOcean  DigitalOceanConfig  `koanf:"digitalocean"`
 	Freshness     FreshnessConfig     `koanf:"freshness"`
 }
 
@@ -125,6 +126,10 @@ type IBMConfig struct {
 type AlibabaConfig struct {
 	AccessKeyID     string `koanf:"access_key_id"`
 	AccessKeySecret string `koanf:"access_key_secret"`
+}
+
+type DigitalOceanConfig struct {
+	Token string `koanf:"token"`
 }
 
 type FreshnessConfig struct {
@@ -280,7 +285,16 @@ func resolveEnvFallbacks(cfg *Config) error {
 		}
 	}
 
-	// 10. Resolve Auth JWT Secret fallback
+	// 10. Resolve DigitalOcean fallbacks
+	if cfg.DigitalOcean.Token == "" {
+		if val := os.Getenv("CLOUDVITTA_DIGITALOCEAN_TOKEN"); val != "" {
+			cfg.DigitalOcean.Token = val
+		} else {
+			cfg.DigitalOcean.Token = os.Getenv("DIGITALOCEAN_TOKEN")
+		}
+	}
+
+	// 11. Resolve Auth JWT Secret fallback
 	if cfg.Auth.JWTSecret == "" {
 		if val := os.Getenv("CLOUDVITTA_AUTH_JWT_SECRET"); val != "" {
 			cfg.Auth.JWTSecret = val

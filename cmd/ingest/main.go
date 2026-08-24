@@ -14,6 +14,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/alibaba"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/digitalocean"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/ibm"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/oracle"
@@ -373,6 +374,21 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, aliAdapter)
+
+	// Register DigitalOcean compute adapter with rate limiting and retry config
+	var doOpts []digitalocean.Option
+	if cfg.DigitalOcean.Token != "" {
+		doOpts = append(doOpts, digitalocean.WithToken(cfg.DigitalOcean.Token))
+	}
+	doClient := digitalocean.NewClient(doOpts...)
+	doAdapter := digitalocean.NewAdapter(doClient, rawStorage, digitalocean.WithCategory("compute"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "digitalocean",
+		Category:       "compute",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, doAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

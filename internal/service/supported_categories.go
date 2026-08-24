@@ -4,6 +4,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/alibaba"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/digitalocean"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/ibm"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/oracle"
@@ -25,6 +26,8 @@ func IsProviderCategorySupported(provider, category string) bool {
 		return ibm.IsCategorySupported(category)
 	case "alibaba":
 		return alibaba.IsCategorySupported(category)
+	case "digitalocean":
+		return digitalocean.IsCategorySupported(category)
 	default:
 		return false
 	}
@@ -46,6 +49,8 @@ func SupportedCategoriesForProvider(provider string) []string {
 		return ibm.SupportedCategories()
 	case "alibaba":
 		return alibaba.SupportedCategories()
+	case "digitalocean":
+		return digitalocean.SupportedCategories()
 	default:
 		return nil
 	}

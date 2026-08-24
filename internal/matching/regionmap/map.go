@@ -18,6 +18,8 @@ func MapRegion(provider, region string) (string, error) {
 		return MapIBMRegion(region)
 	case "alibaba":
 		return MapAlibabaRegion(region)
+	case "digitalocean":
+		return MapDigitalOceanRegion(region)
 	default:
 		return "", fmt.Errorf("regionmap: unmapped provider %q", provider)
 	}
@@ -39,6 +41,8 @@ func ResolveNativeRegion(provider, regionGroup string) (string, error) {
 		return ResolveIBMNativeRegion(regionGroup)
 	case "alibaba":
 		return ResolveAlibabaNativeRegion(regionGroup)
+	case "digitalocean":
+		return ResolveDigitalOceanNativeRegion(regionGroup)
 	default:
 		return "", fmt.Errorf("regionmap: unmapped provider %q", provider)
 	}
