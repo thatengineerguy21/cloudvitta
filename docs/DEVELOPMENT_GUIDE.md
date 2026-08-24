@@ -111,10 +111,10 @@ CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS=Authorization=Basic MTIzNDU2OmdsY19leUouLi
 
 ---
 
-## 3. Provisioning External Services
+## 3. Provisioning External Services & Configuring Secrets
 
 ### Service A: Neon Serverless Postgres (Database)
-1. **Create Project**: Log in to [Neon Console](https://console.neon.tech/) and create a new project (e.g. `cloudvitta-dev`). Select PostgreSQL version `16+` and your target region (e.g. `us-east-1` or `us-east-2`).
+1. **Create Project**: Log in to the [Neon Console](https://console.neon.tech/) and create a new project (e.g. `cloudvitta-dev`). Select PostgreSQL version `16+` and your target region (e.g. `us-east-1` or `us-east-2`).
 2. **Extract Credentials**: On the Neon dashboard, inspect **Connection Details**:
    - `CLOUDVITTA_DATABASE_USER`: e.g. `neondb_owner`.
    - `CLOUDVITTA_DATABASE_PASSWORD`: Your secret Neon user password.
@@ -129,7 +129,7 @@ CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS=Authorization=Basic MTIzNDU2OmdsY19leUouLi
 ---
 
 ### Service B: Upstash Redis (Cache, Singleflight, & DLQ)
-1. **Create Database**: Log in to [Upstash Console](https://console.upstash.io/) and create a Redis database (e.g. `cloudvitta-cache-dev`). Select a primary region close to your database.
+1. **Create Database**: Log in to the [Upstash Console](https://console.upstash.io/) and create a Redis database (e.g. `cloudvitta-cache-dev`). Select a primary region close to your database.
 2. **Copy TLS URL**: Under database details, locate **Node client / Redis URL**. Select the TLS connection string starting with `rediss://` (e.g. `rediss://default:password@xxx.upstash.io:6379`).
 3. **Configure Key**: Set `CLOUDVITTA_REDIS_URL` in `.env`.
    *Note: If `CLOUDVITTA_REDIS_URL` is unavailable or empty, the API server logs a warning and automatically falls back to direct Postgres reads.*
@@ -137,7 +137,7 @@ CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS=Authorization=Basic MTIzNDU2OmdsY19leUouLi
 ---
 
 ### Service C: Google Cloud Storage (Raw Payloads & Quarantine Sinks)
-1. **Create Bucket**: Log in to [Google Cloud Console](https://console.cloud.google.com/) and create a Cloud Storage bucket (e.g. `cloudvitta-raw-dev`).
+1. **Create Bucket**: Log in to the [Google Cloud Console](https://console.cloud.google.com/) and create a Cloud Storage bucket (e.g. `cloudvitta-raw-dev`).
 2. **Configure Key**: Set `CLOUDVITTA_STORAGE_GCS_BUCKET_NAME=cloudvitta-raw-dev` in `.env`.
 3. **Authenticate Local Environment**: Authenticate your local machine using Application Default Credentials:
    ```bash
@@ -148,28 +148,98 @@ CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS=Authorization=Basic MTIzNDU2OmdsY19leUouLi
 ---
 
 ### Service D: Grafana Cloud (OpenTelemetry Traces, Metrics, and Logs)
-1. **Locate OTLP Details**: Log in to [Grafana Cloud Console](https://grafana.com/) and navigate to Stack Details -> **OpenTelemetry** -> **Configure**.
+1. **Locate OTLP Details**: Log in to the [Grafana Cloud Console](https://grafana.com/) and navigate to Stack Details -> **OpenTelemetry** -> **Configure**.
 2. **Extract OTLP Endpoint**: Copy your OTLP HTTP Endpoint (e.g. `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`) and set `CLOUDVITTA_OBSERVABILITY_OTLP_ENDPOINT`.
 3. **Generate Authorization Header**:
    - Create an Access Token / API Key with publisher permissions in Grafana Cloud.
    - Note your Grafana Instance ID (numeric ID on the OTel details page).
    - Format the string: `Instance_ID:API_Token` (e.g. `123456:glc_eyJ...`).
-   - Base64-encode the string (e.g. `MTIzNDU2OmdsY19leUouLi4=`).
-   - Set `CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS="Authorization=Basic MTIzNDU2OmdsY19leUouLi4="`.
+   - Base64-encode the string using your terminal:
+     ```bash
+     echo -n "123456:glc_your_token_here" | base64
+     ```
+   - Set `CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS="Authorization=Basic <BASE64_STRING>"`.
    *Note: If `CLOUDVITTA_OBSERVABILITY_OTLP_ENDPOINT` is empty, OpenTelemetry falls back to local Prometheus metrics (`/metrics`) and stdout JSON logging without attempting remote exports.*
 
 ---
 
-### Service E: External Cloud Provider APIs & Foreign Exchange (FX) Reference
-CloudVitta pulls real pricing data from 7 cloud providers and real exchange rates from Frankfurter:
-- **AWS**: Public Bulk Pricing JSON endpoints (unauthenticated).
-- **Azure**: Public Azure Retail Prices API (unauthenticated).
-- **GCP**: Google Cloud Billing Catalog API (requires optional `CLOUDVITTA_GCP_API_KEY` for high-volume requests).
-- **Oracle OCI**: Oracle CE Tools Public Pricelist JSON (unauthenticated).
-- **IBM Cloud**: IBM Cloud Global Catalog API and IAM token exchange (requires optional `CLOUDVITTA_IBM_API_KEY`).
-- **Alibaba Cloud**: Alibaba ECS DescribePrice RPC API with HMAC-SHA1 signature (requires optional `CLOUDVITTA_ALIBABA_ACCESS_KEY_ID` and `CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET`).
-- **DigitalOcean**: DigitalOcean Droplets Sizes REST API (requires optional `CLOUDVITTA_DIGITALOCEAN_TOKEN`).
-- **Frankfurter API**: European Central Bank (ECB) daily reference rates (unauthenticated public API, backed by local `fx_rates` database table).
+### Service E: Authentication & Security Secrets
+
+Generate high-entropy cryptographic keys for JWT signing and session tracking cookies:
+
+1. **Generate JWT Access Token Secret (`CLOUDVITTA_AUTH_JWT_SECRET`)**:
+   - The JWT signing secret must be at least 32 characters long.
+   - Generate a random 256-bit base64-encoded string:
+     ```bash
+     openssl rand -base64 32
+     ```
+   - Copy the generated value to `CLOUDVITTA_AUTH_JWT_SECRET` in `.env`.
+
+2. **Generate Anonymous Cookie Secret (`CLOUDVITTA_AUTH_ANON_COOKIE_SECRET`)**:
+   - The anonymous cookie secret is used to HMAC-sign `cv_anon_id` tracking cookies for the Free Tier rate limiter.
+   - Generate a distinct random 256-bit string:
+     ```bash
+     openssl rand -base64 32
+     ```
+   - Copy the value to `CLOUDVITTA_AUTH_ANON_COOKIE_SECRET` in `.env` (if omitted, it falls back to `CLOUDVITTA_AUTH_JWT_SECRET`).
+
+---
+
+### Service F: Cloud Provider API Keys & Credentials
+
+CloudVitta ingests pricing catalogs from 7 cloud providers and exchange rates from Frankfurter:
+
+1. **Google Cloud Platform (`CLOUDVITTA_GCP_API_KEY`)**:
+   - *Purpose*: Optional API key to increase Google Cloud Billing Catalog API rate quotas during ingestion.
+   - *Steps*:
+     1. Open [Google Cloud Console](https://console.cloud.google.com/).
+     2. Navigate to **APIs & Services** > **Credentials**.
+     3. Click **Create Credentials** > **API key**.
+     4. (Optional) Restrict key to **Cloud Billing API**.
+     5. Set `CLOUDVITTA_GCP_API_KEY=<your_api_key>` in `.env`.
+
+2. **IBM Cloud (`CLOUDVITTA_IBM_API_KEY`)**:
+   - *Purpose*: IAM API key required to authenticate with the IBM Cloud Global Catalog API.
+   - *Steps*:
+     1. Log in to [IBM Cloud Console](https://cloud.ibm.com/).
+     2. Navigate to **Manage** > **Access (IAM)** > **API keys**.
+     3. Click **Create an IBM Cloud API key**, enter a name (e.g. `cloudvitta-ingest`), and click **Create**.
+     4. Copy the generated key and set `CLOUDVITTA_IBM_API_KEY=<your_api_key>` in `.env`.
+
+3. **Alibaba Cloud (`CLOUDVITTA_ALIBABA_ACCESS_KEY_ID` & `CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET`)**:
+   - *Purpose*: AccessKey credentials required for HMAC-SHA1 signature computation on Alibaba Cloud ECS DescribePrice RPC requests.
+   - *Steps*:
+     1. Log in to [Alibaba Cloud Console](https://usercenter.console.aliyun.com/).
+     2. Hover over your avatar and select **AccessKey Management**.
+     3. Click **Create AccessKey** (use a RAM user with read-only ECS permissions for production).
+     4. Set `CLOUDVITTA_ALIBABA_ACCESS_KEY_ID=<AccessKeyId>` and `CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET=<AccessKeySecret>` in `.env`.
+
+4. **DigitalOcean (`CLOUDVITTA_DIGITALOCEAN_TOKEN`)**:
+   - *Purpose*: Personal Access Token required to query the DigitalOcean Droplet Sizes REST API.
+   - *Steps*:
+     1. Log in to [DigitalOcean Control Panel](https://cloud.digitalocean.com/).
+     2. Navigate to **API** > **Tokens**.
+     3. Click **Generate New Token**. Enter a token name (e.g. `cloudvitta-ingest`) and select the **Read** scope.
+     4. Copy the secret token and set `CLOUDVITTA_DIGITALOCEAN_TOKEN=<your_token>` in `.env`.
+
+5. **Public & Unmetered Endpoints (No Credentials Needed)**:
+   - **AWS**: Public bulk pricing JSON price lists (EC2, S3, RDS, DynamoDB, EKS).
+   - **Azure**: Public Azure Retail Prices REST API (Virtual Machines, Storage, Cosmos DB, AKS).
+   - **Oracle OCI**: Public Oracle CE Tools Pricelist JSON.
+   - **Frankfurter API**: Public European Central Bank (ECB) daily reference rates cached locally in the `fx_rates` database table.
+
+---
+
+### Service G: Rate Limiting, CORS, & Data Freshness Overrides (Optional)
+
+You can customize runtime protection policies in `.env`:
+- **`CLOUDVITTA_RATELIMIT_STANDARD_TIER_RATE`**: Max requests per minute for authenticated JWT users (default: `120`).
+- **`CLOUDVITTA_RATELIMIT_FREE_TIER_RATE`**: Max requests per minute for anonymous sessions with tracking cookies (default: `20`).
+- **`CLOUDVITTA_RATELIMIT_IP_CEILING_RATE`**: Outer IP burst ceiling per minute (default: `60`).
+- **`CLOUDVITTA_RATELIMIT_LOGIN_RATE`**: Max login attempts per minute per IP to prevent brute-force attacks (default: `10`).
+- **`CLOUDVITTA_CORS_ALLOWED_ORIGINS`**: Comma-separated list of allowed frontend origins (e.g. `http://localhost:3000,https://cloudvitta.dev`).
+- **`CLOUDVITTA_CORS_ALLOW_CREDENTIALS`**: Set to `true` to allow authorization headers and cookies.
+- **`CLOUDVITTA_FRESHNESS_STALENESS_THRESHOLD_HOURS`**: Hours before provider pricing observations are flagged as stale (default: `168` hours = 7 days).
 
 ---
 
