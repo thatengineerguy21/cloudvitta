@@ -414,95 +414,81 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, ibmNetworkAdapter)
 
-	// Register Alibaba compute adapter with rate limiting and retry config
-	var aliOpts []alibaba.Option
+	// Register Alibaba adapters if credentials are configured
 	if cfg.Alibaba.AccessKeyID != "" && cfg.Alibaba.AccessKeySecret != "" {
-		aliOpts = append(aliOpts, alibaba.WithCredentials(cfg.Alibaba.AccessKeyID, cfg.Alibaba.AccessKeySecret))
-	}
-	aliClient := alibaba.NewClient(aliOpts...)
-	aliAdapter := alibaba.NewAdapter(aliClient, rawStorage, alibaba.WithCategory("compute"))
-	factory.Register(provider.ProviderConfig{
-		Provider:       "alibaba",
-		Category:       "compute",
-		RateLimitRPS:   10,
-		RateLimitBurst: 5,
-		Retry:          provider.DefaultRetryConfig(),
-	}, aliAdapter)
+		aliOpts := []alibaba.Option{
+			alibaba.WithCredentials(cfg.Alibaba.AccessKeyID, cfg.Alibaba.AccessKeySecret),
+		}
+		aliClient := alibaba.NewClient(aliOpts...)
+		aliAdapter := alibaba.NewAdapter(aliClient, rawStorage, alibaba.WithCategory("compute"))
+		factory.Register(provider.ProviderConfig{
+			Provider:       "alibaba",
+			Category:       "compute",
+			RateLimitRPS:   10,
+			RateLimitBurst: 5,
+			Retry:          provider.DefaultRetryConfig(),
+		}, aliAdapter)
 
-	// Register Alibaba storage adapter with rate limiting and retry config
-	var aliStorageOpts []alibaba.Option
-	if cfg.Alibaba.AccessKeyID != "" && cfg.Alibaba.AccessKeySecret != "" {
-		aliStorageOpts = append(aliStorageOpts, alibaba.WithCredentials(cfg.Alibaba.AccessKeyID, cfg.Alibaba.AccessKeySecret))
-	}
-	aliStorageClient := alibaba.NewClient(aliStorageOpts...)
-	aliStorageAdapter := alibaba.NewAdapter(aliStorageClient, rawStorage, alibaba.WithCategory("storage"))
-	factory.Register(provider.ProviderConfig{
-		Provider:       "alibaba",
-		Category:       "storage",
-		RateLimitRPS:   10,
-		RateLimitBurst: 5,
-		Retry:          provider.DefaultRetryConfig(),
-	}, aliStorageAdapter)
+		aliStorageClient := alibaba.NewClient(aliOpts...)
+		aliStorageAdapter := alibaba.NewAdapter(aliStorageClient, rawStorage, alibaba.WithCategory("storage"))
+		factory.Register(provider.ProviderConfig{
+			Provider:       "alibaba",
+			Category:       "storage",
+			RateLimitRPS:   10,
+			RateLimitBurst: 5,
+			Retry:          provider.DefaultRetryConfig(),
+		}, aliStorageAdapter)
 
-	// Register Alibaba network adapter with rate limiting and retry config
-	var aliNetworkOpts []alibaba.Option
-	if cfg.Alibaba.AccessKeyID != "" && cfg.Alibaba.AccessKeySecret != "" {
-		aliNetworkOpts = append(aliNetworkOpts, alibaba.WithCredentials(cfg.Alibaba.AccessKeyID, cfg.Alibaba.AccessKeySecret))
+		aliNetworkClient := alibaba.NewClient(aliOpts...)
+		aliNetworkAdapter := alibaba.NewAdapter(aliNetworkClient, rawStorage, alibaba.WithCategory("network"))
+		factory.Register(provider.ProviderConfig{
+			Provider:       "alibaba",
+			Category:       "network",
+			RateLimitRPS:   10,
+			RateLimitBurst: 5,
+			Retry:          provider.DefaultRetryConfig(),
+		}, aliNetworkAdapter)
+	} else {
+		slog.InfoContext(ctx, "skipping Alibaba Cloud ingestion: credentials not configured (CLOUDVITTA_ALIBABA_ACCESS_KEY_ID / SECRET)")
 	}
-	aliNetworkClient := alibaba.NewClient(aliNetworkOpts...)
-	aliNetworkAdapter := alibaba.NewAdapter(aliNetworkClient, rawStorage, alibaba.WithCategory("network"))
-	factory.Register(provider.ProviderConfig{
-		Provider:       "alibaba",
-		Category:       "network",
-		RateLimitRPS:   10,
-		RateLimitBurst: 5,
-		Retry:          provider.DefaultRetryConfig(),
-	}, aliNetworkAdapter)
 
-	// Register DigitalOcean compute adapter with rate limiting and retry config
-	var doOpts []digitalocean.Option
+	// Register DigitalOcean adapters if token is configured
 	if cfg.DigitalOcean.Token != "" {
-		doOpts = append(doOpts, digitalocean.WithToken(cfg.DigitalOcean.Token))
-	}
-	doClient := digitalocean.NewClient(doOpts...)
-	doAdapter := digitalocean.NewAdapter(doClient, rawStorage, digitalocean.WithCategory("compute"))
-	factory.Register(provider.ProviderConfig{
-		Provider:       "digitalocean",
-		Category:       "compute",
-		RateLimitRPS:   10,
-		RateLimitBurst: 5,
-		Retry:          provider.DefaultRetryConfig(),
-	}, doAdapter)
+		doOpts := []digitalocean.Option{
+			digitalocean.WithToken(cfg.DigitalOcean.Token),
+		}
+		doClient := digitalocean.NewClient(doOpts...)
+		doAdapter := digitalocean.NewAdapter(doClient, rawStorage, digitalocean.WithCategory("compute"))
+		factory.Register(provider.ProviderConfig{
+			Provider:       "digitalocean",
+			Category:       "compute",
+			RateLimitRPS:   10,
+			RateLimitBurst: 5,
+			Retry:          provider.DefaultRetryConfig(),
+		}, doAdapter)
 
-	// Register DigitalOcean storage adapter with rate limiting and retry config
-	var doStorageOpts []digitalocean.Option
-	if cfg.DigitalOcean.Token != "" {
-		doStorageOpts = append(doStorageOpts, digitalocean.WithToken(cfg.DigitalOcean.Token))
-	}
-	doStorageClient := digitalocean.NewClient(doStorageOpts...)
-	doStorageAdapter := digitalocean.NewAdapter(doStorageClient, rawStorage, digitalocean.WithCategory("storage"))
-	factory.Register(provider.ProviderConfig{
-		Provider:       "digitalocean",
-		Category:       "storage",
-		RateLimitRPS:   10,
-		RateLimitBurst: 5,
-		Retry:          provider.DefaultRetryConfig(),
-	}, doStorageAdapter)
+		doStorageClient := digitalocean.NewClient(doOpts...)
+		doStorageAdapter := digitalocean.NewAdapter(doStorageClient, rawStorage, digitalocean.WithCategory("storage"))
+		factory.Register(provider.ProviderConfig{
+			Provider:       "digitalocean",
+			Category:       "storage",
+			RateLimitRPS:   10,
+			RateLimitBurst: 5,
+			Retry:          provider.DefaultRetryConfig(),
+		}, doStorageAdapter)
 
-	// Register DigitalOcean network adapter with rate limiting and retry config
-	var doNetworkOpts []digitalocean.Option
-	if cfg.DigitalOcean.Token != "" {
-		doNetworkOpts = append(doNetworkOpts, digitalocean.WithToken(cfg.DigitalOcean.Token))
+		doNetworkClient := digitalocean.NewClient(doOpts...)
+		doNetworkAdapter := digitalocean.NewAdapter(doNetworkClient, rawStorage, digitalocean.WithCategory("network"))
+		factory.Register(provider.ProviderConfig{
+			Provider:       "digitalocean",
+			Category:       "network",
+			RateLimitRPS:   10,
+			RateLimitBurst: 5,
+			Retry:          provider.DefaultRetryConfig(),
+		}, doNetworkAdapter)
+	} else {
+		slog.InfoContext(ctx, "skipping DigitalOcean ingestion: token not configured (CLOUDVITTA_DIGITALOCEAN_TOKEN)")
 	}
-	doNetworkClient := digitalocean.NewClient(doNetworkOpts...)
-	doNetworkAdapter := digitalocean.NewAdapter(doNetworkClient, rawStorage, digitalocean.WithCategory("network"))
-	factory.Register(provider.ProviderConfig{
-		Provider:       "digitalocean",
-		Category:       "network",
-		RateLimitRPS:   10,
-		RateLimitBurst: 5,
-		Retry:          provider.DefaultRetryConfig(),
-	}, doNetworkAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ
@@ -555,6 +541,14 @@ func run() error {
 				"category", r.Category,
 				"error", r.Err,
 			)
+			// If an unauthenticated IBM job failed due to missing API key, log warning without failing overall run
+			if r.Provider == "ibm" && cfg.IBM.APIKey == "" {
+				slog.WarnContext(ctx, "ibm ingestion failed without api key, proceeding without failing overall run",
+					"category", r.Category,
+					"error", r.Err,
+				)
+				continue
+			}
 			hasErrors = true
 			continue
 		}
