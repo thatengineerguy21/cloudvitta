@@ -68,7 +68,9 @@ classDiagram
 
     class fx {
         FXService Interface
+        Service (In-Memory Cache & DB Fallback)
         NoOpFXService
+        Frankfurter Client
     }
 
     class auth {

@@ -15,6 +15,8 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
+	"github.com/thatengineerguy21/CloudVitta/internal/fx"
+	"github.com/thatengineerguy21/CloudVitta/internal/fx/frankfurter"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/ratelimit"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
@@ -95,6 +97,13 @@ func main() {
 	queries := store.New(dbPool)
 	transactor := store.NewTransactor(dbPool)
 
+	// --- FX Service ---
+	frankfurterClient := frankfurter.NewClient()
+	fxSvc := fx.NewService(queries, frankfurterClient)
+	if err := fxSvc.RefreshRates(ctx); err != nil {
+		slog.WarnContext(ctx, "initial fx rate synchronization failed, operating with fallback rates", "error", err)
+	}
+
 	var dlqReader service.DLQReader
 	if redisClient != nil {
 		dlqReader = dlq.New(redisClient)
@@ -111,6 +120,7 @@ func main() {
 		service.WithTracer(otelProviders.Tracer),
 		service.WithCacheMetrics(cacheMetrics),
 		service.WithFreshnessService(freshnessSvc),
+		service.WithFXService(fxSvc),
 	)
 	authSvc := service.NewAuthService(
 		queries,

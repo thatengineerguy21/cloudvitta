@@ -1,0 +1,89 @@
+{
+  "items": [
+    {
+      "partNumber": "B88206",
+      "displayName": "Object Storage - Storage",
+      "metricName": "Gigabyte Storage Capacity PER MONTH",
+      "serviceCategory": "Storage - Object Storage",
+      "serviceCategoryDisplayName": "Storage",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0255
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1",
+        "us-phoenix-1"
+      ]
+    },
+    {
+      "partNumber": "B88207",
+      "displayName": "Object Storage - Infrequent Access Storage",
+      "metricName": "Gigabyte Storage Capacity PER MONTH",
+      "serviceCategory": "Storage - Object Storage",
+      "serviceCategoryDisplayName": "Storage",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0100
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    },
+    {
+      "partNumber": "B88208",
+      "displayName": "Object Storage - Archive Storage",
+      "metricName": "Gigabyte Storage Capacity PER MONTH",
+      "serviceCategory": "Storage - Object Storage",
+      "serviceCategoryDisplayName": "Storage",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0026
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    },
+    {
+      "partNumber": "B88319",
+      "displayName": "Block Volume - Storage",
+      "metricName": "Gigabyte Storage Capacity PER MONTH",
+      "serviceCategory": "Storage - Block Volume",
+      "serviceCategoryDisplayName": "Storage",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0255
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    }
+  ]
+}

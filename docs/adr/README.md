@@ -42,3 +42,5 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0032-request-alias-conflict-resolution-strategy.md](0032-request-alias-conflict-resolution-strategy.md): Request Alias Conflict Resolution Strategy
 - [0033-nosql-cross-unit-workload-normalization.md](0033-nosql-cross-unit-workload-normalization.md): NoSQL Cross-Unit Workload Normalization
 - [0034-kubernetes-conditional-control-plane-credit.md](0034-kubernetes-conditional-control-plane-credit.md): Kubernetes Conditional Control-Plane Credit
+- [0035-fx-rate-ingestion-and-persistence.md](0035-fx-rate-ingestion-and-persistence.md): Foreign Exchange Rate Ingestion and Persistence Architecture
+- [0036-digitalocean-declared-catalog-scope.md](0036-digitalocean-declared-catalog-scope.md): DigitalOcean Declared Catalog Scope and Exclusion of Unsupported Categories

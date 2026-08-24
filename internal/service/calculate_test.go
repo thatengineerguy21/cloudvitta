@@ -836,3 +836,117 @@ func TestResolveAliasedField(t *testing.T) {
 		}
 	})
 }
+
+func TestPricingService_MatchAndCalculate_4NewProviders_StorageAndNetwork(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+
+	// Seed cache for Oracle, IBM, Alibaba, DigitalOcean storage & network
+	providers := []struct {
+		provider     string
+		region       string
+		storageSku   string
+		storageClass string
+		storageRate  string
+		networkSku   string
+		transferType string
+		networkRate  string
+	}{
+		{"oracle", "us-ashburn-1", "SKU-OCI-B88206", "standard", "0.0255", "SKU-OCI-B88210", "internet_egress", "0.0085"},
+		{"ibm", "us-east", "SKU-IBM-STANDARD-STORAGE", "standard", "0.0210", "SKU-IBM-PUBLIC-EGRESS", "internet_egress", "0.0900"},
+		{"alibaba", "us-east-1", "SKU-ALI-STORAGE-STANDARD", "standard", "0.0190", "SKU-ALI-NETWORK-DATA-TRANSFER-OUT", "internet_egress", "0.0800"},
+		{"digitalocean", "nyc3", "SKU-DO-STORAGE-SPACES", "standard", "0.0200", "SKU-DO-NETWORK-BANDWIDTH", "internet_egress", "0.0100"},
+	}
+
+	for _, p := range providers {
+		storageObs := []domain.PriceObservation{
+			{
+				Provider:          p.provider,
+				ServiceCategory:   "storage",
+				SkuID:             p.storageSku,
+				Region:            p.region,
+				RegionGroup:       "us-east",
+				PriceAmount:       decimal.RequireFromString(p.storageRate),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				Unit:              "GB-Mo",
+				StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: p.storageClass},
+				FetchedAt:         time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, p.provider, "storage", p.region), storageObs, cache.DefaultTTL)
+
+		networkObs := []domain.PriceObservation{
+			{
+				Provider:          p.provider,
+				ServiceCategory:   "network",
+				SkuID:             p.networkSku,
+				Region:            p.region,
+				RegionGroup:       "us-east",
+				PriceAmount:       decimal.RequireFromString(p.networkRate),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				Unit:              "GB",
+				NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000, TransferType: p.transferType},
+				FetchedAt:         time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, p.provider, "network", p.region), networkObs, cache.DefaultTTL)
+	}
+
+	svc := service.NewPricingService(nil, rdb)
+
+	for _, p := range providers {
+		t.Run(p.provider+"_storage", func(t *testing.T) {
+			target := service.MatchTarget{
+				Category:     "storage",
+				SizeGB:       500,
+				StorageClass: "standard",
+			}
+			res, err := svc.MatchAndCalculate(ctx, p.provider, "storage", "us-east", target)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if res == nil {
+				t.Fatal("expected result, got nil")
+			}
+			expectedCost := decimal.RequireFromString(p.storageRate).Mul(decimal.NewFromInt(500))
+			if !res.MonthlyCost.Equal(expectedCost) {
+				t.Errorf("MonthlyCost = %s, want %s", res.MonthlyCost.String(), expectedCost.String())
+			}
+			if res.MatchResult.MatchQuality != "exact" {
+				t.Errorf("MatchQuality = %s, want exact", res.MatchResult.MatchQuality)
+			}
+		})
+
+		t.Run(p.provider+"_network", func(t *testing.T) {
+			target := service.MatchTarget{
+				Category:     "network",
+				EgressGB:     1000,
+				TransferType: "internet_egress",
+			}
+			res, err := svc.MatchAndCalculate(ctx, p.provider, "network", "us-east", target)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if res == nil {
+				t.Fatal("expected result, got nil")
+			}
+			expectedCost := decimal.RequireFromString(p.networkRate).Mul(decimal.NewFromInt(1000))
+			if !res.MonthlyCost.Equal(expectedCost) {
+				t.Errorf("MonthlyCost = %s, want %s", res.MonthlyCost.String(), expectedCost.String())
+			}
+			if res.MatchResult.MatchQuality != "exact" {
+				t.Errorf("MatchQuality = %s, want exact", res.MatchResult.MatchQuality)
+			}
+		})
+	}
+}

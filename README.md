@@ -50,7 +50,7 @@ flowchart TD
     
     subgraph IngestionPipeline["Ingestion Pipeline"]
         Scheduler["Cloud Scheduler"] --> IngestJob["cmd/ingest Worker"]
-        IngestJob --> Adapters["Provider Adapters (AWS/Azure/GCP)"]
+        IngestJob --> Adapters["Provider Adapters (7 Providers)"]
         Adapters --> GCS[("GCS Raw JSON Archive")]
         Adapters --> Normalizer["Streaming Parser & Anomaly Detector"]
         Adapters --> QSink["Quarantine Sink"]
@@ -71,7 +71,7 @@ flowchart TD
 | [Calculator Request Lifecycle](docs/diagrams/04-calculator-request-lifecycle.md) | Single-category cache-miss flow, composite calculation fan-out, and 9 MCP tools lifecycle |
 | [Auth Token Rotation & Theft Containment](docs/diagrams/05-auth-token-rotation.md) | Refresh token family rotation, idempotency replay cache, and theft detection |
 | [Package Structure & Dependencies](docs/diagrams/06-package-structure.md) | Modular monolith package hierarchy and dependency rules |
-| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 34 architectural decision records with context, trade-offs, and alternatives |
+| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 36 architectural decision records with context, trade-offs, and alternatives |
 | [Master Development Guide](docs/DEVELOPMENT_GUIDE.md) | Local environment setup, coding conventions, testing guidelines, and quality standards |
 | [Production Deployment Guide](docs/devops/01-deployment-guide.md) | Cloud Run service configuration, Google Cloud Secret Manager wiring, and CI/CD pipelines |
 

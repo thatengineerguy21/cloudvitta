@@ -1,0 +1,121 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "total_count": 2,
+  "resources": [
+    {
+      "id": "cloud-object-storage",
+      "name": "cloud-object-storage",
+      "kind": "service",
+      "geo_tags": [
+        "us-east",
+        "us-south",
+        "eu-de"
+      ],
+      "overview_ui": {
+        "en": {
+          "display_name": "Cloud Object Storage",
+          "description": "IBM Cloud Object Storage"
+        }
+      },
+      "pricing": {
+        "type": "tiered-usage",
+        "origin": "pricing",
+        "metrics": [
+          {
+            "metric_id": "standard-storage",
+            "tier_model": "linear",
+            "charge_unit": "GIGABYTE_MONTHS",
+            "charge_unit_name": "Standard Storage",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.0210
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "vault-storage",
+            "tier_model": "linear",
+            "charge_unit": "GIGABYTE_MONTHS",
+            "charge_unit_name": "Vault Storage",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.0115
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "cold-vault-storage",
+            "tier_model": "linear",
+            "charge_unit": "GIGABYTE_MONTHS",
+            "charge_unit_name": "Cold Vault Storage",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.0045
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "is.volume",
+      "name": "is.volume",
+      "kind": "service",
+      "geo_tags": [
+        "us-east"
+      ],
+      "overview_ui": {
+        "en": {
+          "display_name": "Block Storage for VPC",
+          "description": "VPC Block Storage Volumes"
+        }
+      },
+      "pricing": {
+        "type": "tiered-usage",
+        "origin": "pricing",
+        "metrics": [
+          {
+            "metric_id": "general-purpose-storage",
+            "tier_model": "linear",
+            "charge_unit": "GIGABYTE_MONTHS",
+            "charge_unit_name": "General Purpose Storage",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.1000
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

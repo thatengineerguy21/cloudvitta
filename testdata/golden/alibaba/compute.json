@@ -1,0 +1,273 @@
+{
+  "RequestId": "473469C7-AA6F-4DC5-B3DB-A3DC0DE3C83E",
+  "TotalCount": 15,
+  "InstanceTypes": {
+    "InstanceType": [
+      {
+        "InstanceTypeId": "ecs.g7.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 8.0,
+        "InstanceTypeFamily": "ecs.g7",
+        "Price": {
+          "OriginalPrice": 0.096,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.096,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.g7.xlarge",
+        "CpuCoreCount": 4,
+        "MemorySize": 16.0,
+        "InstanceTypeFamily": "ecs.g7",
+        "Price": {
+          "OriginalPrice": 0.192,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.192,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.g7.2xlarge",
+        "CpuCoreCount": 8,
+        "MemorySize": 32.0,
+        "InstanceTypeFamily": "ecs.g7",
+        "Price": {
+          "OriginalPrice": 0.384,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.384,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.g6.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 8.0,
+        "InstanceTypeFamily": "ecs.g6",
+        "Price": {
+          "OriginalPrice": 0.086,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.086,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.c7.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 4.0,
+        "InstanceTypeFamily": "ecs.c7",
+        "Price": {
+          "OriginalPrice": 0.076,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.076,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.c7.xlarge",
+        "CpuCoreCount": 4,
+        "MemorySize": 8.0,
+        "InstanceTypeFamily": "ecs.c7",
+        "Price": {
+          "OriginalPrice": 0.152,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.152,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.c7.2xlarge",
+        "CpuCoreCount": 8,
+        "MemorySize": 16.0,
+        "InstanceTypeFamily": "ecs.c7",
+        "Price": {
+          "OriginalPrice": 0.304,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.304,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.c6.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 4.0,
+        "InstanceTypeFamily": "ecs.c6",
+        "Price": {
+          "OriginalPrice": 0.068,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.068,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.r7.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 16.0,
+        "InstanceTypeFamily": "ecs.r7",
+        "Price": {
+          "OriginalPrice": 0.134,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.134,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.r7.xlarge",
+        "CpuCoreCount": 4,
+        "MemorySize": 32.0,
+        "InstanceTypeFamily": "ecs.r7",
+        "Price": {
+          "OriginalPrice": 0.268,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.268,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.r7.2xlarge",
+        "CpuCoreCount": 8,
+        "MemorySize": 64.0,
+        "InstanceTypeFamily": "ecs.r7",
+        "Price": {
+          "OriginalPrice": 0.536,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.536,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.t6-c1m1.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 2.0,
+        "InstanceTypeFamily": "ecs.t6",
+        "Price": {
+          "OriginalPrice": 0.038,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.038,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.t6-c1m2.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 4.0,
+        "InstanceTypeFamily": "ecs.t6",
+        "Price": {
+          "OriginalPrice": 0.052,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.052,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.i3.xlarge",
+        "CpuCoreCount": 4,
+        "MemorySize": 32.0,
+        "InstanceTypeFamily": "ecs.i3",
+        "Price": {
+          "OriginalPrice": 0.312,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.312,
+          "Currency": "USD"
+        },
+        "Regions": [
+          "us-east-1",
+          "us-west-1"
+        ]
+      },
+      {
+        "InstanceTypeId": "ecs.g7.large",
+        "CpuCoreCount": 2,
+        "MemorySize": 8.0,
+        "InstanceTypeFamily": "ecs.g7",
+        "Price": {
+          "OriginalPrice": 0.650,
+          "DiscountPrice": 0.0,
+          "TradePrice": 0.650,
+          "Currency": "CNY"
+        },
+        "Regions": [
+          "cn-hangzhou"
+        ]
+      }
+    ]
+  }
+}

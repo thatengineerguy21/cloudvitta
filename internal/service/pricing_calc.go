@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
@@ -224,7 +225,43 @@ func (s *PricingService) MatchAndCalculate(ctx context.Context, provider, catego
 		return nil, ErrNoMatchFound
 	}
 
-	hourlyCost, monthlyCost, unit, warnings := handler.CalculateCosts(matchResult, target)
+	matchCopy := *matchResult
+	obsCopy := matchResult.Observation
+
+	var warnings []CalculateWarning
+	if obsCopy.PriceCurrency != "" && obsCopy.PriceCurrency != "USD" {
+		if s.fxSvc != nil {
+			convertedAmt, fxMeta, fxErr := s.fxSvc.Convert(ctx, obsCopy.PriceAmount, obsCopy.PriceCurrency, "USD")
+			if fxErr == nil {
+				obsCopy.PriceAmount = convertedAmt
+				matchCopy.Observation = obsCopy
+				if fxMeta.IsFallback {
+					warnings = append(warnings, CalculateWarning{
+						Provider: provider,
+						Code:     "stale_fx_rate",
+						Message:  "Using fallback exchange rates from database.",
+					})
+				}
+			} else {
+				warnings = append(warnings, CalculateWarning{
+					Provider: provider,
+					Code:     "fx_conversion_failed",
+					Message:  fmt.Sprintf("Failed to convert currency %s to USD: %v", obsCopy.PriceCurrency, fxErr),
+				})
+			}
+		} else {
+			warnings = append(warnings, CalculateWarning{
+				Provider: provider,
+				Code:     "non_usd_currency_unsupported",
+				Message:  fmt.Sprintf("Price currency is %s (not USD).", obsCopy.PriceCurrency),
+			})
+		}
+	}
+
+	hourlyCost, monthlyCost, unit, handlerWarnings := handler.CalculateCosts(&matchCopy, target)
+	if len(handlerWarnings) > 0 {
+		warnings = append(warnings, handlerWarnings...)
+	}
 
 	var isStale bool
 	if s.freshnessSvc != nil {

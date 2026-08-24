@@ -1,0 +1,47 @@
+{
+  "items": [
+    {
+      "partNumber": "B88210",
+      "displayName": "Outbound Data Transfer",
+      "metricName": "Gigabyte Outbound Data Transfer PER MONTH",
+      "serviceCategory": "Networking - Virtual Cloud Network",
+      "serviceCategoryDisplayName": "Networking",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0085
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1",
+        "us-phoenix-1"
+      ]
+    },
+    {
+      "partNumber": "B88211",
+      "displayName": "Intra-Region Data Transfer",
+      "metricName": "Gigabyte Intra-Region Data Transfer PER MONTH",
+      "serviceCategory": "Networking - Virtual Cloud Network",
+      "serviceCategoryDisplayName": "Networking",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0000
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    }
+  ]
+}

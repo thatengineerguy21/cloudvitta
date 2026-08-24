@@ -52,12 +52,12 @@ sequenceDiagram
                 else Valid ordering
                     Adapter->>Adapter: Stream tokens, skip unused blocks via depth tracking
                     
-                    alt Unmapped Taxonomy Encountered (5 Curated Maps)
+                    alt Unmapped Taxonomy Encountered (Curated Maps)
                         Adapter->>QSink: Route unmapped token to quarantine.Sink
                         Note over Adapter: Continue parsing valid items without aborting stream
                     end
                     
-                    Note over Adapter: Multi-Component Observation Splits:<br/>1. RDBMS -> instance + storage rows (ADR 0030)<br/>2. NoSQL -> throughput + storage rows (ADR 0033)<br/>3. Serverless -> request_fee + duration_fee (CPU/Mem)
+                    Note over Adapter: Multi-Component Observation Splits:<br/>1. RDBMS -> instance + storage rows (ADR 0030)<br/>2. NoSQL -> throughput + storage rows (ADR 0033)<br/>3. Serverless -> request_fee + duration_fee (CPU/Mem)<br/>4. Multi-Provider Parity (AWS, Azure, GCP, Oracle, IBM, Alibaba, DigitalOcean)
                     Adapter-->>Orch: FetchResult (observations + unmappedCount + GCS path)
                 end
             end

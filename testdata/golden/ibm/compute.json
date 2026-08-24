@@ -1,0 +1,247 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "total_count": 1,
+  "resources": [
+    {
+      "id": "is.instance",
+      "name": "is.instance",
+      "kind": "service",
+      "geo_tags": [
+        "us-east",
+        "us-south",
+        "eu-de",
+        "eu-gb",
+        "jp-tok"
+      ],
+      "overview_ui": {
+        "en": {
+          "display_name": "Virtual Servers for VPC",
+          "description": "Virtual Server Instances in IBM Cloud VPC"
+        }
+      },
+      "pricing": {
+        "type": "tiered-usage",
+        "origin": "pricing",
+        "metrics": [
+          {
+            "metric_id": "bx2-2x8",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.096
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "bx2-4x16",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.192
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "bx2-8x32",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.384
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "cx2-2x4",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.076
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "cx2-4x8",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.152
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "cx2-8x16",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.304
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "mx2-2x16",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.134
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "mx2-4x32",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.268
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "mx2-8x64",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.536
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "vx2-2x28",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.210
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "vx2-4x56",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.420
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "metric_id": "ba2-2x8",
+            "tier_model": "linear",
+            "charge_unit": "INSTANCE_HOURS",
+            "charge_unit_name": "Instance-Hours",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.086
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

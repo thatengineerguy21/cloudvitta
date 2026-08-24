@@ -18,13 +18,18 @@ Create directories only when their stage implementation requires them.
 │   │
 │   ├── adapter/
 │   │   └── provider/
+│   │       ├── alibaba/         # Alibaba Cloud provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── aws/             # AWS provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── azure/           # Azure provider adapter, fetch + normalize + supported_categories.go
+│   │       ├── digitalocean/    # DigitalOcean provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── gcp/             # GCP provider adapter, fetch + normalize + supported_categories.go
+│   │       ├── ibm/             # IBM Cloud provider adapter, fetch + normalize + supported_categories.go
+│   │       ├── oracle/          # Oracle OCI provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── factory.go       # provider adapter construction factory
 │   │       └── retry.go         # retry and backoff policies
 │   │
 │   ├── fx/                      # foreign exchange service interface and implementations
+│   │   └── frankfurter/         # Frankfurter (ECB) API client
 │   │
 │   ├── store/                   # SQLC generated database code and connection pool constructor
 │   │   └── queries/             # SQL query definition files (*.sql)
@@ -65,7 +70,7 @@ Create directories only when their stage implementation requires them.
 ├── migrations/                  # Tern forward-only SQL migration files
 │
 ├── docs/
-│   ├── 05-REPO-STRUCTURE.md     # repository structure reference
+│   ├── REPO-STRUCTURE.md     # repository structure reference
 │   ├── DEVELOPMENT_GUIDE.md     # step-by-step setup and local development guide
 │   ├── adr/                     # Architectural Decision Records (ADRs)
 │   ├── devops/                  # deployment and operations runbooks

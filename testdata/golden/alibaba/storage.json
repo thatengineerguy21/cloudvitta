@@ -1,0 +1,44 @@
+{
+  "RequestId": "A1B2C3D4-E5F6-7890-ABCD-1234567890AB",
+  "TotalCount": 4,
+  "Items": [
+    {
+      "InstanceTypeId": "oss-standard",
+      "ProductCode": "oss",
+      "TradePrice": 0.0190,
+      "Currency": "USD",
+      "Regions": [
+        "us-east-1",
+        "us-west-1",
+        "eu-central-1"
+      ]
+    },
+    {
+      "InstanceTypeId": "oss-ia",
+      "ProductCode": "oss",
+      "TradePrice": 0.0125,
+      "Currency": "USD",
+      "Regions": [
+        "us-east-1"
+      ]
+    },
+    {
+      "InstanceTypeId": "oss-archive",
+      "ProductCode": "oss",
+      "TradePrice": 0.0048,
+      "Currency": "USD",
+      "Regions": [
+        "us-east-1"
+      ]
+    },
+    {
+      "InstanceTypeId": "cloud_essd",
+      "ProductCode": "disk",
+      "TradePrice": 0.0500,
+      "Currency": "USD",
+      "Regions": [
+        "us-east-1"
+      ]
+    }
+  ]
+}

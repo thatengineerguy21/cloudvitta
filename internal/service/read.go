@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/fx"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
@@ -26,6 +27,7 @@ type PricingService struct {
 	cacheMetrics *observability.CacheMetrics
 	sfGroup      singleflight.Group
 	freshnessSvc *FreshnessService
+	fxSvc        fx.FXService
 }
 
 // PricingOption allows configuring optional dependencies for PricingService.
@@ -49,6 +51,13 @@ func WithCacheMetrics(metrics *observability.CacheMetrics) PricingOption {
 func WithFreshnessService(freshnessSvc *FreshnessService) PricingOption {
 	return func(s *PricingService) {
 		s.freshnessSvc = freshnessSvc
+	}
+}
+
+// WithFXService attaches an FXService to PricingService for currency conversion.
+func WithFXService(fxSvc fx.FXService) PricingOption {
+	return func(s *PricingService) {
+		s.fxSvc = fxSvc
 	}
 }
 

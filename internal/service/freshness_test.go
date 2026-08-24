@@ -24,67 +24,8 @@ func (m *mockDLQReader) Get(ctx context.Context, provider, category string) (dlq
 }
 
 type mockStatusQuerier struct {
+	store.Querier
 	getProviderCategoryStatusFunc func(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error)
-}
-
-func (m *mockStatusQuerier) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-	return store.User{}, errors.New("not implemented")
-}
-
-func (m *mockStatusQuerier) GetUserByEmail(ctx context.Context, email string) (store.User, error) {
-	return store.User{}, errors.New("not implemented")
-}
-
-func (m *mockStatusQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (store.User, error) {
-	return store.User{}, errors.New("not implemented")
-}
-
-func (m *mockStatusQuerier) InsertRefreshToken(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {
-	return store.RefreshToken{}, errors.New("not implemented")
-}
-
-func (m *mockStatusQuerier) GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (store.RefreshToken, error) {
-	return store.RefreshToken{}, errors.New("not implemented")
-}
-
-func (m *mockStatusQuerier) GetRefreshTokenByID(ctx context.Context, id pgtype.UUID) (store.RefreshToken, error) {
-	return store.RefreshToken{}, errors.New("not implemented")
-}
-
-func (m *mockStatusQuerier) RevokeRefreshTokenWithReplacement(ctx context.Context, arg store.RevokeRefreshTokenWithReplacementParams) error {
-	return nil
-}
-
-func (m *mockStatusQuerier) RevokeRefreshTokenByHash(ctx context.Context, arg store.RevokeRefreshTokenByHashParams) error {
-	return nil
-}
-
-func (m *mockStatusQuerier) RevokeRefreshTokenFamily(ctx context.Context, arg store.RevokeRefreshTokenFamilyParams) error {
-	return nil
-}
-
-func (m *mockStatusQuerier) ListRefreshTokensByFamilyID(ctx context.Context, familyID pgtype.UUID) ([]store.RefreshToken, error) {
-	return nil, nil
-}
-
-func (m *mockStatusQuerier) GetPriceObservations(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error) {
-	return nil, nil
-}
-
-func (m *mockStatusQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.GetLatestPriceForSKUParams) (store.PriceObservation, error) {
-	return store.PriceObservation{}, nil
-}
-
-func (m *mockStatusQuerier) GetLatestPriceForSKUAndCategory(ctx context.Context, arg store.GetLatestPriceForSKUAndCategoryParams) (store.PriceObservation, error) {
-	return store.PriceObservation{}, nil
-}
-
-func (m *mockStatusQuerier) UpdatePriceObservationLastSeenAt(ctx context.Context, arg store.UpdatePriceObservationLastSeenAtParams) error {
-	return nil
-}
-
-func (m *mockStatusQuerier) InsertPriceObservation(ctx context.Context, arg store.InsertPriceObservationParams) (int64, error) {
-	return 0, nil
 }
 
 func (m *mockStatusQuerier) GetProviderCategoryStatus(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error) {

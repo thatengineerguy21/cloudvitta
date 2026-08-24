@@ -1,0 +1,20 @@
+{
+  "products": [
+    {
+      "slug": "spaces",
+      "name": "Spaces Object Storage",
+      "type": "spaces",
+      "price_monthly": 5.0,
+      "price_per_gb": 0.0200,
+      "regions": ["nyc3", "sfo3", "ams3", "fra1", "sgp1", "syd1"]
+    },
+    {
+      "slug": "volume",
+      "name": "Block Storage Volume",
+      "type": "volume",
+      "price_monthly": 10.0,
+      "price_per_gb": 0.1000,
+      "regions": ["nyc1", "nyc3", "sfo3", "ams3", "fra1", "lon1", "sgp1", "tor1", "blr1", "syd1"]
+    }
+  ]
+}

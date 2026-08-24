@@ -95,13 +95,152 @@ func TestMapGCPTransferType(t *testing.T) {
 	}
 }
 
-func TestMapTransferType(t *testing.T) {
-	got, err := MapTransferType("aws", "AWS Data Transfer Out")
-	if err != nil || got != "internet_egress" {
-		t.Errorf("MapTransferType(aws, AWS Data Transfer Out) = (%q, %v), want (internet_egress, nil)", got, err)
+func TestMapOracleTransferType(t *testing.T) {
+	tests := []struct {
+		rawType  string
+		wantType string
+		wantErr  error
+	}{
+		{"Outbound Data Transfer", "internet_egress", nil},
+		{"Outbound Data Transfer (Internet)", "internet_egress", nil},
+		{"Data Transfer Out", "internet_egress", nil},
+		{"Internet", "internet_egress", nil},
+		{"Intra-Region Data Transfer", "intra_region", nil},
+		{"Inter-Region Data Transfer", "inter_region", nil},
+		{"UnknownTransferType", "", ErrUnmappedTransferType},
 	}
 
-	_, err = MapTransferType("unmapped_provider", "Internet")
+	for _, tt := range tests {
+		got, err := MapOracleTransferType(tt.rawType)
+		if tt.wantErr != nil {
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("MapOracleTransferType(%q) error = %v, want %v", tt.rawType, err, tt.wantErr)
+			}
+		} else {
+			if err != nil || got != tt.wantType {
+				t.Errorf("MapOracleTransferType(%q) = (%q, %v), want (%q, nil)", tt.rawType, got, err, tt.wantType)
+			}
+		}
+	}
+}
+
+func TestMapIBMTransferType(t *testing.T) {
+	tests := []struct {
+		rawType  string
+		wantType string
+		wantErr  error
+	}{
+		{"VPC Public Egress", "internet_egress", nil},
+		{"Public Egress", "internet_egress", nil},
+		{"public-egress", "internet_egress", nil},
+		{"Public Gateway", "internet_egress", nil},
+		{"Floating IP", "internet_egress", nil},
+		{"Internet", "internet_egress", nil},
+		{"Intra-Region Data Transfer", "intra_region", nil},
+		{"Inter-Region Data Transfer", "inter_region", nil},
+		{"UnknownTransferType", "", ErrUnmappedTransferType},
+	}
+
+	for _, tt := range tests {
+		got, err := MapIBMTransferType(tt.rawType)
+		if tt.wantErr != nil {
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("MapIBMTransferType(%q) error = %v, want %v", tt.rawType, err, tt.wantErr)
+			}
+		} else {
+			if err != nil || got != tt.wantType {
+				t.Errorf("MapIBMTransferType(%q) = (%q, %v), want (%q, nil)", tt.rawType, got, err, tt.wantType)
+			}
+		}
+	}
+}
+
+func TestMapAlibabaTransferType(t *testing.T) {
+	tests := []struct {
+		rawType  string
+		wantType string
+		wantErr  error
+	}{
+		{"Pay-By-Traffic Internet Egress", "internet_egress", nil},
+		{"Internet Data Transfer", "internet_egress", nil},
+		{"Data Transfer Out", "internet_egress", nil},
+		{"data-transfer-out", "internet_egress", nil},
+		{"EIP", "internet_egress", nil},
+		{"Elastic IP", "internet_egress", nil},
+		{"Internet", "internet_egress", nil},
+		{"Intra-Region Data Transfer", "intra_region", nil},
+		{"Inter-Region Data Transfer", "inter_region", nil},
+		{"UnknownTransferType", "", ErrUnmappedTransferType},
+	}
+
+	for _, tt := range tests {
+		got, err := MapAlibabaTransferType(tt.rawType)
+		if tt.wantErr != nil {
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("MapAlibabaTransferType(%q) error = %v, want %v", tt.rawType, err, tt.wantErr)
+			}
+		} else {
+			if err != nil || got != tt.wantType {
+				t.Errorf("MapAlibabaTransferType(%q) = (%q, %v), want (%q, nil)", tt.rawType, got, err, tt.wantType)
+			}
+		}
+	}
+}
+
+func TestMapDigitalOceanTransferType(t *testing.T) {
+	tests := []struct {
+		rawType  string
+		wantType string
+		wantErr  error
+	}{
+		{"Bandwidth", "internet_egress", nil},
+		{"bandwidth", "internet_egress", nil},
+		{"Bandwidth Transfer", "internet_egress", nil},
+		{"bandwidth-overage", "internet_egress", nil},
+		{"Data Transfer Out", "internet_egress", nil},
+		{"Internet", "internet_egress", nil},
+		{"Intra-Region Data Transfer", "intra_region", nil},
+		{"Inter-Region Data Transfer", "inter_region", nil},
+		{"UnknownTransferType", "", ErrUnmappedTransferType},
+	}
+
+	for _, tt := range tests {
+		got, err := MapDigitalOceanTransferType(tt.rawType)
+		if tt.wantErr != nil {
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("MapDigitalOceanTransferType(%q) error = %v, want %v", tt.rawType, err, tt.wantErr)
+			}
+		} else {
+			if err != nil || got != tt.wantType {
+				t.Errorf("MapDigitalOceanTransferType(%q) = (%q, %v), want (%q, nil)", tt.rawType, got, err, tt.wantType)
+			}
+		}
+	}
+}
+
+func TestMapTransferType(t *testing.T) {
+	providers := []struct {
+		provider string
+		rawType  string
+		wantType string
+	}{
+		{"aws", "AWS Data Transfer Out", "internet_egress"},
+		{"azure", "Data Transfer Out", "internet_egress"},
+		{"gcp", "Network Internet Egress", "internet_egress"},
+		{"oracle", "Outbound Data Transfer", "internet_egress"},
+		{"ibm", "VPC Public Egress", "internet_egress"},
+		{"alibaba", "Pay-By-Traffic Internet Egress", "internet_egress"},
+		{"digitalocean", "Bandwidth Transfer", "internet_egress"},
+	}
+
+	for _, tc := range providers {
+		got, err := MapTransferType(tc.provider, tc.rawType)
+		if err != nil || got != tc.wantType {
+			t.Errorf("MapTransferType(%s, %s) = (%q, %v), want (%q, nil)", tc.provider, tc.rawType, got, err, tc.wantType)
+		}
+	}
+
+	_, err := MapTransferType("unmapped_provider", "Internet")
 	if err == nil {
 		t.Errorf("MapTransferType(unmapped_provider, Internet) expected error, got nil")
 	}

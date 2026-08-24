@@ -125,34 +125,95 @@ gcloud run services add-iam-policy-binding "${SERVICE_NAME:-cloudvitta-api}" \
 
 ## Phase 3: GitHub Secrets and Variables Configuration
 
-### 1. Repository Secrets (Required)
-Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Secrets** -> **New repository secret**.
+Navigate to your repository on GitHub:
+**Settings** > **Secrets and variables** > **Actions** > **Secrets** tab > click **New repository secret**.
 
-1. **`GCP_PROJECT_ID`**: Your Google Cloud Project ID (e.g., `cloudvitta-prod`).
-2. **`GCP_SERVICE_ACCOUNT`**: The email of the service account you created (e.g., `cloudvitta-deployer@your-project-id.iam.gserviceaccount.com`).
-3. **`GCP_WORKLOAD_IDENTITY_PROVIDER`**: The Workload Identity Provider resource name obtained via:
-   ```bash
-   gcloud iam workload-identity-pools providers describe "github-provider" \
-     --project="${PROJECT_ID}" \
-     --location="global" \
-     --format="value(name)"
-   ```
-4. **`NEON_PROD_DSN`**: The connection string to your production Neon Postgres database (e.g., `postgres://user:password@ep-cool-db-1234.us-east-2.aws.neon.tech/neondb?sslmode=require`).
-5. **`REDIS_URL`**: The connection string for Upstash/Redis (e.g., `rediss://default:password@us1-cool-redis-1234.upstash.io:32451`).
-6. **`CLOUDVITTA_AUTH_JWT_SECRET`** (or **`JWT_SECRET`**): Secret used for signing JWT access tokens (must be at least 32 characters long).
-7. **`CLOUDVITTA_AUTH_ANON_COOKIE_SECRET`**: Secret used for HMAC-signing anonymous tracking cookies (`cv_anon_id`).
-8. **`CLOUDVITTA_GCP_API_KEY`**: Optional API key for Google Cloud Billing Catalog API access during ingestion.
-9. **`GRAFANA_OTLP_ENDPOINT`**: Your Grafana Cloud OTLP HTTP endpoint (e.g., `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`).
-10. **`GRAFANA_OTLP_HEADERS`**: Base64-encoded basic authentication header for Grafana Cloud (e.g., `Authorization=Basic <BASE64_ENCODED_INSTANCE_ID_AND_TOKEN>`).
+---
 
-### 2. Repository Variables (Optional Overrides)
-Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Variables** -> **New repository variable**.
+### 1. Google Cloud & Workload Identity Federation (WIF) Secrets
+
+| Secret Name | Description & Acquisition Command |
+| :--- | :--- |
+| `GCP_PROJECT_ID` | Your Google Cloud project ID (e.g. `cloudvitta-prod`). |
+| `GCP_SERVICE_ACCOUNT` | The service account email created in Phase 2 (e.g. `cloudvitta-deployer@your-project-id.iam.gserviceaccount.com`). |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full resource URI for the GitHub Actions WIF provider. Retrieve with:<br>`gcloud iam workload-identity-pools providers describe "github-provider" --project="${PROJECT_ID}" --location="global" --format="value(name)"` |
+
+---
+
+### 2. Database & Cache Infrastructure Secrets
+
+| Secret Name | Description & Extraction Steps |
+| :--- | :--- |
+| `NEON_PROD_DSN` | Production PostgreSQL connection string with SSL required:<br>`postgres://user:password@ep-prod-db-1234.us-east-2.aws.neon.tech/neondb?sslmode=require`<br>*Note: Use the direct host (non-pooler) to allow Tern DDL migration locks.* |
+| `REDIS_URL` | Upstash Redis TLS connection string:<br>`rediss://default:password@us1-prod-redis-1234.upstash.io:32451` |
+
+---
+
+### 3. Authentication & Security Secrets
+
+Generate high-entropy keys on your local terminal before adding to GitHub Secrets:
+
+1. **`CLOUDVITTA_AUTH_JWT_SECRET` (or `JWT_SECRET`)**:
+   - Generate a 256-bit base64 secret (must be $\ge 32$ characters):
+     ```bash
+     openssl rand -base64 32
+     ```
+   - Paste the generated string into the secret value.
+
+2. **`CLOUDVITTA_AUTH_ANON_COOKIE_SECRET`**:
+   - Generate a distinct 256-bit base64 secret for HMAC signing `cv_anon_id` cookies:
+     ```bash
+     openssl rand -base64 32
+     ```
+   - Paste the generated string into the secret value.
+
+---
+
+### 4. Cloud Provider API Ingestion Secrets (Optional)
+
+Configure API keys to enable scheduled ingestion runs across supported cloud providers:
+
+1. **`CLOUDVITTA_GCP_API_KEY`**:
+   - *Console*: [Google Cloud Console](https://console.cloud.google.com/) > **APIs & Services** > **Credentials** > **Create Credentials** > **API key**.
+   - *Value*: The created API key string (e.g. `AIzaSy...`).
+
+2. **`CLOUDVITTA_IBM_API_KEY`**:
+   - *Console*: [IBM Cloud Console](https://cloud.ibm.com/) > **Manage** > **Access (IAM)** > **API keys** > **Create an IBM Cloud API key**.
+   - *Value*: The generated IBM IAM API key.
+
+3. **`CLOUDVITTA_ALIBABA_ACCESS_KEY_ID`**:
+   - *Console*: [Alibaba Cloud Console](https://usercenter.console.aliyun.com/) > **AccessKey Management** > **Create AccessKey**.
+   - *Value*: The generated `AccessKeyId` string.
+
+4. **`CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET`**:
+   - *Console*: [Alibaba Cloud Console](https://usercenter.console.aliyun.com/) > **AccessKey Management** > **Create AccessKey**.
+   - *Value*: The matching `AccessKeySecret` string.
+
+5. **`CLOUDVITTA_DIGITALOCEAN_TOKEN`**:
+   - *Console*: [DigitalOcean Control Panel](https://cloud.digitalocean.com/) > **API** > **Tokens** > **Generate New Token** (select `Read` scope).
+   - *Value*: The generated Personal Access Token (e.g. `dop_v1_...`).
+
+---
+
+### 5. Observability Secrets (Grafana Cloud)
+
+| Secret Name | Description & Setup Steps |
+| :--- | :--- |
+| `GRAFANA_OTLP_ENDPOINT` | OTLP HTTP export endpoint from Grafana Cloud (e.g. `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`). |
+| `GRAFANA_OTLP_HEADERS` | Basic authentication header formatted as `Authorization=Basic <BASE64_STRING>`.<br>Generate base64 string using: `echo -n "InstanceID:APIToken" \| base64` |
+
+---
+
+### 6. Repository Variables (Optional Overrides)
+
+Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Variables** tab -> click **New repository variable**:
 
 * **`GCP_REGION`**: Target GCP region for Cloud Run and Artifact Registry (default: `asia-southeast1`).
 * **`GAR_LOCATION`**: Specific Artifact Registry location if different from `GCP_REGION` (default: value of `GCP_REGION`).
 * **`GAR_REPO`**: Artifact Registry Docker repository name (default: `cloudvitta-repo`).
 * **`SERVICE_NAME`**: Cloud Run service name (default: `cloudvitta-api`).
-* **`GCS_BUCKET_NAME`**: GCS raw fixtures bucket name (default: `cloudvitta-raw-fixtures`).
+* **`GCS_BUCKET_NAME`**: GCS raw fixtures and payload bucket name (default: `cloudvitta-raw-fixtures`).
+* **`CORS_ALLOWED_ORIGINS`**: Comma-separated allowed frontend origins (default: `https://cloudvitta.dev`).
 
 ---
 
@@ -165,14 +226,14 @@ Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> 
 
 ### What happens during CD?
 1. **Build & Push**: The Go application is packaged into a minimal Docker container and sent to Artifact Registry.
-2. **Database Migrations**: `tern` connects to your Neon production database and applies any new migrations. Since we enforce forward-only migrations, this is safe to do automatically.
-3. **Deploy**: Cloud Run pulls the new image and spins up new instances. Traffic is automatically shifted to the new revision once it is healthy.
+2. **Database Migrations**: `tern` connects to your Neon production database and applies any new forward migrations (`0001_initial_schema.sql`, `0002_create_users_and_refresh_tokens.sql`, `0003_create_fx_rates.sql`). Since we enforce forward-only migrations (ADR 0028), this executes safely on every deploy.
+3. **Deploy**: Cloud Run pulls the new image and spins up new instances. Traffic is automatically shifted to the new revision once it passes readiness probes.
 
 ### Rollbacks
-If a bad deployment goes out:
+If a deployment exhibits unexpected behavior:
 1. Go to the [Google Cloud Run Console](https://console.cloud.google.com/run).
 2. Click on the `cloudvitta-api` service.
 3. Go to the **Revisions** tab.
 4. Select the previous healthy revision and click **Manage Traffic**.
 5. Route 100% of traffic back to the old revision.
-6. Fix the code locally, commit, and push a new fix to `main`.
+6. Fix the issue locally with a new forward commit (or forward migration), and push to `main`.

@@ -664,3 +664,97 @@ func TestComputeRegressionMatchVsLegacy(t *testing.T) {
 			legacyResults[0].MatchQuality, newResult.MatchQuality)
 	}
 }
+
+func TestStorageScorer_4NewProviders(t *testing.T) {
+	scorer := service.StorageScorer{}
+	target := service.MatchTarget{
+		SizeGB:       500,
+		StorageClass: "standard",
+		Category:     "storage",
+	}
+
+	obsList := []domain.PriceObservation{
+		{
+			Provider:          "oracle",
+			SkuID:             "SKU-OCI-B88206",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+		},
+		{
+			Provider:          "ibm",
+			SkuID:             "SKU-IBM-STANDARD-STORAGE",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+		},
+		{
+			Provider:          "alibaba",
+			SkuID:             "SKU-ALI-STORAGE-STANDARD",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+		},
+		{
+			Provider:          "digitalocean",
+			SkuID:             "SKU-DO-STORAGE-SPACES",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+		},
+	}
+
+	for _, obs := range obsList {
+		t.Run(obs.Provider, func(t *testing.T) {
+			dist, missing, eligible := scorer.Score(obs, target)
+			if !eligible {
+				t.Fatalf("expected %s observation to be eligible", obs.Provider)
+			}
+			if dist != 0 {
+				t.Errorf("expected %s distance 0, got %f", obs.Provider, dist)
+			}
+			if len(missing) != 0 {
+				t.Errorf("expected no missing attributes for %s, got %v", obs.Provider, missing)
+			}
+		})
+	}
+}
+
+func TestNetworkScorer_4NewProviders(t *testing.T) {
+	scorer := service.NetworkScorer{}
+	target := service.MatchTarget{
+		EgressGB:     1000,
+		TransferType: "internet_egress",
+		Category:     "network",
+	}
+
+	obsList := []domain.PriceObservation{
+		{
+			Provider:          "oracle",
+			SkuID:             "SKU-OCI-B88210",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000, TransferType: "internet_egress"},
+		},
+		{
+			Provider:          "ibm",
+			SkuID:             "SKU-IBM-PUBLIC-EGRESS",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000, TransferType: "internet_egress"},
+		},
+		{
+			Provider:          "alibaba",
+			SkuID:             "SKU-ALI-NETWORK-DATA-TRANSFER-OUT",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000, TransferType: "internet_egress"},
+		},
+		{
+			Provider:          "digitalocean",
+			SkuID:             "SKU-DO-NETWORK-BANDWIDTH",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000, TransferType: "internet_egress"},
+		},
+	}
+
+	for _, obs := range obsList {
+		t.Run(obs.Provider, func(t *testing.T) {
+			dist, missing, eligible := scorer.Score(obs, target)
+			if !eligible {
+				t.Fatalf("expected %s observation to be eligible", obs.Provider)
+			}
+			if dist != 0 {
+				t.Errorf("expected %s distance 0, got %f", obs.Provider, dist)
+			}
+			if len(missing) != 0 {
+				t.Errorf("expected no missing attributes for %s, got %v", obs.Provider, missing)
+			}
+		})
+	}
+}

@@ -24,6 +24,9 @@ type Config struct {
 	CORS          CORSConfig          `koanf:"cors"`
 	Observability ObservabilityConfig `koanf:"observability"`
 	GCP           GCPConfig           `koanf:"gcp"`
+	IBM           IBMConfig           `koanf:"ibm"`
+	Alibaba       AlibabaConfig       `koanf:"alibaba"`
+	DigitalOcean  DigitalOceanConfig  `koanf:"digitalocean"`
 	Freshness     FreshnessConfig     `koanf:"freshness"`
 }
 
@@ -114,6 +117,19 @@ type ObservabilityConfig struct {
 
 type GCPConfig struct {
 	APIKey string `koanf:"api_key"`
+}
+
+type IBMConfig struct {
+	APIKey string `koanf:"api_key"`
+}
+
+type AlibabaConfig struct {
+	AccessKeyID     string `koanf:"access_key_id"`
+	AccessKeySecret string `koanf:"access_key_secret"`
+}
+
+type DigitalOceanConfig struct {
+	Token string `koanf:"token"`
 }
 
 type FreshnessConfig struct {
@@ -244,7 +260,41 @@ func resolveEnvFallbacks(cfg *Config) error {
 		}
 	}
 
-	// 8. Resolve Auth JWT Secret fallback
+	// 8. Resolve IBM fallbacks
+	if cfg.IBM.APIKey == "" {
+		if val := os.Getenv("CLOUDVITTA_IBM_API_KEY"); val != "" {
+			cfg.IBM.APIKey = val
+		} else {
+			cfg.IBM.APIKey = os.Getenv("IBM_API_KEY")
+		}
+	}
+
+	// 9. Resolve Alibaba fallbacks
+	if cfg.Alibaba.AccessKeyID == "" {
+		if val := os.Getenv("CLOUDVITTA_ALIBABA_ACCESS_KEY_ID"); val != "" {
+			cfg.Alibaba.AccessKeyID = val
+		} else {
+			cfg.Alibaba.AccessKeyID = os.Getenv("ALIBABA_ACCESS_KEY_ID")
+		}
+	}
+	if cfg.Alibaba.AccessKeySecret == "" {
+		if val := os.Getenv("CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET"); val != "" {
+			cfg.Alibaba.AccessKeySecret = val
+		} else {
+			cfg.Alibaba.AccessKeySecret = os.Getenv("ALIBABA_ACCESS_KEY_SECRET")
+		}
+	}
+
+	// 10. Resolve DigitalOcean fallbacks
+	if cfg.DigitalOcean.Token == "" {
+		if val := os.Getenv("CLOUDVITTA_DIGITALOCEAN_TOKEN"); val != "" {
+			cfg.DigitalOcean.Token = val
+		} else {
+			cfg.DigitalOcean.Token = os.Getenv("DIGITALOCEAN_TOKEN")
+		}
+	}
+
+	// 11. Resolve Auth JWT Secret fallback
 	if cfg.Auth.JWTSecret == "" {
 		if val := os.Getenv("CLOUDVITTA_AUTH_JWT_SECRET"); val != "" {
 			cfg.Auth.JWTSecret = val

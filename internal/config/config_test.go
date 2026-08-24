@@ -307,3 +307,61 @@ func TestLoad_CORS_WildcardWithCredentials_Validation(t *testing.T) {
 		t.Errorf("expected AllowedOrigins ['*'], got %v", cfg.CORS.AllowedOrigins)
 	}
 }
+
+func TestLoad_IBMConfigFallback(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("IBM_API_KEY", "ibm-secret-api-key")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	if cfg.IBM.APIKey != "ibm-secret-api-key" {
+		t.Errorf("expected IBM.APIKey 'ibm-secret-api-key', got %s", cfg.IBM.APIKey)
+	}
+}
+
+func TestLoad_AlibabaConfigFallback(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("ALIBABA_ACCESS_KEY_ID", "ali-access-key-id")
+	t.Setenv("ALIBABA_ACCESS_KEY_SECRET", "ali-access-key-secret")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	if cfg.Alibaba.AccessKeyID != "ali-access-key-id" {
+		t.Errorf("expected Alibaba.AccessKeyID 'ali-access-key-id', got %s", cfg.Alibaba.AccessKeyID)
+	}
+	if cfg.Alibaba.AccessKeySecret != "ali-access-key-secret" {
+		t.Errorf("expected Alibaba.AccessKeySecret 'ali-access-key-secret', got %s", cfg.Alibaba.AccessKeySecret)
+	}
+}
+
+func TestLoad_DigitalOceanConfigFallback(t *testing.T) {
+	os.Clearenv()
+	t.Setenv("DATABASE_URL", "postgres://testuser:testpass@localhost:5432/neondb?sslmode=disable")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("GCS_BUCKET_NAME", "test-bucket")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("DIGITALOCEAN_TOKEN", "do-secret-access-token")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	if cfg.DigitalOcean.Token != "do-secret-access-token" {
+		t.Errorf("expected DigitalOcean.Token 'do-secret-access-token', got %s", cfg.DigitalOcean.Token)
+	}
+}
