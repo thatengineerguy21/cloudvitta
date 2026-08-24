@@ -402,9 +402,95 @@ func seedContractComputeObservations(ctx context.Context, t *testing.T, rdb *red
 		},
 	}
 
+	oracleRegionGroup, err := regionmap.MapRegion("oracle", "us-ashburn-1")
+	if err != nil {
+		t.Fatalf("MapRegion(oracle, us-ashburn-1) failed: %v", err)
+	}
+	ibmRegionGroup, err := regionmap.MapRegion("ibm", "us-east")
+	if err != nil {
+		t.Fatalf("MapRegion(ibm, us-east) failed: %v", err)
+	}
+	aliRegionGroup, err := regionmap.MapRegion("alibaba", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(alibaba, us-east-1) failed: %v", err)
+	}
+	doRegionGroup, err := regionmap.MapRegion("digitalocean", "nyc3")
+	if err != nil {
+		t.Fatalf("MapRegion(digitalocean, nyc3) failed: %v", err)
+	}
+
+	oracleObs := []domain.PriceObservation{
+		{
+			Provider:        "oracle",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-OCI-E4-FLEX-2-4",
+			DisplayName:     "VM.Standard.E4.Flex (1 OCPU, 4 GB)",
+			Region:          "us-ashburn-1",
+			RegionGroup:     oracleRegionGroup,
+			Unit:            "hour",
+			PriceAmount:     decimal.RequireFromString("0.0250"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+			FetchedAt:       baseTime.Add(-1 * time.Hour),
+		},
+	}
+	ibmObs := []domain.PriceObservation{
+		{
+			Provider:        "ibm",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-IBM-BX2-2X4",
+			DisplayName:     "bx2-2x4",
+			Region:          "us-east",
+			RegionGroup:     ibmRegionGroup,
+			Unit:            "hour",
+			PriceAmount:     decimal.RequireFromString("0.0480"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+			FetchedAt:       baseTime.Add(-1 * time.Hour),
+		},
+	}
+	aliObs := []domain.PriceObservation{
+		{
+			Provider:        "alibaba",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-ALI-ECS-G7-2X4",
+			DisplayName:     "ecs.g7.large",
+			Region:          "us-east-1",
+			RegionGroup:     aliRegionGroup,
+			Unit:            "hour",
+			PriceAmount:     decimal.RequireFromString("0.0450"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+			FetchedAt:       baseTime.Add(-1 * time.Hour),
+		},
+	}
+	doObs := []domain.PriceObservation{
+		{
+			Provider:        "digitalocean",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-DO-S-2VCPU-4GB",
+			DisplayName:     "s-2vcpu-4gb",
+			Region:          "nyc3",
+			RegionGroup:     doRegionGroup,
+			Unit:            "hour",
+			PriceAmount:     decimal.RequireFromString("0.0357"),
+			PriceCurrency:   "USD",
+			PricingModel:    "OnDemand",
+			Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+			FetchedAt:       baseTime.Add(-1 * time.Hour),
+		},
+	}
+
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), awsObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", "eastus"), azureObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", "us-east4"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "oracle", "compute", "us-ashburn-1"), oracleObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "ibm", "compute", "us-east"), ibmObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "alibaba", "compute", "us-east-1"), aliObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "digitalocean", "compute", "nyc3"), doObs, cache.DefaultTTL)
 }
 
 func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
@@ -421,6 +507,22 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
 	if err != nil {
 		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+	oracleRegionGroup, err := regionmap.MapRegion("oracle", "us-ashburn-1")
+	if err != nil {
+		t.Fatalf("MapRegion(oracle, us-ashburn-1) failed: %v", err)
+	}
+	ibmRegionGroup, err := regionmap.MapRegion("ibm", "us-east")
+	if err != nil {
+		t.Fatalf("MapRegion(ibm, us-east) failed: %v", err)
+	}
+	aliRegionGroup, err := regionmap.MapRegion("alibaba", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(alibaba, us-east-1) failed: %v", err)
+	}
+	doRegionGroup, err := regionmap.MapRegion("digitalocean", "nyc3")
+	if err != nil {
+		t.Fatalf("MapRegion(digitalocean, nyc3) failed: %v", err)
 	}
 
 	awsObs := []domain.PriceObservation{
@@ -513,10 +615,78 @@ func seedContractStorageObservations(ctx context.Context, t *testing.T, rdb *red
 			FetchedAt:         baseTime.Add(-1 * time.Hour),
 		},
 	}
+	oracleStorageObs := []domain.PriceObservation{
+		{
+			Provider:          "oracle",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-OCI-OBJ-STD",
+			DisplayName:       "Object Storage Standard",
+			Region:            "us-ashburn-1",
+			RegionGroup:       oracleRegionGroup,
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.0255"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
+	ibmStorageObs := []domain.PriceObservation{
+		{
+			Provider:          "ibm",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-IBM-COS-STD",
+			DisplayName:       "Cloud Object Storage Standard",
+			Region:            "us-east",
+			RegionGroup:       ibmRegionGroup,
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.0220"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
+	aliStorageObs := []domain.PriceObservation{
+		{
+			Provider:          "alibaba",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-ALI-OSS-STD",
+			DisplayName:       "Object Storage Standard",
+			Region:            "us-east-1",
+			RegionGroup:       aliRegionGroup,
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.0190"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
+	doStorageObs := []domain.PriceObservation{
+		{
+			Provider:          "digitalocean",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-DO-SPACES-STD",
+			DisplayName:       "Spaces Standard Storage",
+			Region:            "nyc3",
+			RegionGroup:       doRegionGroup,
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.0200"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
 
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "eastus"), azureObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east4"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "oracle", "storage", "us-ashburn-1"), oracleStorageObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "ibm", "storage", "us-east"), ibmStorageObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "alibaba", "storage", "us-east-1"), aliStorageObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "digitalocean", "storage", "nyc3"), doStorageObs, cache.DefaultTTL)
 }
 
 func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
@@ -533,6 +703,22 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 	gcpRegionGroup, err := regionmap.MapRegion("gcp", "us-east4")
 	if err != nil {
 		t.Fatalf("MapRegion(gcp, us-east4) failed: %v", err)
+	}
+	oracleRegionGroup, err := regionmap.MapRegion("oracle", "us-ashburn-1")
+	if err != nil {
+		t.Fatalf("MapRegion(oracle, us-ashburn-1) failed: %v", err)
+	}
+	ibmRegionGroup, err := regionmap.MapRegion("ibm", "us-east")
+	if err != nil {
+		t.Fatalf("MapRegion(ibm, us-east) failed: %v", err)
+	}
+	aliRegionGroup, err := regionmap.MapRegion("alibaba", "us-east-1")
+	if err != nil {
+		t.Fatalf("MapRegion(alibaba, us-east-1) failed: %v", err)
+	}
+	doRegionGroup, err := regionmap.MapRegion("digitalocean", "nyc3")
+	if err != nil {
+		t.Fatalf("MapRegion(digitalocean, nyc3) failed: %v", err)
 	}
 
 	awsObs := []domain.PriceObservation{
@@ -625,10 +811,78 @@ func seedContractNetworkObservations(ctx context.Context, t *testing.T, rdb *red
 			FetchedAt:         baseTime.Add(-1 * time.Hour),
 		},
 	}
+	oracleNetworkObs := []domain.PriceObservation{
+		{
+			Provider:          "oracle",
+			ServiceCategory:   "network",
+			SkuID:             "SKU-OCI-NET-EGRESS",
+			DisplayName:       "Outbound Data Transfer",
+			Region:            "us-ashburn-1",
+			RegionGroup:       oracleRegionGroup,
+			Unit:              "GB",
+			PriceAmount:       decimal.RequireFromString("0.0085"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 50, TransferType: "internet_egress"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
+	ibmNetworkObs := []domain.PriceObservation{
+		{
+			Provider:          "ibm",
+			ServiceCategory:   "network",
+			SkuID:             "SKU-IBM-NET-EGRESS",
+			DisplayName:       "Public Egress",
+			Region:            "us-east",
+			RegionGroup:       ibmRegionGroup,
+			Unit:              "GB",
+			PriceAmount:       decimal.RequireFromString("0.0900"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 50, TransferType: "internet_egress"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
+	aliNetworkObs := []domain.PriceObservation{
+		{
+			Provider:          "alibaba",
+			ServiceCategory:   "network",
+			SkuID:             "SKU-ALI-NET-EGRESS",
+			DisplayName:       "PayByTraffic Internet Egress",
+			Region:            "us-east-1",
+			RegionGroup:       aliRegionGroup,
+			Unit:              "GB",
+			PriceAmount:       decimal.RequireFromString("0.0800"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 50, TransferType: "internet_egress"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
+	doNetworkObs := []domain.PriceObservation{
+		{
+			Provider:          "digitalocean",
+			ServiceCategory:   "network",
+			SkuID:             "SKU-DO-NET-EGRESS",
+			DisplayName:       "Additional Bandwidth Transfer Out",
+			Region:            "nyc3",
+			RegionGroup:       doRegionGroup,
+			Unit:              "GB",
+			PriceAmount:       decimal.RequireFromString("0.0100"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 50, TransferType: "internet_egress"},
+			FetchedAt:         baseTime.Add(-1 * time.Hour),
+		},
+	}
 
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "eastus"), azureObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east4"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "oracle", "network", "us-ashburn-1"), oracleNetworkObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "ibm", "network", "us-east"), ibmNetworkObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "alibaba", "network", "us-east-1"), aliNetworkObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "digitalocean", "network", "nyc3"), doNetworkObs, cache.DefaultTTL)
 }
 
 func seedContractKubernetesObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
@@ -3170,13 +3424,24 @@ func TestContractParity_Calculate(t *testing.T) {
 
 		assertCalculateParity(t, restResp, mcpResp)
 
-		// Assert all 7 categories are returned for each provider
+		// Assert full categories for providers that support and seed all 7 categories (aws, azure, gcp),
+		// and partial category results for providers with focused/partial seed catalogs (oracle, ibm, alibaba, digitalocean).
 		for _, pr := range restResp.Results {
-			if len(pr.Categories) != 7 {
-				t.Errorf("provider %s: expected 7 categories in complete workload, got %d", pr.Provider, len(pr.Categories))
-			}
-			if pr.Partial {
-				t.Errorf("provider %s: expected partial=false, got partial=true", pr.Provider)
+			switch pr.Provider {
+			case "aws", "azure", "gcp":
+				if len(pr.Categories) != 7 {
+					t.Errorf("provider %s: expected 7 categories in complete workload, got %d", pr.Provider, len(pr.Categories))
+				}
+				if pr.Partial {
+					t.Errorf("provider %s: expected partial=false, got partial=true", pr.Provider)
+				}
+			default:
+				if len(pr.Categories) != 3 {
+					t.Errorf("provider %s: expected 3 categories in complete workload, got %d", pr.Provider, len(pr.Categories))
+				}
+				if !pr.Partial {
+					t.Errorf("provider %s: expected partial=true, got partial=false", pr.Provider)
+				}
 			}
 		}
 	})
@@ -3727,5 +3992,179 @@ func TestContractParity_ProviderStatus(t *testing.T) {
 		if errMCP == nil {
 			t.Error("expected MCP tool error for unknown provider, got nil")
 		}
+	})
+}
+
+// 8. 7-Provider Complete Fanout & Parity Verification
+func TestContractParity_SevenProviders_FullFanout(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractComputeObservations(ctx, t, harness.rdb, harness.fixedNow)
+	seedContractStorageObservations(ctx, t, harness.rdb, harness.fixedNow)
+	seedContractNetworkObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	expectedProviders := []string{"aws", "azure", "gcp", "oracle", "ibm", "alibaba", "digitalocean"}
+
+	t.Run("Compute_SevenProviders", func(t *testing.T) {
+		restResp, code, body := invokeREST[rest.ComputeComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			"/api/v1/prices/compute?vcpu=2&ram_gb=4&family=general_purpose&region=us-east",
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST compute comparison failed: %d: %s", code, body)
+		}
+
+		vcpu := 2.0
+		ramGB := 4.0
+		mcpResp, err := invokeMCP[mcp.ComputeComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_compute",
+			mcp.CompareComputeInput{
+				VCPU:   &vcpu,
+				RAMGB:  &ramGB,
+				Family: "general_purpose",
+				Region: "us-east",
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP compare_compute failed: %v", err)
+		}
+
+		if len(restResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in REST compute comparison, got %d", len(expectedProviders), len(restResp.Results))
+		}
+		if len(mcpResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in MCP compute comparison, got %d", len(expectedProviders), len(mcpResp.Results))
+		}
+
+		assertComputeParity(t, restResp, mcpResp)
+	})
+
+	t.Run("Storage_SevenProviders", func(t *testing.T) {
+		restResp, code, body := invokeREST[rest.StorageComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			"/api/v1/prices/storage?size_gb=100&storage_class=standard&region=us-east",
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST storage comparison failed: %d: %s", code, body)
+		}
+
+		sizeGB := 100.0
+		mcpResp, err := invokeMCP[mcp.StorageComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_storage",
+			mcp.CompareStorageInput{
+				SizeGB:       &sizeGB,
+				StorageClass: "standard",
+				Region:       "us-east",
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP compare_storage failed: %v", err)
+		}
+
+		if len(restResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in REST storage comparison, got %d", len(expectedProviders), len(restResp.Results))
+		}
+		if len(mcpResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in MCP storage comparison, got %d", len(expectedProviders), len(mcpResp.Results))
+		}
+
+		assertStorageParity(t, restResp, mcpResp)
+	})
+
+	t.Run("Network_SevenProviders", func(t *testing.T) {
+		restResp, code, body := invokeREST[rest.NetworkComparisonResponse](
+			t, harness.restRouter, http.MethodGet,
+			"/api/v1/prices/network?egress_gb=50&transfer_type=internet_egress&region=us-east",
+			nil, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST network comparison failed: %d: %s", code, body)
+		}
+
+		egressGB := 50.0
+		mcpResp, err := invokeMCP[mcp.NetworkComparisonResponse](
+			ctx, t, harness.mcpClient, "compare_network",
+			mcp.CompareNetworkInput{
+				EgressGB:     &egressGB,
+				TransferType: "internet_egress",
+				Region:       "us-east",
+			},
+		)
+		if err != nil {
+			t.Fatalf("MCP compare_network failed: %v", err)
+		}
+
+		if len(restResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in REST network comparison, got %d", len(expectedProviders), len(restResp.Results))
+		}
+		if len(mcpResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in MCP network comparison, got %d", len(expectedProviders), len(mcpResp.Results))
+		}
+
+		assertNetworkParity(t, restResp, mcpResp)
+	})
+
+	t.Run("CalculateWorkload_SevenProviders_CompositeParity", func(t *testing.T) {
+		calcReqREST := rest.CalculateRequestBody{
+			Region: "us-east",
+			Compute: &domain.ComputeAttributes{
+				VCPU:   2,
+				RAMGB:  4,
+				Family: "general_purpose",
+			},
+			Storage: &domain.StorageAttributes{
+				SizeGB:       100,
+				StorageClass: "standard",
+			},
+			Network: &domain.NetworkAttributes{
+				EgressGB:     50,
+				TransferType: "internet_egress",
+			},
+		}
+
+		restResp, code, body := invokeREST[rest.CalculateResponse](
+			t, harness.restRouter, http.MethodPost,
+			"/api/v1/calculate", calcReqREST, harness.bearerToken,
+		)
+		if code != http.StatusOK {
+			t.Fatalf("REST calculate failed: %d: %s", code, body)
+		}
+
+		calcReqMCP := mcp.CalculateWorkloadInput{
+			Region: "us-east",
+			Compute: &mcp.ComputeRequirements{
+				VCPU:   2,
+				RAMGB:  4,
+				Family: "general_purpose",
+			},
+			Storage: &mcp.StorageRequirements{
+				SizeGB:       100,
+				StorageClass: "standard",
+			},
+			Network: &mcp.NetworkRequirements{
+				EgressGB:     50,
+				TransferType: "internet_egress",
+			},
+		}
+
+		mcpResp, err := invokeMCP[mcp.CalculateResponse](
+			ctx, t, harness.mcpClient, "calculate_workload", calcReqMCP,
+		)
+		if err != nil {
+			t.Fatalf("MCP calculate_workload failed: %v", err)
+		}
+
+		if len(restResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in REST composite calculate, got %d", len(expectedProviders), len(restResp.Results))
+		}
+		if len(mcpResp.Results) != len(expectedProviders) {
+			t.Errorf("expected %d providers in MCP composite calculate, got %d", len(expectedProviders), len(mcpResp.Results))
+		}
+
+		assertCalculateParity(t, restResp, mcpResp)
 	})
 }
