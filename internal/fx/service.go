@@ -172,13 +172,7 @@ func (s *Service) resolveRateFromCache(from, to string) (decimal.Decimal, FXMeta
 
 	if from == base {
 		if r, ok := s.rates[to]; ok {
-			return r.Rate, FXMetadata{
-				Rate:       r.Rate,
-				Source:     r.Source,
-				RateDate:   r.RateDate,
-				FetchedAt:  r.FetchedAt,
-				IsFallback: r.IsFallback,
-			}, true
+			return r.Rate, FXMetadata(r), true
 		}
 	}
 

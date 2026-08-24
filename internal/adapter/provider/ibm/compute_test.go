@@ -102,11 +102,12 @@ func TestNormalize_VPCProfiles(t *testing.T) {
 
 	var foundBX2, foundCX2, foundMX2, foundVX2, foundBA2 bool
 	for _, o := range obs {
-		if o.Region == "us-east" {
+		switch o.Region {
+		case "us-east":
 			if o.RegionGroup != "us-east" {
 				t.Errorf("expected RegionGroup us-east for us-east, got %s", o.RegionGroup)
 			}
-		} else if o.Region == "us-south" {
+		case "us-south":
 			if o.RegionGroup != "us-central" {
 				t.Errorf("expected RegionGroup us-central for us-south, got %s", o.RegionGroup)
 			}

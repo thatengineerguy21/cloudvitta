@@ -125,7 +125,8 @@ func TestNormalize_DropletProfiles(t *testing.T) {
 
 		switch o.SkuID {
 		case "SKU-DO-DROPLET-S-1VCPU-1GB":
-			if o.Region == "nyc1" {
+			switch o.Region {
+			case "nyc1":
 				foundBasicNYC1 = true
 				if o.RegionGroup != "us-east" {
 					t.Errorf("expected RegionGroup us-east, got %s", o.RegionGroup)
@@ -137,7 +138,7 @@ func TestNormalize_DropletProfiles(t *testing.T) {
 				if !o.PriceAmount.Equal(expectedPrice) {
 					t.Errorf("Basic price = %s, want %s", o.PriceAmount, expectedPrice)
 				}
-			} else if o.Region == "sfo3" {
+			case "sfo3":
 				foundBasicSFO3 = true
 				if o.RegionGroup != "us-west" {
 					t.Errorf("expected RegionGroup us-west, got %s", o.RegionGroup)

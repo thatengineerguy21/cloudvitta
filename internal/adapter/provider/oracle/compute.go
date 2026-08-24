@@ -16,6 +16,8 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/catalogmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type flexShapeComponent struct {
@@ -435,7 +437,7 @@ func normalizeFixedShape(item ProductItem, category string, price decimal.Decima
 			Provider:        "oracle",
 			ServiceCategory: category,
 			SkuID:           skuID,
-			DisplayName:     fmt.Sprintf("VM.%s", strings.Title(shapeKey)),
+			DisplayName:     fmt.Sprintf("VM.%s", cases.Title(language.English).String(shapeKey)),
 			Region:          region,
 			RegionGroup:     regionGroup,
 			Unit:            "Hrs",
