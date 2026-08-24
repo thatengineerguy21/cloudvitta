@@ -142,8 +142,11 @@ Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> 
 6. **`CLOUDVITTA_AUTH_JWT_SECRET`** (or **`JWT_SECRET`**): Secret used for signing JWT access tokens (must be at least 32 characters long).
 7. **`CLOUDVITTA_AUTH_ANON_COOKIE_SECRET`**: Secret used for HMAC-signing anonymous tracking cookies (`cv_anon_id`).
 8. **`CLOUDVITTA_GCP_API_KEY`**: Optional API key for Google Cloud Billing Catalog API access during ingestion.
-9. **`GRAFANA_OTLP_ENDPOINT`**: Your Grafana Cloud OTLP HTTP endpoint (e.g., `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`).
-10. **`GRAFANA_OTLP_HEADERS`**: Base64-encoded basic authentication header for Grafana Cloud (e.g., `Authorization=Basic <BASE64_ENCODED_INSTANCE_ID_AND_TOKEN>`).
+9. **`CLOUDVITTA_IBM_API_KEY`**: Optional API key for IBM Cloud IAM authentication during Global Catalog ingestion.
+10. **`CLOUDVITTA_ALIBABA_ACCESS_KEY_ID`**: Optional AccessKeyId for Alibaba Cloud RPC API authentication during ECS ingestion.
+11. **`CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET`**: Optional AccessKeySecret for Alibaba Cloud HMAC-SHA1 RPC signing during ECS ingestion.
+12. **`GRAFANA_OTLP_ENDPOINT`**: Your Grafana Cloud OTLP HTTP endpoint (e.g., `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`).
+13. **`GRAFANA_OTLP_HEADERS`**: Base64-encoded basic authentication header for Grafana Cloud (e.g., `Authorization=Basic <BASE64_ENCODED_INSTANCE_ID_AND_TOKEN>`).
 
 ### 2. Repository Variables (Optional Overrides)
 Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Variables** -> **New repository variable**.

@@ -75,6 +75,15 @@ CLOUDVITTA_REDIS_URL=rediss://default:your_upstash_password@your-redis-endpoint.
 # --- Storage (Google Cloud Storage) ---
 CLOUDVITTA_STORAGE_GCS_BUCKET_NAME=cloudvitta-raw-dev
 
+# --- Cloud Provider API Keys & Credentials (Optional) ---
+# GCP Cloud Billing Catalog API Key
+CLOUDVITTA_GCP_API_KEY=
+# IBM Cloud IAM API Key for Global Catalog
+CLOUDVITTA_IBM_API_KEY=
+# Alibaba Cloud AccessKeyId and AccessKeySecret for ECS RPC API
+CLOUDVITTA_ALIBABA_ACCESS_KEY_ID=
+CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET=
+
 # --- Observability (OpenTelemetry / Grafana Cloud) ---
 CLOUDVITTA_OBSERVABILITY_OTLP_ENDPOINT=https://otlp-gateway-prod-us-central-0.grafana.net/otlp
 CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS=Authorization=Basic MTIzNDU2OmdsY19leUouLi4=

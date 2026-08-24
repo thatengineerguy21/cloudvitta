@@ -1,0 +1,16 @@
+package alibaba
+
+// supportedCategories maps service categories supported by the Alibaba Cloud provider adapter.
+var supportedCategories = map[string]bool{
+	"compute": true,
+}
+
+// IsCategorySupported reports whether the specified category is supported by the Alibaba Cloud adapter.
+func IsCategorySupported(category string) bool {
+	return supportedCategories[category]
+}
+
+// SupportedCategories returns a copy of the supported category names for Alibaba Cloud.
+func SupportedCategories() []string {
+	return []string{"compute"}
+}

@@ -18,6 +18,7 @@ Create directories only when their stage implementation requires them.
 │   │
 │   ├── adapter/
 │   │   └── provider/
+│   │       ├── alibaba/         # Alibaba Cloud provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── aws/             # AWS provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── azure/           # Azure provider adapter, fetch + normalize + supported_categories.go
 │   │       ├── gcp/             # GCP provider adapter, fetch + normalize + supported_categories.go

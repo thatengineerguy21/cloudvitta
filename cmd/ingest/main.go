@@ -11,6 +11,7 @@ import (
 	gcsstorage "cloud.google.com/go/storage"
 	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/alibaba"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
@@ -357,6 +358,21 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, ibmAdapter)
+
+	// Register Alibaba compute adapter with rate limiting and retry config
+	var aliOpts []alibaba.Option
+	if cfg.Alibaba.AccessKeyID != "" && cfg.Alibaba.AccessKeySecret != "" {
+		aliOpts = append(aliOpts, alibaba.WithCredentials(cfg.Alibaba.AccessKeyID, cfg.Alibaba.AccessKeySecret))
+	}
+	aliClient := alibaba.NewClient(aliOpts...)
+	aliAdapter := alibaba.NewAdapter(aliClient, rawStorage, alibaba.WithCategory("compute"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "alibaba",
+		Category:       "compute",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, aliAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

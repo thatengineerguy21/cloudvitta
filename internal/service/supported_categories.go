@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/alibaba"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
@@ -22,6 +23,8 @@ func IsProviderCategorySupported(provider, category string) bool {
 		return oracle.IsCategorySupported(category)
 	case "ibm":
 		return ibm.IsCategorySupported(category)
+	case "alibaba":
+		return alibaba.IsCategorySupported(category)
 	default:
 		return false
 	}
@@ -41,6 +44,8 @@ func SupportedCategoriesForProvider(provider string) []string {
 		return oracle.SupportedCategories()
 	case "ibm":
 		return ibm.SupportedCategories()
+	case "alibaba":
+		return alibaba.SupportedCategories()
 	default:
 		return nil
 	}

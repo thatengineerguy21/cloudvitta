@@ -25,6 +25,7 @@ type Config struct {
 	Observability ObservabilityConfig `koanf:"observability"`
 	GCP           GCPConfig           `koanf:"gcp"`
 	IBM           IBMConfig           `koanf:"ibm"`
+	Alibaba       AlibabaConfig       `koanf:"alibaba"`
 	Freshness     FreshnessConfig     `koanf:"freshness"`
 }
 
@@ -119,6 +120,11 @@ type GCPConfig struct {
 
 type IBMConfig struct {
 	APIKey string `koanf:"api_key"`
+}
+
+type AlibabaConfig struct {
+	AccessKeyID     string `koanf:"access_key_id"`
+	AccessKeySecret string `koanf:"access_key_secret"`
 }
 
 type FreshnessConfig struct {
@@ -258,7 +264,23 @@ func resolveEnvFallbacks(cfg *Config) error {
 		}
 	}
 
-	// 9. Resolve Auth JWT Secret fallback
+	// 9. Resolve Alibaba fallbacks
+	if cfg.Alibaba.AccessKeyID == "" {
+		if val := os.Getenv("CLOUDVITTA_ALIBABA_ACCESS_KEY_ID"); val != "" {
+			cfg.Alibaba.AccessKeyID = val
+		} else {
+			cfg.Alibaba.AccessKeyID = os.Getenv("ALIBABA_ACCESS_KEY_ID")
+		}
+	}
+	if cfg.Alibaba.AccessKeySecret == "" {
+		if val := os.Getenv("CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET"); val != "" {
+			cfg.Alibaba.AccessKeySecret = val
+		} else {
+			cfg.Alibaba.AccessKeySecret = os.Getenv("ALIBABA_ACCESS_KEY_SECRET")
+		}
+	}
+
+	// 10. Resolve Auth JWT Secret fallback
 	if cfg.Auth.JWTSecret == "" {
 		if val := os.Getenv("CLOUDVITTA_AUTH_JWT_SECRET"); val != "" {
 			cfg.Auth.JWTSecret = val
