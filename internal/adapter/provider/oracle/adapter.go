@@ -69,7 +69,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	ctx, span := a.tracer.Start(ctx, "oracle.fetch")
 	defer span.End()
 
-	slog.InfoContext(ctx, "starting oracle fetch")
+	slog.DebugContext(ctx, "starting oracle fetch")
 
 	if limiter != nil {
 		if err := limiter.Wait(ctx); err != nil {
@@ -107,7 +107,13 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	g, _ := errgroup.WithContext(ctx)
 
 	// Goroutine 1: Normalize reads from pr
-	g.Go(func() error {
+	g.Go(func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("oracle adapter: panic in normalize goroutine: %v", r)
+				_ = pr.CloseWithError(err)
+			}
+		}()
 		var normErr error
 		observations, normErr = Normalize(pr, fetchedAt, qSink)
 		if normErr != nil {
@@ -119,7 +125,13 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	})
 
 	// Goroutine 2: GCS reads from tee
-	g.Go(func() error {
+	g.Go(func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("oracle adapter: panic in storage write goroutine: %v", r)
+				_ = pw.CloseWithError(err)
+			}
+		}()
 		defer func() { _ = pw.Close() }()
 		if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
 			_ = pw.CloseWithError(err)

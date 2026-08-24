@@ -252,3 +252,102 @@ func TestNormalize_InvalidJSON(t *testing.T) {
 		t.Fatal("expected error on invalid JSON, got nil")
 	}
 }
+
+func TestNormalize_MissingRegion_Quarantined(t *testing.T) {
+	jsonPayload := `{
+		"items": [
+			{
+				"partNumber": "B88317",
+				"displayName": "Compute - Virtual Machine - Standard2.1",
+				"metricName": "OCPU Per Hour",
+				"serviceCategory": "Compute - Virtual Machine",
+				"prices": [
+					{
+						"currencyCode": "USD",
+						"prices": [{"model": "PAY_AS_YOU_GO", "value": 0.0638}]
+					}
+				],
+				"regions": []
+			}
+		]
+	}`
+
+	sink := &memoryQuarantineSink{}
+	obs, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC(), sink)
+	if err != nil {
+		t.Fatalf("Normalize failed: %v", err)
+	}
+	if len(obs) != 0 {
+		t.Errorf("expected 0 observations for item with missing regions, got %d", len(obs))
+	}
+	if sink.Count() != 1 {
+		t.Fatalf("expected 1 quarantined item for missing regions, got %d", sink.Count())
+	}
+	if sink.items[0].Kind != "region" || sink.items[0].RawValue != "missing" {
+		t.Errorf("expected missing region quarantine, got %+v", sink.items[0])
+	}
+}
+
+func TestNormalize_UnrecognizedFlexShape_Quarantined(t *testing.T) {
+	jsonPayload := `{
+		"items": [
+			{
+				"partNumber": "B99991",
+				"displayName": "Compute - Virtual Machine - Flex - Quantum99 - OCPU",
+				"metricName": "OCPU Per Hour",
+				"serviceCategory": "Compute - Virtual Machine",
+				"prices": [
+					{
+						"currencyCode": "USD",
+						"prices": [{"model": "PAY_AS_YOU_GO", "value": 0.050}]
+					}
+				],
+				"regions": ["us-ashburn-1"]
+			}
+		]
+	}`
+
+	sink := &memoryQuarantineSink{}
+	obs, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC(), sink)
+	if err != nil {
+		t.Fatalf("Normalize failed: %v", err)
+	}
+	if len(obs) != 0 {
+		t.Errorf("expected 0 observations for unrecognized flex shape, got %d", len(obs))
+	}
+	if sink.Count() != 1 {
+		t.Fatalf("expected 1 quarantined item, got %d", sink.Count())
+	}
+	if sink.items[0].Kind != "product" || sink.items[0].SkuID != "B99991" {
+		t.Errorf("expected quarantined flex product, got %+v", sink.items[0])
+	}
+}
+
+func TestNormalize_MissingRAMPriceComponent_DoesNotSynthesize(t *testing.T) {
+	// Only OCPU component provided, no RAM component
+	jsonPayload := `{
+		"items": [
+			{
+				"partNumber": "B93113",
+				"displayName": "Compute - Virtual Machine - Standard - E4 - OCPU",
+				"metricName": "OCPU Per Hour",
+				"serviceCategory": "Compute - Virtual Machine",
+				"prices": [
+					{
+						"currencyCode": "USD",
+						"prices": [{"model": "PAY_AS_YOU_GO", "value": 0.025}]
+					}
+				],
+				"regions": ["us-ashburn-1"]
+			}
+		]
+	}`
+
+	obs, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC())
+	if err != nil {
+		t.Fatalf("Normalize failed: %v", err)
+	}
+	if len(obs) != 0 {
+		t.Errorf("expected 0 synthesized observations when RAM price component is missing, got %d", len(obs))
+	}
+}

@@ -10,9 +10,6 @@ import (
 // DefaultComputePriceListURL is the standard Oracle CE Tools API endpoint for Virtual Machines in USD.
 const DefaultComputePriceListURL = "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?serviceCategory=Compute%20-%20Virtual%20Machine&currencyCode=USD"
 
-// DefaultBaseURL is the base Oracle CE Tools product catalog endpoint.
-const DefaultBaseURL = "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/"
-
 // Client is an HTTP client for fetching Oracle OCI CE Tools pricing data.
 type Client struct {
 	httpClient *http.Client

@@ -27,6 +27,97 @@ type flexShapeComponent struct {
 	regions   []string
 }
 
+type flexSizeSpec struct {
+	ocpu  float64
+	vcpu  float64
+	ramGB float64
+}
+
+type flexFamilySpec struct {
+	displayName string
+	arch        string
+	sizes       []flexSizeSpec
+}
+
+var flexFamilySpecs = map[string]flexFamilySpec{
+	"standard_a1": {
+		displayName: "Standard.A1",
+		arch:        "arm64",
+		sizes: []flexSizeSpec{
+			{ocpu: 1, vcpu: 1, ramGB: 6},
+			{ocpu: 2, vcpu: 2, ramGB: 12},
+			{ocpu: 4, vcpu: 4, ramGB: 24},
+			{ocpu: 8, vcpu: 8, ramGB: 48},
+			{ocpu: 16, vcpu: 16, ramGB: 64},
+		},
+	},
+	"standard_e4": {
+		displayName: "Standard.E4",
+		arch:        "x86_64",
+		sizes: []flexSizeSpec{
+			{ocpu: 1, vcpu: 2, ramGB: 8},
+			{ocpu: 2, vcpu: 4, ramGB: 16},
+			{ocpu: 4, vcpu: 8, ramGB: 32},
+			{ocpu: 8, vcpu: 16, ramGB: 64},
+			{ocpu: 16, vcpu: 32, ramGB: 128},
+		},
+	},
+	"standard_e5": {
+		displayName: "Standard.E5",
+		arch:        "x86_64",
+		sizes: []flexSizeSpec{
+			{ocpu: 1, vcpu: 2, ramGB: 8},
+			{ocpu: 2, vcpu: 4, ramGB: 16},
+			{ocpu: 4, vcpu: 8, ramGB: 32},
+			{ocpu: 8, vcpu: 16, ramGB: 64},
+			{ocpu: 16, vcpu: 32, ramGB: 128},
+		},
+	},
+	"standard_e3": {
+		displayName: "Standard.E3",
+		arch:        "x86_64",
+		sizes: []flexSizeSpec{
+			{ocpu: 1, vcpu: 2, ramGB: 8},
+			{ocpu: 2, vcpu: 4, ramGB: 16},
+			{ocpu: 4, vcpu: 8, ramGB: 32},
+			{ocpu: 8, vcpu: 16, ramGB: 64},
+			{ocpu: 16, vcpu: 32, ramGB: 128},
+		},
+	},
+	"standard_x9": {
+		displayName: "Standard.X9",
+		arch:        "x86_64",
+		sizes: []flexSizeSpec{
+			{ocpu: 1, vcpu: 2, ramGB: 8},
+			{ocpu: 2, vcpu: 4, ramGB: 16},
+			{ocpu: 4, vcpu: 8, ramGB: 32},
+			{ocpu: 8, vcpu: 16, ramGB: 64},
+			{ocpu: 16, vcpu: 32, ramGB: 128},
+		},
+	},
+	"denseio_e4": {
+		displayName: "DenseIO.E4",
+		arch:        "x86_64",
+		sizes: []flexSizeSpec{
+			{ocpu: 1, vcpu: 2, ramGB: 8},
+			{ocpu: 2, vcpu: 4, ramGB: 16},
+			{ocpu: 4, vcpu: 8, ramGB: 32},
+			{ocpu: 8, vcpu: 16, ramGB: 64},
+			{ocpu: 16, vcpu: 32, ramGB: 128},
+		},
+	},
+	"optimized3": {
+		displayName: "Optimized3",
+		arch:        "x86_64",
+		sizes: []flexSizeSpec{
+			{ocpu: 1, vcpu: 2, ramGB: 4},
+			{ocpu: 2, vcpu: 4, ramGB: 8},
+			{ocpu: 4, vcpu: 8, ramGB: 16},
+			{ocpu: 8, vcpu: 16, ramGB: 32},
+		},
+	},
+}
+
 // Normalize parses an Oracle CE Tools API JSON stream and returns normalized domain observations.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
 func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
@@ -82,7 +173,18 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 		regions := item.Regions
 		if len(regions) == 0 {
-			regions = []string{"us-ashburn-1"}
+			if sink != nil {
+				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+					Provider:   "oracle",
+					Category:   category,
+					Kind:       "region",
+					RawValue:   "missing",
+					SkuID:      item.PartNumber,
+					ObservedAt: fetchedAt,
+				})
+			}
+			slog.Warn("oracle normalize: skipping SKU due to missing regions", "part_number", item.PartNumber)
+			continue
 		}
 
 		// Check if item is a flexible shape component or a fixed shape
@@ -108,6 +210,18 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 				if len(item.Regions) > 0 {
 					comp.regions = item.Regions
 				}
+			} else {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "oracle",
+						Category:   category,
+						Kind:       "product",
+						RawValue:   item.DisplayName,
+						SkuID:      item.PartNumber,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("oracle normalize: skipping unrecognized flex shape component", "part_number", item.PartNumber, "name", item.DisplayName)
 			}
 			continue
 		}
@@ -158,29 +272,28 @@ func parseFlexInfo(item ProductItem) (family string, arch string, isOCPU bool, i
 	switch {
 	case strings.Contains(text, "a1"):
 		family = "standard_a1"
-		arch = "arm64"
 	case strings.Contains(text, "e5"):
 		family = "standard_e5"
-		arch = "x86_64"
 	case strings.Contains(text, "e4") && strings.Contains(text, "denseio"):
 		family = "denseio_e4"
-		arch = "x86_64"
 	case strings.Contains(text, "e4"):
 		family = "standard_e4"
-		arch = "x86_64"
 	case strings.Contains(text, "e3"):
 		family = "standard_e3"
-		arch = "x86_64"
 	case strings.Contains(text, "x9"):
 		family = "standard_x9"
-		arch = "x86_64"
 	case strings.Contains(text, "optimized3") || strings.Contains(text, "optimized 3"):
 		family = "optimized3"
-		arch = "x86_64"
 	default:
-		family = "standard_e4"
-		arch = "x86_64"
+		return "", "", false, false
 	}
+
+	spec, ok := flexFamilySpecs[family]
+	if !ok {
+		return "", "", false, false
+	}
+
+	arch = spec.arch
 
 	if strings.Contains(text, "ocpu") {
 		isOCPU = true
@@ -192,80 +305,35 @@ func parseFlexInfo(item ProductItem) (family string, arch string, isOCPU bool, i
 	return family, arch, isOCPU, isRAM
 }
 
-type flexSizeSpec struct {
-	ocpu  float64
-	vcpu  float64
-	ramGB float64
-}
-
 func synthesizeFlexShapes(comp *flexShapeComponent, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
-	if comp.ocpuPrice.IsZero() {
+	if comp.ocpuPrice.IsZero() || comp.ramPrice.IsZero() {
+		// Both OCPU and RAM pricing components are required to calculate total flex shape cost
 		return nil, nil
 	}
 
-	ramPrice := comp.ramPrice
-	if ramPrice.IsZero() {
-		ramPrice = decimal.RequireFromString("0.0015")
-	}
-
-	var specs []flexSizeSpec
-	if comp.arch == "arm64" {
-		// Arm (Ampere A1): 1 OCPU = 1 vCPU
-		specs = []flexSizeSpec{
-			{ocpu: 1, vcpu: 1, ramGB: 6},
-			{ocpu: 2, vcpu: 2, ramGB: 12},
-			{ocpu: 4, vcpu: 4, ramGB: 24},
-			{ocpu: 8, vcpu: 8, ramGB: 48},
-			{ocpu: 16, vcpu: 16, ramGB: 64},
-		}
-	} else if comp.family == "optimized3" {
-		// Compute-optimized x86: 1 OCPU = 2 vCPU, 1:2 vCPU:RAM ratio
-		specs = []flexSizeSpec{
-			{ocpu: 1, vcpu: 2, ramGB: 4},
-			{ocpu: 2, vcpu: 4, ramGB: 8},
-			{ocpu: 4, vcpu: 8, ramGB: 16},
-			{ocpu: 8, vcpu: 16, ramGB: 32},
-		}
-	} else {
-		// Standard x86: 1 OCPU = 2 vCPU, 1:4 vCPU:RAM ratio
-		specs = []flexSizeSpec{
-			{ocpu: 1, vcpu: 2, ramGB: 8},
-			{ocpu: 2, vcpu: 4, ramGB: 16},
-			{ocpu: 4, vcpu: 8, ramGB: 32},
-			{ocpu: 8, vcpu: 16, ramGB: 64},
-			{ocpu: 16, vcpu: 32, ramGB: 128},
-		}
+	spec, ok := flexFamilySpecs[comp.family]
+	if !ok {
+		return nil, nil
 	}
 
 	var observations []domain.PriceObservation
 
-	for _, spec := range specs {
-		ocpuCost := comp.ocpuPrice.Mul(decimal.NewFromFloat(spec.ocpu))
-		ramCost := ramPrice.Mul(decimal.NewFromFloat(spec.ramGB))
+	for _, size := range spec.sizes {
+		ocpuCost := comp.ocpuPrice.Mul(decimal.NewFromFloat(size.ocpu))
+		ramCost := comp.ramPrice.Mul(decimal.NewFromFloat(size.ramGB))
 		totalHourlyCost := ocpuCost.Add(ramCost)
 
 		skuFamily := strings.ToUpper(strings.ReplaceAll(comp.family, "_", "-"))
-		skuID := fmt.Sprintf("SKU-OCI-VM-%s-FLEX-%.0fVCPU-%.0fGB", skuFamily, spec.vcpu, spec.ramGB)
-		displayName := fmt.Sprintf("VM.%s.Flex (%.0f vCPU, %.0f GB RAM)", formatDisplayFamily(comp.family), spec.vcpu, spec.ramGB)
+		skuID := fmt.Sprintf("SKU-OCI-VM-%s-FLEX-%.0fVCPU-%.0fGB", skuFamily, size.vcpu, size.ramGB)
+		displayName := fmt.Sprintf("VM.%s.Flex (%.0f vCPU, %.0f GB RAM)", spec.displayName, size.vcpu, size.ramGB)
 
 		for _, region := range comp.regions {
-			regionGroup, err := regionmap.MapOracleRegion(region)
+			regionGroup, err := recordAndResolveRegion(context.Background(), region, skuID, "compute", fetchedAt, sink)
 			if err != nil {
-				if errors.Is(err, regionmap.ErrUnmappedRegion) {
-					if sink != nil {
-						_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-							Provider:   "oracle",
-							Category:   "compute",
-							Kind:       "region",
-							RawValue:   region,
-							SkuID:      skuID,
-							ObservedAt: fetchedAt,
-						})
-					}
-					slog.Warn("oracle normalize: skipping flex SKU due to unmapped region", "sku", skuID, "region", region)
-					continue
-				}
 				return nil, fmt.Errorf("oracle normalize flex sku %s: %w", skuID, err)
+			}
+			if regionGroup == "" {
+				continue
 			}
 
 			observations = append(observations, domain.PriceObservation{
@@ -280,8 +348,8 @@ func synthesizeFlexShapes(comp *flexShapeComponent, fetchedAt time.Time, sink qu
 				PriceCurrency:   "USD",
 				PricingModel:    "OnDemand",
 				Attributes: domain.ComputeAttributes{
-					VCPU:   spec.vcpu,
-					RAMGB:  spec.ramGB,
+					VCPU:   size.vcpu,
+					RAMGB:  size.ramGB,
 					Family: comp.family,
 				},
 				FetchedAt: fetchedAt,
@@ -290,27 +358,6 @@ func synthesizeFlexShapes(comp *flexShapeComponent, fetchedAt time.Time, sink qu
 	}
 
 	return observations, nil
-}
-
-func formatDisplayFamily(family string) string {
-	switch family {
-	case "standard_e4":
-		return "Standard.E4"
-	case "standard_e5":
-		return "Standard.E5"
-	case "standard_e3":
-		return "Standard.E3"
-	case "standard_a1":
-		return "Standard.A1"
-	case "standard_x9":
-		return "Standard.X9"
-	case "optimized3":
-		return "Optimized3"
-	case "denseio_e4":
-		return "DenseIO.E4"
-	default:
-		return strings.Title(strings.ReplaceAll(family, "_", "."))
-	}
 }
 
 var fixedShapeSpecs = map[string]domain.ComputeAttributes{
@@ -353,23 +400,12 @@ func normalizeFixedShape(item ProductItem, category string, price decimal.Decima
 
 	var observations []domain.PriceObservation
 	for _, region := range regions {
-		regionGroup, err := regionmap.MapOracleRegion(region)
+		regionGroup, err := recordAndResolveRegion(context.Background(), region, skuID, category, fetchedAt, sink)
 		if err != nil {
-			if errors.Is(err, regionmap.ErrUnmappedRegion) {
-				if sink != nil {
-					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-						Provider:   "oracle",
-						Category:   category,
-						Kind:       "region",
-						RawValue:   region,
-						SkuID:      skuID,
-						ObservedAt: fetchedAt,
-					})
-				}
-				slog.Warn("oracle normalize: skipping fixed SKU due to unmapped region", "sku", skuID, "region", region)
-				continue
-			}
 			return nil, fmt.Errorf("oracle normalize fixed sku %s: %w", skuID, err)
+		}
+		if regionGroup == "" {
+			continue
 		}
 
 		observations = append(observations, domain.PriceObservation{
@@ -389,4 +425,26 @@ func normalizeFixedShape(item ProductItem, category string, price decimal.Decima
 	}
 
 	return observations, nil
+}
+
+func recordAndResolveRegion(ctx context.Context, region, skuID, category string, fetchedAt time.Time, sink quarantine.Sink) (string, error) {
+	regionGroup, err := regionmap.MapOracleRegion(region)
+	if err != nil {
+		if errors.Is(err, regionmap.ErrUnmappedRegion) {
+			if sink != nil {
+				_ = sink.Record(ctx, quarantine.UnmappedItem{
+					Provider:   "oracle",
+					Category:   category,
+					Kind:       "region",
+					RawValue:   region,
+					SkuID:      skuID,
+					ObservedAt: fetchedAt,
+				})
+			}
+			slog.Warn("oracle normalize: skipping SKU due to unmapped region", "sku", skuID, "region", region)
+			return "", nil
+		}
+		return "", err
+	}
+	return regionGroup, nil
 }
