@@ -5,17 +5,21 @@ import (
 )
 
 var oracleStorageClassMap = map[string]string{
-	// Object Storage
-	"standard":                                   "standard",
-	"Standard":                                   "standard",
-	"Object Storage Standard":                    "standard",
-	"Object Storage - Storage":                   "standard",
-	"Storage - Object Storage":                   "standard",
+	// Object Storage Standard
+	"standard":                 "standard",
+	"Standard":                 "standard",
+	"Object Storage Standard":  "standard",
+	"Object Storage - Storage": "standard",
+	"Storage - Object Storage": "standard",
+
+	// Object Storage Infrequent Access
 	"infrequent_access":                          "infrequent_access",
 	"Infrequent Access":                          "infrequent_access",
 	"Object Storage Infrequent Access":           "infrequent_access",
 	"Object Storage - Infrequent Access":         "infrequent_access",
 	"Object Storage - Infrequent Access Storage": "infrequent_access",
+
+	// Object Storage Archive
 	"archive":                          "archive",
 	"Archive":                          "archive",
 	"Archive Storage":                  "archive",
