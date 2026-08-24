@@ -125,7 +125,7 @@ gcloud run services add-iam-policy-binding "${SERVICE_NAME:-cloudvitta-api}" \
 
 ## Phase 3: GitHub Secrets and Variables Configuration
 
-### 1. Repository Secrets (Required)
+### 1. Repository Secrets (Required & Optional)
 Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Secrets** -> **New repository secret**.
 
 1. **`GCP_PROJECT_ID`**: Your Google Cloud Project ID (e.g., `cloudvitta-prod`).
@@ -145,8 +145,9 @@ Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> 
 9. **`CLOUDVITTA_IBM_API_KEY`**: Optional API key for IBM Cloud IAM authentication during Global Catalog ingestion.
 10. **`CLOUDVITTA_ALIBABA_ACCESS_KEY_ID`**: Optional AccessKeyId for Alibaba Cloud RPC API authentication during ECS ingestion.
 11. **`CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET`**: Optional AccessKeySecret for Alibaba Cloud HMAC-SHA1 RPC signing during ECS ingestion.
-12. **`GRAFANA_OTLP_ENDPOINT`**: Your Grafana Cloud OTLP HTTP endpoint (e.g., `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`).
-13. **`GRAFANA_OTLP_HEADERS`**: Base64-encoded basic authentication header for Grafana Cloud (e.g., `Authorization=Basic <BASE64_ENCODED_INSTANCE_ID_AND_TOKEN>`).
+12. **`CLOUDVITTA_DIGITALOCEAN_TOKEN`**: Optional Personal Access Token for DigitalOcean Droplets Sizes API access during ingestion.
+13. **`GRAFANA_OTLP_ENDPOINT`**: Your Grafana Cloud OTLP HTTP endpoint (e.g., `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`).
+14. **`GRAFANA_OTLP_HEADERS`**: Base64-encoded basic authentication header for Grafana Cloud (e.g., `Authorization=Basic <BASE64_ENCODED_INSTANCE_ID_AND_TOKEN>`).
 
 ### 2. Repository Variables (Optional Overrides)
 Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Variables** -> **New repository variable**.
@@ -156,6 +157,7 @@ Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> 
 * **`GAR_REPO`**: Artifact Registry Docker repository name (default: `cloudvitta-repo`).
 * **`SERVICE_NAME`**: Cloud Run service name (default: `cloudvitta-api`).
 * **`GCS_BUCKET_NAME`**: GCS raw fixtures bucket name (default: `cloudvitta-raw-fixtures`).
+* **`CORS_ALLOWED_ORIGINS`**: Comma-separated allowed CORS origins (default: `https://cloudvitta.dev`).
 
 ---
 
@@ -168,14 +170,14 @@ Go to your repository on GitHub -> **Settings** -> **Secrets and variables** -> 
 
 ### What happens during CD?
 1. **Build & Push**: The Go application is packaged into a minimal Docker container and sent to Artifact Registry.
-2. **Database Migrations**: `tern` connects to your Neon production database and applies any new migrations. Since we enforce forward-only migrations, this is safe to do automatically.
-3. **Deploy**: Cloud Run pulls the new image and spins up new instances. Traffic is automatically shifted to the new revision once it is healthy.
+2. **Database Migrations**: `tern` connects to your Neon production database and applies any new forward migrations (`0001_initial_schema.sql`, `0002_create_users_and_refresh_tokens.sql`, `0003_create_fx_rates.sql`). Since we enforce forward-only migrations (ADR 0028), this executes safely on every deploy.
+3. **Deploy**: Cloud Run pulls the new image and spins up new instances. Traffic is automatically shifted to the new revision once it passes readiness probes.
 
 ### Rollbacks
-If a bad deployment goes out:
+If a deployment exhibits unexpected behavior:
 1. Go to the [Google Cloud Run Console](https://console.cloud.google.com/run).
 2. Click on the `cloudvitta-api` service.
 3. Go to the **Revisions** tab.
 4. Select the previous healthy revision and click **Manage Traffic**.
 5. Route 100% of traffic back to the old revision.
-6. Fix the code locally, commit, and push a new fix to `main`.
+6. Fix the issue locally with a new forward commit (or forward migration), and push to `main`.
