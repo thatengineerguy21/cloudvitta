@@ -14,6 +14,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/aws"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/oracle"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
@@ -329,6 +330,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpKubernetesAdapter)
+
+	// Register Oracle compute adapter with rate limiting and retry config
+	oracleClient := oracle.NewClient()
+	oracleAdapter := oracle.NewAdapter(oracleClient, rawStorage, oracle.WithCategory("compute"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "oracle",
+		Category:       "compute",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, oracleAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

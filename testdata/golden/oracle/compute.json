@@ -1,0 +1,130 @@
+{
+  "items": [
+    {
+      "partNumber": "B93113",
+      "displayName": "Compute - Virtual Machine - Standard - E4 - OCPU",
+      "metricName": "OCPU Per Hour",
+      "serviceCategory": "Compute - Virtual Machine",
+      "serviceCategoryDisplayName": "Compute",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.025
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    },
+    {
+      "partNumber": "B93114",
+      "displayName": "Compute - Virtual Machine - Standard - E4 - Memory",
+      "metricName": "Gigabyte Memory Per Hour",
+      "serviceCategory": "Compute - Virtual Machine",
+      "serviceCategoryDisplayName": "Compute",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0015
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    },
+    {
+      "partNumber": "B94178",
+      "displayName": "Compute - Virtual Machine - Standard - A1 - OCPU",
+      "metricName": "OCPU Per Hour",
+      "serviceCategory": "Compute - Virtual Machine",
+      "serviceCategoryDisplayName": "Compute",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.010
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    },
+    {
+      "partNumber": "B94179",
+      "displayName": "Compute - Virtual Machine - Standard - A1 - Memory",
+      "metricName": "Gigabyte Memory Per Hour",
+      "serviceCategory": "Compute - Virtual Machine",
+      "serviceCategoryDisplayName": "Compute",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0015
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    },
+    {
+      "partNumber": "B88317",
+      "displayName": "Compute - Virtual Machine - Standard2.1",
+      "metricName": "OCPU Per Hour",
+      "serviceCategory": "Compute - Virtual Machine",
+      "serviceCategoryDisplayName": "Compute",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.0638
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    },
+    {
+      "partNumber": "B88318",
+      "displayName": "Compute - Virtual Machine - Standard2.2",
+      "metricName": "OCPU Per Hour",
+      "serviceCategory": "Compute - Virtual Machine",
+      "serviceCategoryDisplayName": "Compute",
+      "prices": [
+        {
+          "currencyCode": "USD",
+          "prices": [
+            {
+              "model": "PAY_AS_YOU_GO",
+              "value": 0.1276
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-ashburn-1"
+      ]
+    }
+  ]
+}

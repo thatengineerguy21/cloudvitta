@@ -12,6 +12,8 @@ func MapRegion(provider, region string) (string, error) {
 		return MapAzureRegion(region)
 	case "gcp":
 		return MapGCPRegion(region)
+	case "oracle":
+		return MapOracleRegion(region)
 	default:
 		return "", fmt.Errorf("regionmap: unmapped provider %q", provider)
 	}
@@ -27,6 +29,8 @@ func ResolveNativeRegion(provider, regionGroup string) (string, error) {
 		return ResolveAzureNativeRegion(regionGroup)
 	case "gcp":
 		return ResolveGCPNativeRegion(regionGroup)
+	case "oracle":
+		return ResolveOracleNativeRegion(regionGroup)
 	default:
 		return "", fmt.Errorf("regionmap: unmapped provider %q", provider)
 	}
