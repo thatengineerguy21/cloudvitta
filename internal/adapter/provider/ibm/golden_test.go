@@ -12,12 +12,14 @@ func TestIBMNormalize_GoldenCorpus(t *testing.T) {
 	tests := []struct {
 		name         string
 		goldenFile   string
+		category     string
 		wantObsCount int
 		expectedSKUs []string
 	}{
 		{
 			name:         "IBM Cloud Compute Golden",
 			goldenFile:   "../../../../testdata/golden/ibm/compute.json",
+			category:     "compute",
 			wantObsCount: 60, // 12 metrics * 5 regions
 			expectedSKUs: []string{
 				"SKU-IBM-VPC-BX2-2X8",
@@ -32,6 +34,27 @@ func TestIBMNormalize_GoldenCorpus(t *testing.T) {
 				"SKU-IBM-VPC-VX2-2X28",
 				"SKU-IBM-VPC-VX2-4X56",
 				"SKU-IBM-VPC-BA2-2X8",
+			},
+		},
+		{
+			name:         "IBM Cloud Storage Golden",
+			goldenFile:   "../../../../testdata/golden/ibm/storage.json",
+			category:     "storage",
+			wantObsCount: 10, // 3 COS metrics * 3 regions (9) + 1 Volume metric * 1 region (1) = 10
+			expectedSKUs: []string{
+				"SKU-IBM-STANDARD-STORAGE",
+				"SKU-IBM-VAULT-STORAGE",
+				"SKU-IBM-COLD-VAULT-STORAGE",
+				"SKU-IBM-GENERAL-PURPOSE-STORAGE",
+			},
+		},
+		{
+			name:         "IBM Cloud Network Golden",
+			goldenFile:   "../../../../testdata/golden/ibm/network.json",
+			category:     "network",
+			wantObsCount: 2, // 1 metric * 2 regions = 2
+			expectedSKUs: []string{
+				"SKU-IBM-PUBLIC-EGRESS",
 			},
 		},
 	}
@@ -62,8 +85,8 @@ func TestIBMNormalize_GoldenCorpus(t *testing.T) {
 				if o.Provider != "ibm" {
 					t.Errorf("expected Provider ibm, got %q", o.Provider)
 				}
-				if o.ServiceCategory != "compute" {
-					t.Errorf("expected ServiceCategory compute, got %q", o.ServiceCategory)
+				if o.ServiceCategory != tt.category {
+					t.Errorf("expected ServiceCategory %q, got %q", tt.category, o.ServiceCategory)
 				}
 				if o.PriceAmount.IsZero() {
 					t.Errorf("expected non-zero PriceAmount for SKU %s", o.SkuID)

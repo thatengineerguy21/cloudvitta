@@ -155,12 +155,18 @@ func TestSupportedCategories(t *testing.T) {
 	if !oracle.IsCategorySupported("compute") {
 		t.Errorf("expected compute to be supported")
 	}
+	if !oracle.IsCategorySupported("storage") {
+		t.Errorf("expected storage to be supported")
+	}
+	if !oracle.IsCategorySupported("network") {
+		t.Errorf("expected network to be supported")
+	}
 	if oracle.IsCategorySupported("unknown-category") {
 		t.Errorf("expected unknown-category to not be supported")
 	}
 	cats := oracle.SupportedCategories()
-	if len(cats) != 1 || cats[0] != "compute" {
-		t.Errorf("SupportedCategories() = %v, want [compute]", cats)
+	if len(cats) != 3 {
+		t.Errorf("SupportedCategories() = %v, want 3 categories", cats)
 	}
 }
 

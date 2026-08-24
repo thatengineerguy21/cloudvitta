@@ -24,22 +24,28 @@ var (
 )
 
 type computeNormalizer struct {
+	ctx       context.Context
 	fetchedAt time.Time
 	sink      quarantine.Sink
 	seen      map[string]bool
 }
 
-func (n *computeNormalizer) recordQuarantine(ctx context.Context, kind, rawValue, skuID, category string) {
-	if n.sink != nil {
-		_ = n.sink.Record(ctx, quarantine.UnmappedItem{
-			Provider:   "alibaba",
-			Category:   category,
-			Kind:       kind,
-			RawValue:   rawValue,
-			SkuID:      skuID,
-			ObservedAt: n.fetchedAt,
-		})
+func (n *computeNormalizer) recordQuarantine(kind, rawValue, skuID, category string) {
+	if n.sink == nil {
+		return
 	}
+	ctx := n.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = n.sink.Record(ctx, quarantine.UnmappedItem{
+		Provider:   "alibaba",
+		Category:   category,
+		Kind:       kind,
+		RawValue:   rawValue,
+		SkuID:      skuID,
+		ObservedAt: n.fetchedAt,
+	})
 }
 
 // Normalize parses an Alibaba Cloud ECS catalog or pricing JSON stream and returns normalized domain observations.
@@ -56,6 +62,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 	}
 
 	normalizer := &computeNormalizer{
+		ctx:       context.Background(),
 		fetchedAt: fetchedAt,
 		sink:      sink,
 		seen:      make(map[string]bool),
@@ -94,11 +101,19 @@ func (n *computeNormalizer) processItem(item InstanceTypeItem) ([]domain.PriceOb
 	category, err := catalogmap.MapAlibabaProduct(productCode)
 	if err != nil {
 		if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-			n.recordQuarantine(context.Background(), "product", productCode, item.InstanceTypeID, "unknown")
+			n.recordQuarantine("product", productCode, item.InstanceTypeID, "unknown")
 			slog.Warn("alibaba normalize: skipping item due to unmapped product", "product", productCode, "instance_type", item.InstanceTypeID)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("alibaba normalize product %s: %w", productCode, err)
+	}
+
+	if category == "storage" {
+		return n.normalizeStorageItem(item)
+	}
+
+	if category == "network" {
+		return n.normalizeNetworkItem(item)
 	}
 
 	if category != "compute" {
@@ -112,7 +127,7 @@ func (n *computeNormalizer) processItem(item InstanceTypeItem) ([]domain.PriceOb
 
 	family := classifyECSFamily(instanceTypeID, item.InstanceTypeFamily, item.InstanceFamily)
 	if family == "" {
-		n.recordQuarantine(context.Background(), "product", instanceTypeID, instanceTypeID, "compute")
+		n.recordQuarantine("product", instanceTypeID, instanceTypeID, "compute")
 		slog.Warn("alibaba normalize: skipping unrecognized instance family", "instance_type", instanceTypeID)
 		return nil, nil
 	}
@@ -120,7 +135,7 @@ func (n *computeNormalizer) processItem(item InstanceTypeItem) ([]domain.PriceOb
 	vcpus := item.CPUCoreCount
 	ramGB := item.MemorySize
 	if vcpus <= 0 || ramGB <= 0 {
-		n.recordQuarantine(context.Background(), "product", instanceTypeID, instanceTypeID, "compute")
+		n.recordQuarantine("product", instanceTypeID, instanceTypeID, "compute")
 		slog.Warn("alibaba normalize: skipping instance type with zero vCPU or RAM", "instance_type", instanceTypeID, "vcpu", vcpus, "ram", ramGB)
 		return nil, nil
 	}
@@ -141,14 +156,14 @@ func (n *computeNormalizer) processItem(item InstanceTypeItem) ([]domain.PriceOb
 	}
 
 	if len(regions) == 0 {
-		n.recordQuarantine(context.Background(), "region", "missing", skuID, "compute")
+		n.recordQuarantine("region", "missing", skuID, "compute")
 		slog.Warn("alibaba normalize: skipping SKU due to missing regions", "sku", skuID)
 		return nil, nil
 	}
 
 	var observations []domain.PriceObservation
 	for _, region := range regions {
-		regionGroup, err := n.recordAndResolveRegion(context.Background(), region, skuID, "compute")
+		regionGroup, err := n.recordAndResolveRegion(region, skuID, "compute")
 		if err != nil {
 			return nil, fmt.Errorf("alibaba normalize sku %s region %s: %w", skuID, region, err)
 		}
@@ -279,11 +294,11 @@ func extractPriceAndCurrency(item InstanceTypeItem) (decimal.Decimal, string) {
 	return decimal.Zero, currency
 }
 
-func (n *computeNormalizer) recordAndResolveRegion(ctx context.Context, region, skuID, category string) (string, error) {
+func (n *computeNormalizer) recordAndResolveRegion(region, skuID, category string) (string, error) {
 	regionGroup, err := regionmap.MapAlibabaRegion(region)
 	if err != nil {
 		if errors.Is(err, regionmap.ErrUnmappedRegion) {
-			n.recordQuarantine(ctx, "region", region, skuID, category)
+			n.recordQuarantine("region", region, skuID, category)
 			slog.Warn("alibaba normalize: skipping SKU due to unmapped region", "sku", skuID, "region", region)
 			return "", nil
 		}

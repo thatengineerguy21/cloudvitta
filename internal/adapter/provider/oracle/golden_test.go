@@ -12,12 +12,14 @@ func TestOracleNormalize_GoldenCorpus(t *testing.T) {
 	tests := []struct {
 		name         string
 		goldenFile   string
+		category     string
 		wantObsCount int
 		expectedSKUs []string
 	}{
 		{
 			name:         "Oracle Compute Golden",
 			goldenFile:   "../../../../testdata/golden/oracle/compute.json",
+			category:     "compute",
 			wantObsCount: 12,
 			expectedSKUs: []string{
 				"SKU-OCI-VM-STANDARD-E4-FLEX-2VCPU-8GB",
@@ -32,6 +34,27 @@ func TestOracleNormalize_GoldenCorpus(t *testing.T) {
 				"SKU-OCI-VM-STANDARD-A1-FLEX-16VCPU-64GB",
 				"SKU-OCI-B88317-STANDARD2-1",
 				"SKU-OCI-B88318-STANDARD2-2",
+			},
+		},
+		{
+			name:         "Oracle Storage Golden",
+			goldenFile:   "../../../../testdata/golden/oracle/storage.json",
+			category:     "storage",
+			wantObsCount: 5, // B88206 in 2 regions + B88207, B88208, B88319 in 1 region
+			expectedSKUs: []string{
+				"SKU-OCI-B88206",
+				"SKU-OCI-B88207",
+				"SKU-OCI-B88208",
+				"SKU-OCI-B88319",
+			},
+		},
+		{
+			name:         "Oracle Network Golden",
+			goldenFile:   "../../../../testdata/golden/oracle/network.json",
+			category:     "network",
+			wantObsCount: 2, // B88210 in 2 regions (B88211 is zero price so skipped)
+			expectedSKUs: []string{
+				"SKU-OCI-B88210",
 			},
 		},
 	}
@@ -62,11 +85,8 @@ func TestOracleNormalize_GoldenCorpus(t *testing.T) {
 				if o.Provider != "oracle" {
 					t.Errorf("expected Provider oracle, got %q", o.Provider)
 				}
-				if o.ServiceCategory != "compute" {
-					t.Errorf("expected ServiceCategory compute, got %q", o.ServiceCategory)
-				}
-				if o.RegionGroup != "us-east" {
-					t.Errorf("expected RegionGroup us-east, got %q", o.RegionGroup)
+				if o.ServiceCategory != tt.category {
+					t.Errorf("expected ServiceCategory %q, got %q", tt.category, o.ServiceCategory)
 				}
 				if o.PriceAmount.IsZero() {
 					t.Errorf("expected non-zero PriceAmount for SKU %s", o.SkuID)

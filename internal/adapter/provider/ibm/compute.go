@@ -39,22 +39,28 @@ var (
 )
 
 type computeNormalizer struct {
+	ctx       context.Context
 	fetchedAt time.Time
 	sink      quarantine.Sink
 	seen      map[string]bool
 }
 
-func (n *computeNormalizer) recordQuarantine(ctx context.Context, kind, rawValue, skuID, category string) {
-	if n.sink != nil {
-		_ = n.sink.Record(ctx, quarantine.UnmappedItem{
-			Provider:   "ibm",
-			Category:   category,
-			Kind:       kind,
-			RawValue:   rawValue,
-			SkuID:      skuID,
-			ObservedAt: n.fetchedAt,
-		})
+func (n *computeNormalizer) recordQuarantine(kind, rawValue, skuID, category string) {
+	if n.sink == nil {
+		return
 	}
+	ctx := n.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = n.sink.Record(ctx, quarantine.UnmappedItem{
+		Provider:   "ibm",
+		Category:   category,
+		Kind:       kind,
+		RawValue:   rawValue,
+		SkuID:      skuID,
+		ObservedAt: n.fetchedAt,
+	})
 }
 
 // Normalize parses an IBM Cloud Global Catalog API JSON stream and returns normalized domain observations.
@@ -105,12 +111,14 @@ func (n *computeNormalizer) processResource(
 		productIdentifier = resource.ID
 	}
 
+	var category string
 	if productIdentifier != "" {
-		category, err := catalogmap.MapIBMProduct(productIdentifier)
+		var err error
+		category, err = catalogmap.MapIBMProduct(productIdentifier)
 		if err != nil {
 			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
 				if resource.Pricing != nil && len(resource.Pricing.Metrics) > 0 {
-					n.recordQuarantine(context.Background(), "product", productIdentifier, resource.ID, "unknown")
+					n.recordQuarantine("product", productIdentifier, resource.ID, "unknown")
 					slog.Warn("ibm normalize: skipping resource due to unmapped product", "id", resource.ID, "name", productIdentifier)
 				}
 				// Skip pricing for this unmapped resource
@@ -119,7 +127,7 @@ func (n *computeNormalizer) processResource(
 			return nil, fmt.Errorf("ibm normalize resource %s: %w", resource.ID, err)
 		}
 
-		if category != "compute" {
+		if category != "compute" && category != "storage" && category != "network" {
 			return nil, nil
 		}
 	}
@@ -127,7 +135,16 @@ func (n *computeNormalizer) processResource(
 	// Normalize pricing metrics if present
 	if resource.Pricing != nil {
 		for _, metric := range resource.Pricing.Metrics {
-			metricObs, err := n.normalizeMetric(metric, geoTags)
+			var metricObs []domain.PriceObservation
+			var err error
+			switch category {
+			case "storage":
+				metricObs, err = n.normalizeStorageMetric(metric, resource, geoTags)
+			case "network":
+				metricObs, err = n.normalizeNetworkMetric(metric, resource, geoTags)
+			default:
+				metricObs, err = n.normalizeMetric(metric, geoTags)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -156,7 +173,7 @@ func (n *computeNormalizer) normalizeMetric(
 
 	matches := profileRegex.FindStringSubmatch(metricID)
 	if len(matches) < 5 {
-		n.recordQuarantine(context.Background(), "product", metric.MetricID, metric.MetricID, "compute")
+		n.recordQuarantine("product", metric.MetricID, metric.MetricID, "compute")
 		slog.Warn("ibm normalize: skipping unrecognized VPC profile metric", "metric_id", metric.MetricID)
 		return nil, nil
 	}
@@ -164,7 +181,7 @@ func (n *computeNormalizer) normalizeMetric(
 	prefix := strings.ToLower(matches[1])
 	family := classifyFamily(prefix)
 	if family == "" {
-		n.recordQuarantine(context.Background(), "product", metric.MetricID, metric.MetricID, "compute")
+		n.recordQuarantine("product", metric.MetricID, metric.MetricID, "compute")
 		slog.Warn("ibm normalize: skipping unrecognized instance family", "metric_id", metric.MetricID, "prefix", prefix)
 		return nil, nil
 	}
@@ -192,14 +209,14 @@ func (n *computeNormalizer) normalizeMetric(
 	displayName := fmt.Sprintf("IBM VPC Virtual Server %s (%.0f vCPU, %.0f GB RAM)", cleanProfile, vcpus, ramGB)
 
 	if len(geoTags) == 0 {
-		n.recordQuarantine(context.Background(), "region", "missing", skuID, "compute")
+		n.recordQuarantine("region", "missing", skuID, "compute")
 		slog.Warn("ibm normalize: skipping metric due to missing regions", "sku", skuID)
 		return nil, nil
 	}
 
 	var observations []domain.PriceObservation
 	for _, region := range geoTags {
-		regionGroup, err := n.recordAndResolveRegion(context.Background(), region, skuID, "compute")
+		regionGroup, err := n.recordAndResolveRegion(region, skuID, "compute")
 		if err != nil {
 			return nil, fmt.Errorf("ibm normalize sku %s region %s: %w", skuID, region, err)
 		}
@@ -266,11 +283,11 @@ func extractMetricPrice(metric PricingMetric) (decimal.Decimal, error) {
 	return decimal.Zero, nil
 }
 
-func (n *computeNormalizer) recordAndResolveRegion(ctx context.Context, region, skuID, category string) (string, error) {
+func (n *computeNormalizer) recordAndResolveRegion(region, skuID, category string) (string, error) {
 	regionGroup, err := regionmap.MapIBMRegion(region)
 	if err != nil {
 		if errors.Is(err, regionmap.ErrUnmappedRegion) {
-			n.recordQuarantine(ctx, "region", region, skuID, category)
+			n.recordQuarantine("region", region, skuID, category)
 			slog.Warn("ibm normalize: skipping SKU due to unmapped region", "sku", skuID, "region", region)
 			return "", nil
 		}

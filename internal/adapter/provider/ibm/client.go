@@ -10,6 +10,12 @@ import (
 // DefaultGlobalCatalogURL is the standard IBM Cloud Global Catalog API endpoint for VPC instances.
 const DefaultGlobalCatalogURL = "https://globalcatalog.cloud.ibm.com/api/v1?q=kind:service+name:is.instance&include=*"
 
+// DefaultGlobalStorageCatalogURL is the standard IBM Cloud Global Catalog API endpoint for Cloud Object Storage and Block Storage.
+const DefaultGlobalStorageCatalogURL = "https://globalcatalog.cloud.ibm.com/api/v1?q=kind:service+(name:cloud-object-storage+OR+name:is.volume)&include=*"
+
+// DefaultGlobalNetworkCatalogURL is the standard IBM Cloud Global Catalog API endpoint for VPC Networking.
+const DefaultGlobalNetworkCatalogURL = "https://globalcatalog.cloud.ibm.com/api/v1?q=kind:service+name:is.floating-ip&include=*"
+
 // Client is an HTTP client for fetching IBM Cloud Global Catalog pricing data.
 type Client struct {
 	httpClient *http.Client

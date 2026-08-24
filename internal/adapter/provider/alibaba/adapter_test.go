@@ -204,12 +204,18 @@ func TestSupportedCategories(t *testing.T) {
 	if !alibaba.IsCategorySupported("compute") {
 		t.Errorf("expected compute to be supported")
 	}
+	if !alibaba.IsCategorySupported("storage") {
+		t.Errorf("expected storage to be supported")
+	}
+	if !alibaba.IsCategorySupported("network") {
+		t.Errorf("expected network to be supported")
+	}
 	if alibaba.IsCategorySupported("unknown-category") {
 		t.Errorf("expected unknown-category to not be supported")
 	}
 	cats := alibaba.SupportedCategories()
-	if len(cats) != 1 || cats[0] != "compute" {
-		t.Errorf("SupportedCategories() = %v, want [compute]", cats)
+	if len(cats) != 3 {
+		t.Errorf("SupportedCategories() = %v, want 3 categories", cats)
 	}
 }
 

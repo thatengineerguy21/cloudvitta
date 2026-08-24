@@ -1,0 +1,25 @@
+{
+  "RequestId": "B2C3D4E5-F6A1-8901-BCDE-2345678901BC",
+  "TotalCount": 2,
+  "Items": [
+    {
+      "InstanceTypeId": "data-transfer-out",
+      "ProductCode": "data_transfer",
+      "TradePrice": 0.0800,
+      "Currency": "USD",
+      "Regions": [
+        "us-east-1",
+        "eu-central-1"
+      ]
+    },
+    {
+      "InstanceTypeId": "eip",
+      "ProductCode": "eip",
+      "TradePrice": 0.0700,
+      "Currency": "USD",
+      "Regions": [
+        "us-east-1"
+      ]
+    }
+  ]
+}

@@ -118,12 +118,44 @@ var flexFamilySpecs = map[string]flexFamilySpec{
 	},
 }
 
+type oracleNormalizer struct {
+	ctx       context.Context
+	fetchedAt time.Time
+	sink      quarantine.Sink
+	seen      map[string]bool
+}
+
+func (n *oracleNormalizer) recordQuarantine(kind, rawValue, skuID, category string) {
+	if n.sink == nil {
+		return
+	}
+	ctx := n.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = n.sink.Record(ctx, quarantine.UnmappedItem{
+		Provider:   "oracle",
+		Category:   category,
+		Kind:       kind,
+		RawValue:   rawValue,
+		SkuID:      skuID,
+		ObservedAt: n.fetchedAt,
+	})
+}
+
 // Normalize parses an Oracle CE Tools API JSON stream and returns normalized domain observations.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
 func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
+	}
+
+	norm := &oracleNormalizer{
+		ctx:       context.Background(),
+		fetchedAt: fetchedAt,
+		sink:      sink,
+		seen:      make(map[string]bool),
 	}
 
 	var resp ProductResponse
@@ -143,20 +175,29 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		category, err := catalogmap.MapOracleProduct(serviceCategory)
 		if err != nil {
 			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-				if sink != nil {
-					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-						Provider:   "oracle",
-						Category:   "unknown",
-						Kind:       "product",
-						RawValue:   serviceCategory,
-						SkuID:      item.PartNumber,
-						ObservedAt: fetchedAt,
-					})
-				}
+				norm.recordQuarantine("product", serviceCategory, item.PartNumber, "unknown")
 				slog.Warn("oracle normalize: skipping SKU due to unmapped product", "part_number", item.PartNumber, "product", serviceCategory)
 				continue
 			}
 			return nil, fmt.Errorf("oracle normalize part %s: %w", item.PartNumber, err)
+		}
+
+		if category == "storage" {
+			storageObs, err := norm.normalizeStorageItem(item)
+			if err != nil {
+				return nil, err
+			}
+			observations = append(observations, storageObs...)
+			continue
+		}
+
+		if category == "network" {
+			networkObs, err := norm.normalizeNetworkItem(item)
+			if err != nil {
+				return nil, err
+			}
+			observations = append(observations, networkObs...)
+			continue
 		}
 
 		if category != "compute" {
@@ -173,16 +214,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 		regions := item.Regions
 		if len(regions) == 0 {
-			if sink != nil {
-				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-					Provider:   "oracle",
-					Category:   category,
-					Kind:       "region",
-					RawValue:   "missing",
-					SkuID:      item.PartNumber,
-					ObservedAt: fetchedAt,
-				})
-			}
+			norm.recordQuarantine("region", "missing", item.PartNumber, category)
 			slog.Warn("oracle normalize: skipping SKU due to missing regions", "part_number", item.PartNumber)
 			continue
 		}
@@ -211,16 +243,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 					comp.regions = item.Regions
 				}
 			} else {
-				if sink != nil {
-					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-						Provider:   "oracle",
-						Category:   category,
-						Kind:       "product",
-						RawValue:   item.DisplayName,
-						SkuID:      item.PartNumber,
-						ObservedAt: fetchedAt,
-					})
-				}
+				norm.recordQuarantine("product", item.DisplayName, item.PartNumber, category)
 				slog.Warn("oracle normalize: skipping unrecognized flex shape component", "part_number", item.PartNumber, "name", item.DisplayName)
 			}
 			continue

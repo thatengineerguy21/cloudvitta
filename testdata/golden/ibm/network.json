@@ -1,0 +1,46 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "total_count": 1,
+  "resources": [
+    {
+      "id": "is.floating-ip",
+      "name": "is.floating-ip",
+      "kind": "service",
+      "geo_tags": [
+        "us-east",
+        "eu-de"
+      ],
+      "overview_ui": {
+        "en": {
+          "display_name": "Floating IP & Egress",
+          "description": "VPC Public Network Egress"
+        }
+      },
+      "pricing": {
+        "type": "tiered-usage",
+        "origin": "pricing",
+        "metrics": [
+          {
+            "metric_id": "public-egress",
+            "tier_model": "linear",
+            "charge_unit": "GIGABYTES",
+            "charge_unit_name": "VPC Public Egress",
+            "amounts": [
+              {
+                "country": "USA",
+                "currency": "USD",
+                "prices": [
+                  {
+                    "quantity_tier": 1,
+                    "price": 0.0900
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

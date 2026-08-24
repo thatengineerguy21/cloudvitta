@@ -18,22 +18,28 @@ import (
 )
 
 type computeNormalizer struct {
+	ctx       context.Context
 	fetchedAt time.Time
 	sink      quarantine.Sink
 	seen      map[string]bool
 }
 
-func (n *computeNormalizer) recordQuarantine(ctx context.Context, kind, rawValue, skuID, category string) {
-	if n.sink != nil {
-		_ = n.sink.Record(ctx, quarantine.UnmappedItem{
-			Provider:   "digitalocean",
-			Category:   category,
-			Kind:       kind,
-			RawValue:   rawValue,
-			SkuID:      skuID,
-			ObservedAt: n.fetchedAt,
-		})
+func (n *computeNormalizer) recordQuarantine(kind, rawValue, skuID, category string) {
+	if n.sink == nil {
+		return
 	}
+	ctx := n.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = n.sink.Record(ctx, quarantine.UnmappedItem{
+		Provider:   "digitalocean",
+		Category:   category,
+		Kind:       kind,
+		RawValue:   rawValue,
+		SkuID:      skuID,
+		ObservedAt: n.fetchedAt,
+	})
 }
 
 // Normalize parses a DigitalOcean Droplet sizes JSON stream and returns normalized domain observations.
@@ -50,6 +56,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 	}
 
 	normalizer := &computeNormalizer{
+		ctx:       context.Background(),
 		fetchedAt: fetchedAt,
 		sink:      sink,
 		seen:      make(map[string]bool),
@@ -64,6 +71,37 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		observations = append(observations, obsList...)
 	}
 
+	for _, prod := range resp.Products {
+		rawCat := prod.Type
+		if rawCat == "" {
+			rawCat = prod.Slug
+		}
+		category, err := catalogmap.MapDigitalOceanProduct(rawCat)
+		if err != nil {
+			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
+				normalizer.recordQuarantine("product", rawCat, prod.Slug, "unknown")
+				slog.Warn("digitalocean normalize: skipping product due to unmapped category", "slug", prod.Slug, "type", rawCat)
+				continue
+			}
+			return nil, fmt.Errorf("digitalocean normalize product %s: %w", prod.Slug, err)
+		}
+
+		switch category {
+		case "storage":
+			obsList, err := normalizer.normalizeStorageProduct(prod)
+			if err != nil {
+				return nil, err
+			}
+			observations = append(observations, obsList...)
+		case "network":
+			obsList, err := normalizer.normalizeNetworkProduct(prod)
+			if err != nil {
+				return nil, err
+			}
+			observations = append(observations, obsList...)
+		}
+	}
+
 	return observations, nil
 }
 
@@ -71,7 +109,7 @@ func (n *computeNormalizer) processSize(size Size) ([]domain.PriceObservation, e
 	category, err := catalogmap.MapDigitalOceanProduct("droplet")
 	if err != nil {
 		if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-			n.recordQuarantine(context.Background(), "product", "droplet", size.Slug, "unknown")
+			n.recordQuarantine("product", "droplet", size.Slug, "unknown")
 			slog.Warn("digitalocean normalize: skipping size due to unmapped product", "slug", size.Slug)
 			return nil, nil
 		}
@@ -91,7 +129,7 @@ func (n *computeNormalizer) processSize(size Size) ([]domain.PriceObservation, e
 	ramGB := float64(size.Memory) / 1024.0
 
 	if vcpus <= 0 || ramGB <= 0 {
-		n.recordQuarantine(context.Background(), "product", slug, slug, "compute")
+		n.recordQuarantine("product", slug, slug, "compute")
 		slog.Warn("digitalocean normalize: skipping size with zero vCPU or RAM", "slug", slug, "vcpu", vcpus, "ram", ramGB)
 		return nil, nil
 	}
@@ -120,14 +158,14 @@ func (n *computeNormalizer) processSize(size Size) ([]domain.PriceObservation, e
 
 	regions := size.Regions
 	if len(regions) == 0 {
-		n.recordQuarantine(context.Background(), "region", "missing", skuID, "compute")
+		n.recordQuarantine("region", "missing", skuID, "compute")
 		slog.Warn("digitalocean normalize: skipping SKU due to missing regions", "sku", skuID)
 		return nil, nil
 	}
 
 	var observations []domain.PriceObservation
 	for _, region := range regions {
-		regionGroup, err := n.recordAndResolveRegion(context.Background(), region, skuID, "compute")
+		regionGroup, err := n.recordAndResolveRegion(region, skuID, "compute")
 		if err != nil {
 			return nil, fmt.Errorf("digitalocean normalize sku %s region %s: %w", skuID, region, err)
 		}
@@ -184,11 +222,11 @@ func classifyDropletFamily(slug, description string) string {
 	}
 }
 
-func (n *computeNormalizer) recordAndResolveRegion(ctx context.Context, region, skuID, category string) (string, error) {
+func (n *computeNormalizer) recordAndResolveRegion(region, skuID, category string) (string, error) {
 	regionGroup, err := regionmap.MapDigitalOceanRegion(region)
 	if err != nil {
 		if errors.Is(err, regionmap.ErrUnmappedRegion) {
-			n.recordQuarantine(ctx, "region", region, skuID, category)
+			n.recordQuarantine("region", region, skuID, category)
 			slog.Warn("digitalocean normalize: skipping SKU due to unmapped region", "sku", skuID, "region", region)
 			return "", nil
 		}

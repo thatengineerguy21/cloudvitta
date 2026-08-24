@@ -1,0 +1,11 @@
+{
+  "products": [
+    {
+      "slug": "bandwidth",
+      "name": "Bandwidth Data Transfer",
+      "type": "bandwidth",
+      "price_per_gb": 0.0100,
+      "regions": ["nyc1", "nyc3", "sfo3", "ams3", "fra1", "lon1", "sgp1", "tor1", "blr1", "syd1"]
+    }
+  ]
+}

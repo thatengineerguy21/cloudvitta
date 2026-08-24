@@ -345,6 +345,28 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, oracleAdapter)
 
+	// Register Oracle storage adapter with rate limiting and retry config
+	oracleStorageClient := oracle.NewClient(oracle.WithURL(oracle.DefaultStoragePriceListURL))
+	oracleStorageAdapter := oracle.NewAdapter(oracleStorageClient, rawStorage, oracle.WithCategory("storage"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "oracle",
+		Category:       "storage",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, oracleStorageAdapter)
+
+	// Register Oracle network adapter with rate limiting and retry config
+	oracleNetworkClient := oracle.NewClient(oracle.WithURL(oracle.DefaultNetworkPriceListURL))
+	oracleNetworkAdapter := oracle.NewAdapter(oracleNetworkClient, rawStorage, oracle.WithCategory("network"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "oracle",
+		Category:       "network",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, oracleNetworkAdapter)
+
 	// Register IBM compute adapter with rate limiting and retry config
 	var ibmOpts []ibm.Option
 	if cfg.IBM.APIKey != "" {
@@ -359,6 +381,38 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, ibmAdapter)
+
+	// Register IBM storage adapter with rate limiting and retry config
+	var ibmStorageOpts []ibm.Option
+	if cfg.IBM.APIKey != "" {
+		ibmStorageOpts = append(ibmStorageOpts, ibm.WithAPIKey(cfg.IBM.APIKey))
+	}
+	ibmStorageOpts = append(ibmStorageOpts, ibm.WithCatalogURL(ibm.DefaultGlobalStorageCatalogURL))
+	ibmStorageClient := ibm.NewClient(ibmStorageOpts...)
+	ibmStorageAdapter := ibm.NewAdapter(ibmStorageClient, rawStorage, ibm.WithCategory("storage"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "ibm",
+		Category:       "storage",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, ibmStorageAdapter)
+
+	// Register IBM network adapter with rate limiting and retry config
+	var ibmNetworkOpts []ibm.Option
+	if cfg.IBM.APIKey != "" {
+		ibmNetworkOpts = append(ibmNetworkOpts, ibm.WithAPIKey(cfg.IBM.APIKey))
+	}
+	ibmNetworkOpts = append(ibmNetworkOpts, ibm.WithCatalogURL(ibm.DefaultGlobalNetworkCatalogURL))
+	ibmNetworkClient := ibm.NewClient(ibmNetworkOpts...)
+	ibmNetworkAdapter := ibm.NewAdapter(ibmNetworkClient, rawStorage, ibm.WithCategory("network"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "ibm",
+		Category:       "network",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, ibmNetworkAdapter)
 
 	// Register Alibaba compute adapter with rate limiting and retry config
 	var aliOpts []alibaba.Option
@@ -375,6 +429,36 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, aliAdapter)
 
+	// Register Alibaba storage adapter with rate limiting and retry config
+	var aliStorageOpts []alibaba.Option
+	if cfg.Alibaba.AccessKeyID != "" && cfg.Alibaba.AccessKeySecret != "" {
+		aliStorageOpts = append(aliStorageOpts, alibaba.WithCredentials(cfg.Alibaba.AccessKeyID, cfg.Alibaba.AccessKeySecret))
+	}
+	aliStorageClient := alibaba.NewClient(aliStorageOpts...)
+	aliStorageAdapter := alibaba.NewAdapter(aliStorageClient, rawStorage, alibaba.WithCategory("storage"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "alibaba",
+		Category:       "storage",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, aliStorageAdapter)
+
+	// Register Alibaba network adapter with rate limiting and retry config
+	var aliNetworkOpts []alibaba.Option
+	if cfg.Alibaba.AccessKeyID != "" && cfg.Alibaba.AccessKeySecret != "" {
+		aliNetworkOpts = append(aliNetworkOpts, alibaba.WithCredentials(cfg.Alibaba.AccessKeyID, cfg.Alibaba.AccessKeySecret))
+	}
+	aliNetworkClient := alibaba.NewClient(aliNetworkOpts...)
+	aliNetworkAdapter := alibaba.NewAdapter(aliNetworkClient, rawStorage, alibaba.WithCategory("network"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "alibaba",
+		Category:       "network",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, aliNetworkAdapter)
+
 	// Register DigitalOcean compute adapter with rate limiting and retry config
 	var doOpts []digitalocean.Option
 	if cfg.DigitalOcean.Token != "" {
@@ -389,6 +473,36 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, doAdapter)
+
+	// Register DigitalOcean storage adapter with rate limiting and retry config
+	var doStorageOpts []digitalocean.Option
+	if cfg.DigitalOcean.Token != "" {
+		doStorageOpts = append(doStorageOpts, digitalocean.WithToken(cfg.DigitalOcean.Token))
+	}
+	doStorageClient := digitalocean.NewClient(doStorageOpts...)
+	doStorageAdapter := digitalocean.NewAdapter(doStorageClient, rawStorage, digitalocean.WithCategory("storage"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "digitalocean",
+		Category:       "storage",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, doStorageAdapter)
+
+	// Register DigitalOcean network adapter with rate limiting and retry config
+	var doNetworkOpts []digitalocean.Option
+	if cfg.DigitalOcean.Token != "" {
+		doNetworkOpts = append(doNetworkOpts, digitalocean.WithToken(cfg.DigitalOcean.Token))
+	}
+	doNetworkClient := digitalocean.NewClient(doNetworkOpts...)
+	doNetworkAdapter := digitalocean.NewAdapter(doNetworkClient, rawStorage, digitalocean.WithCategory("network"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "digitalocean",
+		Category:       "network",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, doNetworkAdapter)
 
 	// --- DLQ ---
 	var dlqSvc *dlq.DLQ

@@ -14,11 +14,24 @@ type Size struct {
 	Description  string   `json:"description,omitempty"`
 }
 
-// SizesResponse represents the top-level payload returned by GET /v2/sizes.
+// Product represents a non-compute product in DigitalOcean API or pricing payload (Spaces, Volumes, Bandwidth).
+type Product struct {
+	Slug         string   `json:"slug"`
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	PriceMonthly float64  `json:"price_monthly,omitempty"`
+	PriceHourly  float64  `json:"price_hourly,omitempty"`
+	PricePerGB   float64  `json:"price_per_gb,omitempty"`
+	Regions      []string `json:"regions"`
+	Description  string   `json:"description,omitempty"`
+}
+
+// SizesResponse represents the top-level payload returned by GET /v2/sizes or products payload.
 type SizesResponse struct {
-	Sizes []Size `json:"sizes"`
-	Links *Links `json:"links,omitempty"`
-	Meta  *Meta  `json:"meta,omitempty"`
+	Sizes    []Size    `json:"sizes,omitempty"`
+	Products []Product `json:"products,omitempty"`
+	Links    *Links    `json:"links,omitempty"`
+	Meta     *Meta     `json:"meta,omitempty"`
 }
 
 // Region represents a region definition returned by DigitalOcean API v2.

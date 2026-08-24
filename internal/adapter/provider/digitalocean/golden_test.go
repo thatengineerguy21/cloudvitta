@@ -12,12 +12,14 @@ func TestDigitalOceanNormalize_GoldenCorpus(t *testing.T) {
 	tests := []struct {
 		name         string
 		goldenFile   string
+		category     string
 		wantObsCount int
 		expectedSKUs []string
 	}{
 		{
 			name:         "DigitalOcean Compute Golden",
 			goldenFile:   "../../../../testdata/golden/digitalocean/compute.json",
+			category:     "compute",
 			wantObsCount: 58, // 10 regions for s-1vcpu-1gb + 12*4 regions for others
 			expectedSKUs: []string{
 				"SKU-DO-DROPLET-S-1VCPU-1GB",
@@ -33,6 +35,25 @@ func TestDigitalOceanNormalize_GoldenCorpus(t *testing.T) {
 				"SKU-DO-DROPLET-M-4VCPU-32GB",
 				"SKU-DO-DROPLET-SO-2VCPU-16GB",
 				"SKU-DO-DROPLET-G-2VCPU-8GB",
+			},
+		},
+		{
+			name:         "DigitalOcean Storage Golden",
+			goldenFile:   "../../../../testdata/golden/digitalocean/storage.json",
+			category:     "storage",
+			wantObsCount: 16, // spaces * 6 regions (6) + volume * 10 regions (10) = 16
+			expectedSKUs: []string{
+				"SKU-DO-STORAGE-SPACES",
+				"SKU-DO-STORAGE-VOLUME",
+			},
+		},
+		{
+			name:         "DigitalOcean Network Golden",
+			goldenFile:   "../../../../testdata/golden/digitalocean/network.json",
+			category:     "network",
+			wantObsCount: 10, // bandwidth * 10 regions = 10
+			expectedSKUs: []string{
+				"SKU-DO-NETWORK-BANDWIDTH",
 			},
 		},
 	}
@@ -63,8 +84,8 @@ func TestDigitalOceanNormalize_GoldenCorpus(t *testing.T) {
 				if o.Provider != "digitalocean" {
 					t.Errorf("expected Provider digitalocean, got %q", o.Provider)
 				}
-				if o.ServiceCategory != "compute" {
-					t.Errorf("expected ServiceCategory compute, got %q", o.ServiceCategory)
+				if o.ServiceCategory != tt.category {
+					t.Errorf("expected ServiceCategory %q, got %q", tt.category, o.ServiceCategory)
 				}
 				if o.PriceAmount.IsZero() {
 					t.Errorf("expected non-zero PriceAmount for SKU %s", o.SkuID)

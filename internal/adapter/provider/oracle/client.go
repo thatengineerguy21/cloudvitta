@@ -10,6 +10,15 @@ import (
 // DefaultComputePriceListURL is the standard Oracle CE Tools API endpoint for Virtual Machines in USD.
 const DefaultComputePriceListURL = "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?serviceCategory=Compute%20-%20Virtual%20Machine&currencyCode=USD"
 
+// DefaultStoragePriceListURL is the standard Oracle CE Tools API endpoint for all Storage (Object & Block) in USD.
+const DefaultStoragePriceListURL = "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?serviceCategory=Storage&currencyCode=USD"
+
+// DefaultBlockStoragePriceListURL is the standard Oracle CE Tools API endpoint for Block Volumes in USD.
+const DefaultBlockStoragePriceListURL = "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?serviceCategory=Storage%20-%20Block%20Volume&currencyCode=USD"
+
+// DefaultNetworkPriceListURL is the standard Oracle CE Tools API endpoint for Networking in USD.
+const DefaultNetworkPriceListURL = "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?serviceCategory=Networking%20-%20Virtual%20Cloud%20Network&currencyCode=USD"
+
 // Client is an HTTP client for fetching Oracle OCI CE Tools pricing data.
 type Client struct {
 	httpClient *http.Client
