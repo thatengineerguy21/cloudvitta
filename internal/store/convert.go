@@ -28,6 +28,20 @@ func TimestamptzFromTime(t time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: t, Valid: !t.IsZero()}
 }
 
+// DateFromTime converts a time.Time to a pgtype.Date.
+func DateFromTime(t time.Time) pgtype.Date {
+	return pgtype.Date{Time: t, Valid: !t.IsZero()}
+}
+
+// DateFromString parses an ISO 8601 date string (YYYY-MM-DD) to a pgtype.Date.
+func DateFromString(s string) (pgtype.Date, error) {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return pgtype.Date{}, fmt.Errorf("parse date string %q: %w", s, err)
+	}
+	return pgtype.Date{Time: t, Valid: true}, nil
+}
+
 // TextFromString converts a Go string to a pgtype.Text.
 func TextFromString(s string) pgtype.Text {
 	return pgtype.Text{String: s, Valid: s != ""}

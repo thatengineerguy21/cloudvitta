@@ -25,6 +25,7 @@ Create directories only when their stage implementation requires them.
 │   │       └── retry.go         # retry and backoff policies
 │   │
 │   ├── fx/                      # foreign exchange service interface and implementations
+│   │   └── frankfurter/         # Frankfurter (ECB) API client
 │   │
 │   ├── store/                   # SQLC generated database code and connection pool constructor
 │   │   └── queries/             # SQL query definition files (*.sql)
@@ -65,7 +66,7 @@ Create directories only when their stage implementation requires them.
 ├── migrations/                  # Tern forward-only SQL migration files
 │
 ├── docs/
-│   ├── 05-REPO-STRUCTURE.md     # repository structure reference
+│   ├── REPO-STRUCTURE.md     # repository structure reference
 │   ├── DEVELOPMENT_GUIDE.md     # step-by-step setup and local development guide
 │   ├── adr/                     # Architectural Decision Records (ADRs)
 │   ├── devops/                  # deployment and operations runbooks

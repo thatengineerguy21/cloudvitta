@@ -11,6 +11,7 @@ import (
 
 // mockQuerier implements store.Querier for REST test suites.
 type mockQuerier struct {
+	store.Querier
 	createUserFunc                        func(ctx context.Context, arg store.CreateUserParams) (store.User, error)
 	getUserByEmailFunc                    func(ctx context.Context, email string) (store.User, error)
 	getUserByIDFunc                       func(ctx context.Context, id pgtype.UUID) (store.User, error)

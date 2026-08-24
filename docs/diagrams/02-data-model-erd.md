@@ -49,8 +49,11 @@ erDiagram
         BIGSERIAL id PK
         TEXT base_currency
         TEXT target_currency
-        NUMERIC exchange_rate
+        NUMERIC rate
+        TEXT source
+        DATE rate_date
         TIMESTAMPTZ fetched_at
+        TIMESTAMPTZ created_at
     }
 
     users ||--o{ refresh_tokens : "owns"

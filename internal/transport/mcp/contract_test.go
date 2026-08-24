@@ -17,7 +17,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/redis/go-redis/v9"
@@ -43,67 +42,8 @@ func ptrDecimal(d decimal.Decimal) *decimal.Decimal {
 // --- Mock Querier & DLQ Harness ---
 
 type contractMockQuerier struct {
+	store.Querier
 	getProviderCategoryStatusFunc func(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error)
-}
-
-func (m *contractMockQuerier) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
-	return store.User{}, errors.New("CreateUser not implemented")
-}
-
-func (m *contractMockQuerier) GetUserByEmail(ctx context.Context, email string) (store.User, error) {
-	return store.User{}, pgx.ErrNoRows
-}
-
-func (m *contractMockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (store.User, error) {
-	return store.User{}, pgx.ErrNoRows
-}
-
-func (m *contractMockQuerier) InsertRefreshToken(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {
-	return store.RefreshToken{}, errors.New("InsertRefreshToken not implemented")
-}
-
-func (m *contractMockQuerier) GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (store.RefreshToken, error) {
-	return store.RefreshToken{}, pgx.ErrNoRows
-}
-
-func (m *contractMockQuerier) GetRefreshTokenByID(ctx context.Context, id pgtype.UUID) (store.RefreshToken, error) {
-	return store.RefreshToken{}, pgx.ErrNoRows
-}
-
-func (m *contractMockQuerier) RevokeRefreshTokenWithReplacement(ctx context.Context, arg store.RevokeRefreshTokenWithReplacementParams) error {
-	return nil
-}
-
-func (m *contractMockQuerier) RevokeRefreshTokenByHash(ctx context.Context, arg store.RevokeRefreshTokenByHashParams) error {
-	return nil
-}
-
-func (m *contractMockQuerier) RevokeRefreshTokenFamily(ctx context.Context, arg store.RevokeRefreshTokenFamilyParams) error {
-	return nil
-}
-
-func (m *contractMockQuerier) ListRefreshTokensByFamilyID(ctx context.Context, familyID pgtype.UUID) ([]store.RefreshToken, error) {
-	return nil, nil
-}
-
-func (m *contractMockQuerier) GetPriceObservations(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error) {
-	return nil, errors.New("GetPriceObservations not implemented")
-}
-
-func (m *contractMockQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.GetLatestPriceForSKUParams) (store.PriceObservation, error) {
-	return store.PriceObservation{}, errors.New("GetLatestPriceForSKU not implemented")
-}
-
-func (m *contractMockQuerier) GetLatestPriceForSKUAndCategory(ctx context.Context, arg store.GetLatestPriceForSKUAndCategoryParams) (store.PriceObservation, error) {
-	return store.PriceObservation{}, errors.New("GetLatestPriceForSKUAndCategory not implemented")
-}
-
-func (m *contractMockQuerier) UpdatePriceObservationLastSeenAt(ctx context.Context, arg store.UpdatePriceObservationLastSeenAtParams) error {
-	return nil
-}
-
-func (m *contractMockQuerier) InsertPriceObservation(ctx context.Context, arg store.InsertPriceObservationParams) (int64, error) {
-	return 0, errors.New("InsertPriceObservation not implemented")
 }
 
 func (m *contractMockQuerier) GetProviderCategoryStatus(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error) {

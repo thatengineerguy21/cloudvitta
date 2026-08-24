@@ -8,6 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type FxRate struct {
+	ID             int64              `json:"id"`
+	BaseCurrency   string             `json:"base_currency"`
+	TargetCurrency string             `json:"target_currency"`
+	Rate           pgtype.Numeric     `json:"rate"`
+	Source         string             `json:"source"`
+	RateDate       pgtype.Date        `json:"rate_date"`
+	FetchedAt      pgtype.Timestamptz `json:"fetched_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type PriceObservation struct {
 	ID              int64              `json:"id"`
 	Provider        string             `json:"provider"`

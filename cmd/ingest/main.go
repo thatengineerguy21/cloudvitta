@@ -17,6 +17,8 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
+	"github.com/thatengineerguy21/CloudVitta/internal/fx"
+	"github.com/thatengineerguy21/CloudVitta/internal/fx/frankfurter"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
@@ -334,8 +336,19 @@ func run() error {
 		dlqSvc = dlq.New(redisClient)
 	}
 
-	// --- Orchestrator ---
 	queries := store.New(dbPool)
+
+	// --- FX Rates Synchronization ---
+	frankfurterClient := frankfurter.NewClient()
+	fxSvc := fx.NewService(queries, frankfurterClient)
+	slog.InfoContext(ctx, "syncing daily fx rates...")
+	if err := fxSvc.RefreshRates(ctx); err != nil {
+		slog.WarnContext(ctx, "fx rate synchronization failed during ingestion run, operating with fallback rates", "error", err)
+	} else {
+		slog.InfoContext(ctx, "daily fx rates synchronized successfully")
+	}
+
+	// --- Orchestrator ---
 	orchConfig := service.DefaultOrchestratorConfig()
 	orchConfig.Tracer = otelProviders.Tracer
 	orchConfig.Meter = otelProviders.Meter

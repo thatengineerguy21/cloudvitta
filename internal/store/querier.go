@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	GetLatestFXRate(ctx context.Context, arg GetLatestFXRateParams) (FxRate, error)
 	GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceForSKUParams) (PriceObservation, error)
 	GetLatestPriceForSKUAndCategory(ctx context.Context, arg GetLatestPriceForSKUAndCategoryParams) (PriceObservation, error)
 	GetPriceObservations(ctx context.Context, arg GetPriceObservationsParams) ([]PriceObservation, error)
@@ -23,11 +24,13 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	InsertPriceObservation(ctx context.Context, arg InsertPriceObservationParams) (int64, error)
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
+	ListLatestFXRates(ctx context.Context, baseCurrency string) ([]FxRate, error)
 	ListRefreshTokensByFamilyID(ctx context.Context, familyID pgtype.UUID) ([]RefreshToken, error)
 	RevokeRefreshTokenByHash(ctx context.Context, arg RevokeRefreshTokenByHashParams) error
 	RevokeRefreshTokenFamily(ctx context.Context, arg RevokeRefreshTokenFamilyParams) error
 	RevokeRefreshTokenWithReplacement(ctx context.Context, arg RevokeRefreshTokenWithReplacementParams) error
 	UpdatePriceObservationLastSeenAt(ctx context.Context, arg UpdatePriceObservationLastSeenAtParams) error
+	UpsertFXRate(ctx context.Context, arg UpsertFXRateParams) (FxRate, error)
 }
 
 var _ Querier = (*Queries)(nil)
