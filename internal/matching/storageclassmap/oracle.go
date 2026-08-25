@@ -31,10 +31,20 @@ var oracleStorageClassMap = map[string]string{
 	"Block Volume":                      "standard",
 	"Block Volumes":                     "standard",
 	"Block Volume - Storage":            "standard",
+	"Storage - Block Volume - Storage":  "standard",
 	"Block Volume Standard":             "standard",
 	"Block Volume - Balanced":           "standard",
 	"Block Volume - Higher Performance": "standard",
 	"Block Volume - Lower Cost":         "standard",
+
+	// Archive Storage
+	"Archive Storage - Storage": "archive",
+
+	// Infrequent Access Storage
+	"Infrequent Access Storage - Storage": "infrequent_access",
+
+	// File Storage
+	"File Storage - Storage": "standard",
 }
 
 // MapOracleStorageClass resolves an Oracle OCI storage class to a canonical class.

@@ -95,13 +95,13 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
 
 	qSink := quarantine.NewStorageSink(a.storage, "aws", category, fetchID, fetchedAt)
-	var observations []domain.PriceObservation
+	var normResult domain.NormalizationResult
 	g, _ := errgroup.WithContext(ctx)
 
 	// Goroutine 1: Normalize reads from pr
 	g.Go(func() error {
 		var normErr error
-		observations, normErr = Normalize(pr, fetchedAt, qSink)
+		normResult, normErr = Normalize(pr, fetchedAt, qSink)
 		if normErr != nil {
 			_ = pr.CloseWithError(normErr)
 			return fmt.Errorf("aws adapter: normalize: %w", normErr)
@@ -143,8 +143,9 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	}
 
 	return domain.FetchResult{
-		Observations:  observations,
+		Observations:  normResult.Observations,
 		RawGCSPath:    gcsPath,
 		UnmappedCount: qSink.Count(),
+		IgnoredCount:  normResult.IgnoredCount,
 	}, nil
 }

@@ -247,3 +247,93 @@ func TestJob_Fetch_UnmappedRatio_ExceedsThreshold_Fails(t *testing.T) {
 		t.Fatal("expected error when unmapped ratio exceeds threshold, got nil")
 	}
 }
+
+func TestJob_Fetch_3WayClassification_ThresholdBoundaries(t *testing.T) {
+	tests := []struct {
+		name          string
+		obsCount      int
+		unmappedCount int
+		ignoredCount  int
+		maxRatio      float64
+		wantErr       bool
+	}{
+		{
+			name:          "Zero in-scope items, only ignored items -> succeeds",
+			obsCount:      0,
+			unmappedCount: 0,
+			ignoredCount:  10000,
+			maxRatio:      0.05,
+			wantErr:       false,
+		},
+		{
+			name:          "Large ignored count does not skew denominator: 2 unmapped / 100 in-scope (2% <= 5%) -> succeeds",
+			obsCount:      98,
+			unmappedCount: 2,
+			ignoredCount:  50000,
+			maxRatio:      0.05,
+			wantErr:       false,
+		},
+		{
+			name:          "Exactly at 5% boundary: 5 unmapped / 100 in-scope (5.00% <= 5.00%) -> succeeds",
+			obsCount:      95,
+			unmappedCount: 5,
+			ignoredCount:  1000,
+			maxRatio:      0.05,
+			wantErr:       false,
+		},
+		{
+			name:          "Just under boundary: 4 unmapped / 100 in-scope (4.00% <= 5.00%) -> succeeds",
+			obsCount:      96,
+			unmappedCount: 4,
+			ignoredCount:  1000,
+			maxRatio:      0.05,
+			wantErr:       false,
+		},
+		{
+			name:          "Just over boundary: 6 unmapped / 100 in-scope (6.00% > 5.00%) -> fails",
+			obsCount:      94,
+			unmappedCount: 6,
+			ignoredCount:  1000,
+			maxRatio:      0.05,
+			wantErr:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obs := make([]domain.PriceObservation, tt.obsCount)
+			adapter := &stubAdapter{
+				result: domain.FetchResult{
+					Observations:  obs,
+					UnmappedCount: tt.unmappedCount,
+					IgnoredCount:  tt.ignoredCount,
+					RawGCSPath:    "test/path",
+				},
+			}
+
+			f := provider.NewFactory()
+			f.Register(provider.ProviderConfig{
+				Provider:         "test",
+				Category:         "compute",
+				MaxUnmappedRatio: tt.maxRatio,
+			}, adapter)
+
+			jobs := f.BuildJobs()
+			res, err := jobs[0].Fetch(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Fetch() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				if res.IgnoredCount != tt.ignoredCount {
+					t.Errorf("got ignored count %d, want %d", res.IgnoredCount, tt.ignoredCount)
+				}
+				if res.UnmappedCount != tt.unmappedCount {
+					t.Errorf("got unmapped count %d, want %d", res.UnmappedCount, tt.unmappedCount)
+				}
+				if len(res.Observations) != tt.obsCount {
+					t.Errorf("got obs count %d, want %d", len(res.Observations), tt.obsCount)
+				}
+			}
+		})
+	}
+}

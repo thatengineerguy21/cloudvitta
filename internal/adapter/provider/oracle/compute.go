@@ -147,7 +147,7 @@ func (n *oracleNormalizer) recordQuarantine(kind, rawValue, skuID, category stri
 
 // Normalize parses an Oracle CE Tools API JSON stream and returns normalized domain observations.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
-func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -162,13 +162,17 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 	var resp ProductResponse
 	if err := json.NewDecoder(r).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("oracle normalize: decode json: %w", err)
+		return domain.NormalizationResult{}, fmt.Errorf("oracle normalize: decode json: %w", err)
 	}
 
 	var observations []domain.PriceObservation
+	var ignoredCount int
 	flexShapes := make(map[string]*flexShapeComponent)
 
 	for _, item := range resp.Items {
+		sinkCountBefore := norm.sinkCount()
+		obsCountBefore := len(observations)
+
 		serviceCategory := item.ServiceCategory
 		if serviceCategory == "" {
 			serviceCategory = item.ServiceCategoryDisplayName
@@ -177,40 +181,49 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		category, err := catalogmap.MapOracleProduct(serviceCategory)
 		if err != nil {
 			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-				norm.recordQuarantine("product", serviceCategory, item.PartNumber, "unknown")
-				slog.Warn("oracle normalize: skipping SKU due to unmapped product", "part_number", item.PartNumber, "product", serviceCategory)
+				slog.Debug("oracle normalize: ignoring out-of-scope product", "part_number", item.PartNumber, "product", serviceCategory)
+				ignoredCount++
 				continue
 			}
-			return nil, fmt.Errorf("oracle normalize part %s: %w", item.PartNumber, err)
+			return domain.NormalizationResult{}, fmt.Errorf("oracle normalize part %s: %w", item.PartNumber, err)
 		}
 
 		if category == "storage" {
 			storageObs, err := norm.normalizeStorageItem(item)
 			if err != nil {
-				return nil, err
+				return domain.NormalizationResult{}, err
 			}
 			observations = append(observations, storageObs...)
+			if len(observations) == obsCountBefore && norm.sinkCount() == sinkCountBefore {
+				ignoredCount++
+			}
 			continue
 		}
 
 		if category == "network" {
 			networkObs, err := norm.normalizeNetworkItem(item)
 			if err != nil {
-				return nil, err
+				return domain.NormalizationResult{}, err
 			}
 			observations = append(observations, networkObs...)
+			if len(observations) == obsCountBefore && norm.sinkCount() == sinkCountBefore {
+				ignoredCount++
+			}
 			continue
 		}
 
 		if category != "compute" {
+			slog.Debug("oracle normalize: skipping unhandled category in compute pass", "part_number", item.PartNumber, "category", category)
+			ignoredCount++
 			continue
 		}
 
 		priceAmount, err := extractPrice(item)
 		if err != nil {
-			return nil, fmt.Errorf("oracle normalize part %s: %w", item.PartNumber, err)
+			return domain.NormalizationResult{}, fmt.Errorf("oracle normalize part %s: %w", item.PartNumber, err)
 		}
 		if priceAmount.IsZero() {
+			ignoredCount++
 			continue
 		}
 
@@ -254,21 +267,38 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		// Fixed shape normalization
 		fixedObs, err := normalizeFixedShape(item, category, priceAmount, regions, fetchedAt, sink)
 		if err != nil {
-			return nil, err
+			return domain.NormalizationResult{}, err
 		}
 		observations = append(observations, fixedObs...)
+
+		if len(observations) == obsCountBefore && norm.sinkCount() == sinkCountBefore {
+			ignoredCount++
+		}
 	}
 
 	// Synthesize discrete compute instances from collected flexible shape components
 	for _, comp := range flexShapes {
 		synthObs, err := synthesizeFlexShapes(comp, fetchedAt, sink)
 		if err != nil {
-			return nil, err
+			return domain.NormalizationResult{}, err
 		}
 		observations = append(observations, synthObs...)
 	}
 
-	return observations, nil
+	return domain.NormalizationResult{
+		Observations: observations,
+		IgnoredCount: ignoredCount,
+	}, nil
+}
+
+func (n *oracleNormalizer) sinkCount() int {
+	if n.sink == nil {
+		return 0
+	}
+	if counter, ok := n.sink.(interface{ Count() int }); ok {
+		return counter.Count()
+	}
+	return 0
 }
 
 func extractPrice(item ProductItem) (decimal.Decimal, error) {

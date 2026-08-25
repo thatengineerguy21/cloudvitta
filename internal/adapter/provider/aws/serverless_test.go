@@ -19,10 +19,11 @@ func TestNormalize_AWSServerlessGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, err := aws.Normalize(f, fixedTime)
+	res, err := aws.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 4 {
 		t.Fatalf("expected 4 observations, got %d", len(obs))
@@ -92,10 +93,11 @@ func TestNormalize_AWSServerless_UnmappedArchQuarantine(t *testing.T) {
 	}`
 
 	sink := &mockQuarantineSink{}
-	obs, err := aws.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	res, err := aws.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Fatalf("expected 0 normalized observations for unmapped arch, got %d", len(obs))

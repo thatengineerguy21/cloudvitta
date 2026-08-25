@@ -95,7 +95,7 @@ var knownAzureVMSpecs = map[string]azureVMSpec{
 
 // Normalize parses an Azure Retail Prices API JSON stream and returns normalized domain observations and the next page link.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
-func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, string, error) {
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, string, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -104,21 +104,33 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 	var payload azurePriceListResponse
 	dec := json.NewDecoder(r)
 	if err := dec.Decode(&payload); err != nil {
-		return nil, "", fmt.Errorf("azure normalize: decode JSON: %w", err)
+		return domain.NormalizationResult{}, "", fmt.Errorf("azure normalize: decode JSON: %w", err)
 	}
 
 	var observations []domain.PriceObservation
+	var ignoredCount int
 
 	for _, item := range payload.Items {
 		// Filter 1: Must be Consumption (On-Demand)
 		if item.Type != "Consumption" {
+			ignoredCount++
 			continue
 		}
 
 		skuID := item.SkuID
 		if skuID == "" {
 			skuID = item.MeterID
+		} else if item.MeterID != "" && item.MeterID != item.SkuID {
+			skuID = fmt.Sprintf("%s:%s", item.SkuID, item.MeterID)
 		}
+
+		sinkCountBefore := 0
+		if sink != nil {
+			if counter, ok := sink.(interface{ Count() int }); ok {
+				sinkCountBefore = counter.Count()
+			}
+		}
+		obsCountBefore := len(observations)
 
 		// Filter 2: Check service category mapping (fails loudly if unmapped)
 		category, err := catalogmap.MapAzureProduct(item.ServiceName)
@@ -137,7 +149,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 				slog.Warn("azure normalize: skipping SKU due to unmapped product", "sku", skuID, "product", item.ServiceName)
 				continue
 			}
-			return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+			return domain.NormalizationResult{}, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 		}
 
 		// Filter 3: Check region mapping (fails loudly if unmapped)
@@ -161,12 +173,12 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 				slog.Warn("azure normalize: skipping SKU due to unmapped region", "sku", skuID, "region", region)
 				continue
 			}
-			return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+			return domain.NormalizationResult{}, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 		}
 
 		priceAmount, err := decimal.NewFromString(item.UnitPrice.String())
 		if err != nil {
-			return nil, "", fmt.Errorf("azure normalize sku %s: invalid unit price %q: %w", item.SkuID, item.UnitPrice, err)
+			return domain.NormalizationResult{}, "", fmt.Errorf("azure normalize sku %s: invalid unit price %q: %w", item.SkuID, item.UnitPrice, err)
 		}
 
 		if category == "compute" {
@@ -225,7 +237,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 					slog.Warn("azure normalize: skipping SKU due to unmapped storage class", "sku", skuID, "sku_name", item.SkuName, "meter_name", item.MeterName)
 					continue
 				}
-				return nil, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
+				return domain.NormalizationResult{}, "", fmt.Errorf("azure normalize sku %s: %w", item.SkuID, err)
 			}
 
 			displayName := item.ProductName
@@ -289,7 +301,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 					slog.Warn("azure normalize: skipping SKU due to unmapped transfer type", "sku", skuID, "display_name", displayName)
 					continue
 				}
-				return nil, "", fmt.Errorf("azure normalize sku %s transfer type: %w", skuID, err)
+				return domain.NormalizationResult{}, "", fmt.Errorf("azure normalize sku %s transfer type: %w", skuID, err)
 			}
 
 			obs := domain.PriceObservation{
@@ -328,7 +340,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 					slog.Warn("azure normalize: skipping SKU due to unmapped database engine", "sku", skuID, "service", item.ServiceName)
 					continue
 				}
-				return nil, "", fmt.Errorf("azure normalize sku %s database engine: %w", skuID, err)
+				return domain.NormalizationResult{}, "", fmt.Errorf("azure normalize sku %s database engine: %w", skuID, err)
 			}
 
 			isStorage := strings.Contains(item.MeterName, "Storage") ||
@@ -536,7 +548,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		} else if category == "kubernetes" {
 			k8sObs, err := normalizeAzureKubernetesItem(item, category, region, regionGroup, skuID, priceAmount, fetchedAt, sink)
 			if err != nil {
-				return nil, "", err
+				return domain.NormalizationResult{}, "", err
 			}
 			if k8sObs != nil {
 				observations = append(observations, *k8sObs)
@@ -544,15 +556,31 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		} else if category == "serverless" {
 			serverlessObs, err := normalizeAzureServerlessItem(item, category, region, regionGroup, skuID, priceAmount, fetchedAt, sink)
 			if err != nil {
-				return nil, "", err
+				return domain.NormalizationResult{}, "", err
 			}
 			if serverlessObs != nil {
 				observations = append(observations, *serverlessObs)
 			}
 		}
+
+		if len(observations) == obsCountBefore {
+			sinkCountAfter := 0
+			if sink != nil {
+				if counter, ok := sink.(interface{ Count() int }); ok {
+					sinkCountAfter = counter.Count()
+				}
+			}
+			if sinkCountAfter == sinkCountBefore {
+				slog.Debug("azure normalize: ignoring out-of-scope SKU", "sku", skuID, "service", item.ServiceName, "product", item.ProductName)
+				ignoredCount++
+			}
+		}
 	}
 
-	return observations, payload.NextPageLink, nil
+	return domain.NormalizationResult{
+		Observations: observations,
+		IgnoredCount: ignoredCount,
+	}, payload.NextPageLink, nil
 }
 
 func isComputeInstance(item azureItem) bool {

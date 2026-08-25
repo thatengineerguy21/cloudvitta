@@ -66,3 +66,6 @@ tsconfig.tsbuildinfo
 .task/
 
 cloudvitta
+
+# User Context Documents
+/.user

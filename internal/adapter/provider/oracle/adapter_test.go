@@ -95,7 +95,7 @@ func TestAdapter_Fetch_HappyPath(t *testing.T) {
 	}
 }
 
-func TestAdapter_Fetch_UnmappedProduct_Quarantined(t *testing.T) {
+func TestAdapter_Fetch_UnmappedProduct_Ignored(t *testing.T) {
 	jsonBody := `{
 		"items": [
 			{
@@ -127,8 +127,11 @@ func TestAdapter_Fetch_UnmappedProduct_Quarantined(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Fetch() unexpected error: %v", err)
 	}
-	if result.UnmappedCount != 1 {
-		t.Errorf("Fetch() unmapped count = %d, want 1", result.UnmappedCount)
+	if result.UnmappedCount != 0 {
+		t.Errorf("Fetch() unmapped count = %d, want 0", result.UnmappedCount)
+	}
+	if result.IgnoredCount != 1 {
+		t.Errorf("Fetch() ignored count = %d, want 1", result.IgnoredCount)
 	}
 	if len(result.Observations) != 0 {
 		t.Errorf("Fetch() observations = %d, want 0", len(result.Observations))

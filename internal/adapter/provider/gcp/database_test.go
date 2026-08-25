@@ -15,10 +15,11 @@ func TestGCPNormalize_Database(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := Normalize(f, fixedTime)
+	res, _, err := Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() error = %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 5 {
 		t.Fatalf("expected 5 observations, got %d", len(obs))

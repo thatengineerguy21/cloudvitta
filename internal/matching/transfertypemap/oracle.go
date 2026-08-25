@@ -6,13 +6,16 @@ import (
 
 var oracleTransferTypeMap = map[string]string{
 	// Internet Egress
-	"Outbound Data Transfer":            "internet_egress",
-	"Outbound Data Transfer (Internet)": "internet_egress",
-	"Data Transfer Out":                 "internet_egress",
-	"Data Transfer Out (Internet)":      "internet_egress",
-	"Internet Egress":                   "internet_egress",
-	"Internet Data Transfer":            "internet_egress",
-	"Internet":                          "internet_egress",
+	"Outbound Data Transfer":                                                 "internet_egress",
+	"Outbound Data Transfer (Internet)":                                      "internet_egress",
+	"Outbound Data Transfer - Originating in North America, Europe, and UK":  "internet_egress",
+	"Outbound Data Transfer - Originating in APAC, Japan, and South America": "internet_egress",
+	"Outbound Data Transfer - Originating in Middle East and Africa":         "internet_egress",
+	"Data Transfer Out":            "internet_egress",
+	"Data Transfer Out (Internet)": "internet_egress",
+	"Internet Egress":              "internet_egress",
+	"Internet Data Transfer":       "internet_egress",
+	"Internet":                     "internet_egress",
 
 	// Intra-Region and Inter-Region
 	"Intra-Region Data Transfer": "intra_region",

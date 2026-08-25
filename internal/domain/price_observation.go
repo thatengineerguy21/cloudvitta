@@ -52,11 +52,27 @@ type PriceObservation struct {
 	FetchedAt                time.Time                `json:"fetched_at"`
 }
 
-// FetchResult bundles a batch of observations, raw storage path, and unmapped count.
+// ItemClassification represents the 3-way triage classification of an ingested item.
+type ItemClassification string
+
+const (
+	ItemClassificationNormalized  ItemClassification = "normalized"
+	ItemClassificationQuarantined ItemClassification = "quarantined"
+	ItemClassificationIgnored     ItemClassification = "ignored"
+)
+
+// NormalizationResult captures normalized observations alongside ignored item count.
+type NormalizationResult struct {
+	Observations []PriceObservation
+	IgnoredCount int
+}
+
+// FetchResult bundles a batch of observations, raw storage path, unmapped count, and ignored count.
 type FetchResult struct {
 	Observations  []PriceObservation
 	RawGCSPath    string
 	UnmappedCount int
+	IgnoredCount  int
 }
 
 // ScoredComputeObservation represents a scored and filtered compute observation.

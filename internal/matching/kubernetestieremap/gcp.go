@@ -17,14 +17,25 @@ var gcpTierMap = map[string]domain.KubernetesTier{
 	"gke standard":                             TierStandard,
 	"gke":                                      TierStandard,
 	"kubernetes engine":                        TierStandard,
+	"cluster":                                  TierStandard,
+	"zonal kubernetes clusters":                TierStandard,
+	"regional kubernetes clusters":             TierStandard,
+	"extended period kubernetes clusters":      TierExtendedSupport,
+	"extended-support":                         TierExtendedSupport,
+	"extended support":                         TierExtendedSupport,
 }
 
 // MapGCPTier maps a GCP GKE SKU description, resource group, or tier to a canonical tier identifier.
 func MapGCPTier(rawTier string) (domain.KubernetesTier, error) {
 	key := strings.ToLower(strings.TrimSpace(rawTier))
-	canonical, ok := gcpTierMap[key]
-	if !ok {
-		return "", fmt.Errorf("%w: gcp tier %q", ErrUnmappedTier, rawTier)
+	if canonical, ok := gcpTierMap[key]; ok {
+		return canonical, nil
 	}
-	return canonical, nil
+
+	// Substring matching for known GKE cluster management fee line items
+	if strings.Contains(key, "cluster management") || strings.Contains(key, "cluster fee") || strings.Contains(key, "gke standard") {
+		return TierStandard, nil
+	}
+
+	return "", fmt.Errorf("%w: gcp tier %q", ErrUnmappedTier, rawTier)
 }

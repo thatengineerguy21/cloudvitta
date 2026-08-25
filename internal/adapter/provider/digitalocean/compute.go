@@ -42,9 +42,19 @@ func (n *computeNormalizer) recordQuarantine(kind, rawValue, skuID, category str
 	})
 }
 
+func (n *computeNormalizer) sinkCount() int {
+	if n.sink == nil {
+		return 0
+	}
+	if counter, ok := n.sink.(interface{ Count() int }); ok {
+		return counter.Count()
+	}
+	return 0
+}
+
 // Normalize parses a DigitalOcean Droplet sizes JSON stream and returns normalized domain observations.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting.
-func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -52,7 +62,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 	var resp SizesResponse
 	if err := json.NewDecoder(r).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("digitalocean normalize: decode json: %w", err)
+		return domain.NormalizationResult{}, fmt.Errorf("digitalocean normalize: decode json: %w", err)
 	}
 
 	normalizer := &computeNormalizer{
@@ -63,15 +73,28 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 	}
 
 	var observations []domain.PriceObservation
+	var ignoredCount int
+
 	for _, size := range resp.Sizes {
+		sinkCountBefore := normalizer.sinkCount()
+		obsCountBefore := len(observations)
+
 		obsList, err := normalizer.processSize(size)
 		if err != nil {
-			return nil, err
+			return domain.NormalizationResult{}, err
 		}
 		observations = append(observations, obsList...)
+
+		if len(observations) == obsCountBefore && normalizer.sinkCount() == sinkCountBefore {
+			slog.Debug("digitalocean normalize: ignoring out-of-scope size", "slug", size.Slug)
+			ignoredCount++
+		}
 	}
 
 	for _, prod := range resp.Products {
+		sinkCountBefore := normalizer.sinkCount()
+		obsCountBefore := len(observations)
+
 		rawCat := prod.Type
 		if rawCat == "" {
 			rawCat = prod.Slug
@@ -83,26 +106,34 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 				slog.Warn("digitalocean normalize: skipping product due to unmapped category", "slug", prod.Slug, "type", rawCat)
 				continue
 			}
-			return nil, fmt.Errorf("digitalocean normalize product %s: %w", prod.Slug, err)
+			return domain.NormalizationResult{}, fmt.Errorf("digitalocean normalize product %s: %w", prod.Slug, err)
 		}
 
 		switch category {
 		case "storage":
 			obsList, err := normalizer.normalizeStorageProduct(prod)
 			if err != nil {
-				return nil, err
+				return domain.NormalizationResult{}, err
 			}
 			observations = append(observations, obsList...)
 		case "network":
 			obsList, err := normalizer.normalizeNetworkProduct(prod)
 			if err != nil {
-				return nil, err
+				return domain.NormalizationResult{}, err
 			}
 			observations = append(observations, obsList...)
 		}
+
+		if len(observations) == obsCountBefore && normalizer.sinkCount() == sinkCountBefore {
+			slog.Debug("digitalocean normalize: ignoring out-of-scope product", "slug", prod.Slug, "type", rawCat)
+			ignoredCount++
+		}
 	}
 
-	return observations, nil
+	return domain.NormalizationResult{
+		Observations: observations,
+		IgnoredCount: ignoredCount,
+	}, nil
 }
 
 func (n *computeNormalizer) processSize(size Size) ([]domain.PriceObservation, error) {

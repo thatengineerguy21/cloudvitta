@@ -336,7 +336,7 @@ func TestAdapter_Fetch_Storage_HappyPath(t *testing.T) {
 
 	var hotObs *domain.PriceObservation
 	for i := range result.Observations {
-		if result.Observations[i].SkuID == "SKU-AZ-BLOB-HOT-001" {
+		if strings.HasPrefix(result.Observations[i].SkuID, "SKU-AZ-BLOB-HOT-001") {
 			hotObs = &result.Observations[i]
 			break
 		}
@@ -402,8 +402,8 @@ func TestAdapter_Fetch_Network_HappyPath(t *testing.T) {
 	}
 
 	obs := result.Observations[0]
-	if obs.SkuID != "SKU-AZ-BW-FLAT" {
-		t.Errorf("SkuID = %q, want SKU-AZ-BW-FLAT", obs.SkuID)
+	if !strings.HasPrefix(obs.SkuID, "SKU-AZ-BW-FLAT") {
+		t.Errorf("SkuID = %q, want prefix SKU-AZ-BW-FLAT", obs.SkuID)
 	}
 	if obs.Provider != "azure" {
 		t.Errorf("Provider = %q, want azure", obs.Provider)
