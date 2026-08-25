@@ -44,9 +44,17 @@ var awsEngineMap = map[string]string{
 // MapAWSEngine maps an AWS database engine string to a canonical engine identifier.
 func MapAWSEngine(rawEngine string) (string, error) {
 	key := strings.ToLower(strings.TrimSpace(rawEngine))
-	canonical, ok := awsEngineMap[key]
-	if !ok {
-		return "", fmt.Errorf("%w: aws engine %q", ErrUnmappedDatabaseEngine, rawEngine)
+	if canonical, ok := awsEngineMap[key]; ok {
+		return canonical, nil
 	}
-	return canonical, nil
+
+	// Handle on-premise Outpost qualifiers e.g. "MySQL (on-premise for Outpost)" -> "mysql"
+	if idx := strings.Index(key, "("); idx != -1 {
+		base := strings.TrimSpace(key[:idx])
+		if canonical, ok := awsEngineMap[base]; ok {
+			return canonical, nil
+		}
+	}
+
+	return "", fmt.Errorf("%w: aws engine %q", ErrUnmappedDatabaseEngine, rawEngine)
 }

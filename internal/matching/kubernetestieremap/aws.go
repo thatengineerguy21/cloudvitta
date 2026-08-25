@@ -21,7 +21,9 @@ var awsTierMap = map[string]domain.KubernetesTier{
 	"extended":                        TierExtendedSupport,
 	"amazoneks-extendedsupport-hours": TierExtendedSupport,
 	"amazoneks-extendedsupport-hours:percluster": TierExtendedSupport,
-	"clustersupport": TierExtendedSupport,
+	"clustersupport":               TierExtendedSupport,
+	"provisionedcontrolplaneusage": TierStandard,
+	"provisionedtier":              TierStandard,
 }
 
 // MapAWSTier maps an AWS EKS tier, usage type, or operation string to a canonical tier identifier.
@@ -37,6 +39,10 @@ func MapAWSTier(rawTier string) (domain.KubernetesTier, error) {
 		if canonical, ok := awsTierMap[stripped]; ok {
 			return canonical, nil
 		}
+	}
+
+	if strings.Contains(key, "provisionedtier") || strings.Contains(key, "provisionedcontrolplane") {
+		return TierStandard, nil
 	}
 
 	return "", fmt.Errorf("%w: aws tier %q", ErrUnmappedTier, rawTier)

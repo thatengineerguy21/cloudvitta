@@ -18,6 +18,15 @@ func (n *oracleNormalizer) normalizeStorageItem(item ProductItem) ([]domain.Pric
 		rawClass = item.ServiceCategory
 	}
 
+	// Exclude auxiliary operational fee items (requests, retrieval, performance units, mount targets, free tiers)
+	if strings.Contains(rawClass, "Mount Target") ||
+		strings.Contains(rawClass, "Requests") ||
+		strings.Contains(rawClass, "Performance Units") ||
+		strings.Contains(rawClass, "Data Retrieval") ||
+		strings.Contains(rawClass, "Free") {
+		return nil, nil
+	}
+
 	storageClass, err := storageclassmap.MapOracleStorageClass(rawClass)
 	if err != nil {
 		if errors.Is(err, storageclassmap.ErrUnmappedStorageClass) {

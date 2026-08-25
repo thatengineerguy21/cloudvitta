@@ -36,6 +36,13 @@ func isKubernetesProduct(product awsProduct, attrs map[string]string) bool {
 	if strings.Contains(usageType, "Controller") || strings.Contains(usageType, "CRD") {
 		return false
 	}
+	// Exclude EKS Capabilities (ArgoCD, KRO, ACK) and Hybrid Nodes
+	if strings.Contains(usageType, "Capabilities") || strings.Contains(usageType, "HybridNodes") ||
+		strings.Contains(group, "Capabilities") || strings.Contains(group, "HybridNodes") ||
+		strings.Contains(desc, "Capability") || strings.Contains(desc, "Hybrid Node") ||
+		strings.Contains(desc, "ArgoCD") || strings.Contains(desc, "KRO") || strings.Contains(desc, "ACK") {
+		return false
+	}
 
 	if attrs["servicecode"] == "AmazonEKS" {
 		return true

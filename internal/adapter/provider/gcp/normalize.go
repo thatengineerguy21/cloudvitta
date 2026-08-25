@@ -215,17 +215,8 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 				category, err := catalogmap.MapGCPProduct(serviceName)
 				if err != nil {
 					if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-						if sink != nil {
-							_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-								Provider:   "gcp",
-								Category:   "unknown",
-								Kind:       "product",
-								RawValue:   serviceName,
-								SkuID:      sku.SkuID,
-								ObservedAt: fetchedAt,
-							})
-						}
-						slog.Warn("gcp normalize: skipping SKU due to unmapped product", "sku", sku.SkuID, "product", serviceName)
+						slog.Debug("gcp normalize: ignoring out-of-scope product", "sku", sku.SkuID, "product", serviceName)
+						ignoredCount++
 						continue
 					}
 					return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
@@ -590,7 +581,17 @@ func isNetworkProduct(sku gcpSKU) bool {
 	if sku.Category.UsageType != "OnDemand" {
 		return false
 	}
-	if sku.Category.ResourceFamily == "Network" || strings.Contains(sku.Description, "Network") || strings.Contains(sku.Description, "Egress") || strings.Contains(sku.Description, "Data Transfer") || strings.Contains(sku.Category.ResourceGroup, "Interconnect") || strings.Contains(sku.Category.ResourceGroup, "Egress") {
+	desc := sku.Description
+	group := sku.Category.ResourceGroup
+
+	// Exclude non-egress/auxiliary networking lines (IP reservations, DNS, peering, internal Google service replication)
+	if strings.Contains(desc, "IP address") || strings.Contains(desc, "to Google Services") ||
+		strings.Contains(desc, "Carrier Peering") || strings.Contains(desc, "Direct Peering") ||
+		strings.Contains(desc, "Replication Networking Traffic") {
+		return false
+	}
+
+	if sku.Category.ResourceFamily == "Network" || strings.Contains(desc, "Network") || strings.Contains(desc, "Egress") || strings.Contains(desc, "Data Transfer") || strings.Contains(group, "Interconnect") || strings.Contains(group, "Egress") {
 		return true
 	}
 	return false
@@ -859,6 +860,18 @@ func parseGCPTransferType(description, resourceGroup string) (string, error) {
 			}
 		}
 	}
+
+	descLower := strings.ToLower(description)
+	if strings.Contains(descLower, "internet") || strings.Contains(descLower, "external") {
+		return "internet_egress", nil
+	}
+	if strings.Contains(descLower, "inter region") || strings.Contains(descLower, "inter-region") || strings.Contains(descLower, "cross region") {
+		return "inter_region", nil
+	}
+	if strings.Contains(descLower, "intra region") || strings.Contains(descLower, "intra-region") || strings.Contains(descLower, "inter-zone") || strings.Contains(descLower, "inter zone") {
+		return "intra_region", nil
+	}
+
 	return transfertypemap.MapGCPTransferType(description)
 }
 

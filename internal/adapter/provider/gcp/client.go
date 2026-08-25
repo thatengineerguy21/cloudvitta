@@ -33,18 +33,14 @@ const DefaultDatabaseServiceID = "9662-B51E-5089"
 // DefaultDatabaseBillingCatalogURL is the base URL for the GCP Cloud SQL Billing Catalog API.
 const DefaultDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultDatabaseServiceID + "/skus"
 
-// DefaultNoSQLDatabaseServiceID is the official GCP Cloud Billing service ID for Cloud Firestore / Datastore.
-// Note: These externally-assigned service IDs can change if GCP restructures its catalog; a future 404
-// should be triaged by checking the GCP Billing services list.
-const DefaultNoSQLDatabaseServiceID = "E24D-7981-67BD"
+// DefaultNoSQLDatabaseServiceID is the official GCP Cloud Billing service ID for Cloud Firestore.
+const DefaultNoSQLDatabaseServiceID = "EE2C-7FAC-5E08"
 
 // DefaultNoSQLDatabaseBillingCatalogURL is the base URL for the GCP Cloud Firestore Billing Catalog API.
 const DefaultNoSQLDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultNoSQLDatabaseServiceID + "/skus"
 
 // DefaultKubernetesServiceID is the official GCP Cloud Billing service ID for Kubernetes Engine (GKE).
-// Note: These externally-assigned service IDs can change if GCP restructures its catalog; a future 404
-// should be triaged by checking the GCP Billing services list.
-const DefaultKubernetesServiceID = "24E6-581D-38E5"
+const DefaultKubernetesServiceID = "CCD8-9BF1-090E"
 
 // DefaultKubernetesBillingCatalogURL is the base URL for the GCP Kubernetes Engine Billing Catalog API.
 const DefaultKubernetesBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultKubernetesServiceID + "/skus"
