@@ -3,9 +3,10 @@
 This guide explains how to set up the infrastructure and manage the deployment of CloudVitta to Google Cloud Run via GitHub Actions.
 
 ## Architecture Overview
-- **CI (`ci.yml`)**: On every push and PR, code is linted, tested against an ephemeral Postgres container, and built to ensure it compiles.
-- **CD (`deploy.yml`)**: On pushes to `main`, the code is containerized, pushed to Google Artifact Registry (GAR), database migrations are applied to the Neon production database, and the new container is deployed to Cloud Run.
-- **Authentication**: GitHub Actions communicates with Google Cloud using **Workload Identity Federation** (WIF), eliminating the need for long-lived service account keys.
+- **CI (`ci.yml`)**: On every push and pull request, the pipeline lints code, runs tests against an ephemeral PostgreSQL container, and validates compilation.
+- **CD (`deploy.yml`)**: On pushes to `main`, the pipeline packages the application into a minimal distroless container image, pushes it to Google Artifact Registry (GAR), applies forward database migrations to Neon via `tern`, deploys the `cloudvitta-api` Cloud Run Service, deploys the `cloudvitta-ingest` Cloud Run Job, and triggers a post-deploy verification execution of the ingestion job.
+- **Authentication**: GitHub Actions communicates with Google Cloud using **Workload Identity Federation** (WIF), which avoids long-lived service account keys.
+- **Scheduling**: Google Cloud Scheduler triggers recurring daily ingestion runs for the Cloud Run Ingestion Job through OpenID Connect (OIDC) authentication.
 
 ---
 
@@ -28,6 +29,7 @@ export GITHUB_REPO="yourusername/CloudVitta"
 gcloud services enable \
   artifactregistry.googleapis.com \
   run.googleapis.com \
+  cloudscheduler.googleapis.com \
   iamcredentials.googleapis.com \
   cloudresourcemanager.googleapis.com \
   --project="${PROJECT_ID}"
@@ -59,7 +61,7 @@ export SERVICE_ACCOUNT_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gservice
 ```
 
 ### 2. Grant Permissions to the Service Account
-Give it permission to push to Artifact Registry and deploy to Cloud Run.
+Give it permission to push to Artifact Registry and deploy to Cloud Run services and jobs.
 ```bash
 # Permission to push to Artifact Registry
 gcloud artifacts repositories add-iam-policy-binding ${REPO_NAME} \
@@ -68,7 +70,7 @@ gcloud artifacts repositories add-iam-policy-binding ${REPO_NAME} \
   --role="roles/artifactregistry.writer" \
   --project="${PROJECT_ID}"
 
-# Permission to deploy to Cloud Run
+# Permission to deploy and manage Cloud Run services and jobs
 gcloud projects add-iam-policy-binding ${PROJECT_ID} \
   --member="serviceAccount:${SERVICE_ACCOUNT_EMAIL}" \
   --role="roles/run.admin"
@@ -110,7 +112,7 @@ gcloud iam service-accounts add-iam-policy-binding "${SERVICE_ACCOUNT_EMAIL}" \
   --member="principalSet://iam.googleapis.com/${WORKLOAD_IDENTITY_POOL_ID}/attribute.repository/${GITHUB_REPO}"
 ```
 
-### 5. Allow Public Invocations for Cloud Run (One-Time Setup)
+### 5. Allow Public Invocations for Cloud Run Service (One-Time Setup)
 To allow public users to call the CloudVitta API without authentication, grant the `Cloud Run Invoker` role to `allUsers`:
 ```bash
 gcloud run services add-iam-policy-binding "${SERVICE_NAME:-cloudvitta-api}" \
@@ -119,7 +121,36 @@ gcloud run services add-iam-policy-binding "${SERVICE_NAME:-cloudvitta-api}" \
   --role="roles/run.invoker" \
   --project="${PROJECT_ID}"
 ```
-*Note: The GitHub Actions deploy workflow also specifies `--allow-unauthenticated` on deployments.*
+*Note: The GitHub Actions deploy workflow also specifies `--allow-unauthenticated` on service deployments.*
+
+### 6. Set Up Cloud Scheduler for Daily Ingestion Job (One-Time Setup)
+Create a dedicated service account for Cloud Scheduler to invoke the `cloudvitta-ingest` Cloud Run Job securely:
+```bash
+export SCHEDULER_SA_NAME="cloudvitta-scheduler"
+gcloud iam service-accounts create ${SCHEDULER_SA_NAME} \
+  --display-name="CloudVitta Ingestion Scheduler" \
+  --project="${PROJECT_ID}"
+
+export SCHEDULER_SA_EMAIL="${SCHEDULER_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# Grant permission to invoke the Cloud Run Ingestion Job
+gcloud run jobs add-iam-policy-binding "${INGEST_JOB_NAME:-cloudvitta-ingest}" \
+  --region="${REGION}" \
+  --member="serviceAccount:${SCHEDULER_SA_EMAIL}" \
+  --role="roles/run.invoker" \
+  --project="${PROJECT_ID}"
+
+# Create the Cloud Scheduler cron trigger (02:00 UTC daily)
+gcloud scheduler jobs create http cloudvitta-daily-ingest \
+  --location="${REGION}" \
+  --schedule="0 2 * * *" \
+  --time-zone="UTC" \
+  --uri="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/${INGEST_JOB_NAME:-cloudvitta-ingest}:run" \
+  --http-method=POST \
+  --oauth-service-account-email="${SCHEDULER_SA_EMAIL}" \
+  --oauth-token-scope="https://www.googleapis.com/auth/cloud-platform" \
+  --project="${PROJECT_ID}"
+```
 
 ---
 
@@ -211,7 +242,8 @@ Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Va
 * **`GCP_REGION`**: Target GCP region for Cloud Run and Artifact Registry (default: `asia-southeast1`).
 * **`GAR_LOCATION`**: Specific Artifact Registry location if different from `GCP_REGION` (default: value of `GCP_REGION`).
 * **`GAR_REPO`**: Artifact Registry Docker repository name (default: `cloudvitta-repo`).
-* **`SERVICE_NAME`**: Cloud Run service name (default: `cloudvitta-api`).
+* **`SERVICE_NAME`**: Cloud Run API service name (default: `cloudvitta-api`).
+* **`INGEST_JOB_NAME`**: Cloud Run Ingestion Job name (default: `cloudvitta-ingest`).
 * **`GCS_BUCKET_NAME`**: GCS raw fixtures and payload bucket name (default: `cloudvitta-raw-fixtures`).
 * **`CORS_ALLOWED_ORIGINS`**: Comma-separated allowed frontend origins (default: `https://cloudvitta.dev`).
 
@@ -225,9 +257,19 @@ Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Va
 3. Merge the Pull Request into `main`. The **CD** pipeline (`deploy.yml`) will automatically trigger.
 
 ### What happens during CD?
-1. **Build & Push**: The Go application is packaged into a minimal Docker container and sent to Artifact Registry.
+1. **Build & Push**: The Go application is packaged into a minimal distroless container image containing both `/api` and `/ingest` statically compiled binaries, and pushed to Google Artifact Registry.
 2. **Database Migrations**: `tern` connects to your Neon production database and applies any new forward migrations (`0001_initial_schema.sql`, `0002_create_users_and_refresh_tokens.sql`, `0003_create_fx_rates.sql`). Since we enforce forward-only migrations (ADR 0028), this executes safely on every deploy.
-3. **Deploy**: Cloud Run pulls the new image and spins up new instances. Traffic is automatically shifted to the new revision once it passes readiness probes.
+3. **Deploy API Service**: Cloud Run updates the `cloudvitta-api` service with the new image revision. Traffic shifts automatically once the instance passes readiness probes.
+4. **Deploy Ingest Job**: The pipeline executes `gcloud run jobs deploy` to configure the `cloudvitta-ingest` Cloud Run Job with `--command /ingest`, resource limits (2 CPU, 2Gi RAM, 20m timeout), and matching production environment secrets.
+5. **Execute Post-Deploy Warmup**: The pipeline triggers immediate job execution (`gcloud run jobs execute --wait`) to validate provider ingestion against the new schema and refresh the Redis cache.
+
+### Manual Ingestion Job Trigger
+To trigger an on-demand ingestion run manually outside scheduled hours:
+```bash
+gcloud run jobs execute "${INGEST_JOB_NAME:-cloudvitta-ingest}" \
+  --region="${REGION:-asia-southeast1}" \
+  --wait
+```
 
 ### Rollbacks
 If a deployment exhibits unexpected behavior:

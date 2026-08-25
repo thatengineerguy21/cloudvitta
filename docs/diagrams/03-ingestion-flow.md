@@ -3,7 +3,9 @@
 ```mermaid
 sequenceDiagram
     autonumber
+    participant CD as CD Pipeline (GitHub Actions)
     participant Scheduler as Cloud Scheduler
+    participant Job as Cloud Run Job (cloudvitta-ingest)
     participant Main as cmd/ingest
     participant Orch as Orchestrator
     participant Lock as Redis Lock
@@ -16,7 +18,14 @@ sequenceDiagram
     participant Redis as Redis / Upstash
     participant DLQ as Redis DLQ
 
-    Scheduler->>Main: Trigger run
+    alt CD Pipeline Post-Deploy Warmup
+        CD->>Job: gcloud run jobs execute --wait
+        Job->>Main: Start container (/ingest)
+    else Scheduled Daily Cron (02:00 UTC)
+        Scheduler->>Job: HTTP POST OIDC trigger
+        Job->>Main: Start container (/ingest)
+    end
+
     Main->>Factory: BuildJobs()
     Factory-->>Main: []Job (provider, category, limiter, retry)
     Main->>Orch: RunAll(ctx)
@@ -132,3 +141,25 @@ ratio = unmapped_count / in_scope_total
 - If `ratio > MaxUnmappedRatio` (default 5%), the job fails with `ErrPermanentFailure` and logs a blocked incident to Redis DLQ to alert engineers of breaking upstream API taxonomy changes.
 - If `ratio <= MaxUnmappedRatio`, valid observations proceed to database upsert and cache warming.
 - Quarantined records are flushed to GCS at `quarantine/<provider>/<category>/<date>/<fetchID>.jsonl` and digested with `cmd/quarantine-digest`.
+
+---
+
+## Ingestion Job Triggers (CD Post-Deploy Warmup & Cloud Scheduler)
+
+CloudVitta supports two automated execution pathways and one manual trigger pathway for the `cloudvitta-ingest` Cloud Run Job:
+
+1. **Continuous Delivery (CD) Post-Deploy Warmup**:
+   - On pushes to `main`, the CD workflow ([`.github/workflows/deploy.yml`](file:///D:/02-code/cloudvitta/.github/workflows/deploy.yml)) builds the unified container image, applies database migrations, deploys the `cloudvitta-api` service, and deploys the `cloudvitta-ingest` job with `--command /ingest`.
+   - The workflow then executes `gcloud run jobs execute cloudvitta-ingest --region ${{ env.GCP_REGION }} --wait`.
+   - This step verifies provider ingestion against the newly applied database migrations and primes the Redis cache immediately after deployment.
+
+2. **Google Cloud Scheduler Recurring Daily Trigger**:
+   - Runs on a daily schedule at 02:00 UTC (`0 2 * * *`).
+   - Google Cloud Scheduler authenticates via an OIDC service account (`roles/run.invoker`) and sends an HTTP POST request to the Cloud Run Jobs execution API endpoint.
+   - Executes multi-provider ingestion across all supported cloud providers (AWS, Azure, GCP, Oracle, IBM, Alibaba, DigitalOcean).
+
+3. **Manual On-Demand Invocation**:
+   - Engineers can trigger on-demand ingestion runs directly via the Google Cloud SDK:
+     ```bash
+     gcloud run jobs execute cloudvitta-ingest --region asia-southeast1 --wait
+     ```
