@@ -584,10 +584,14 @@ func isNetworkProduct(sku gcpSKU) bool {
 	desc := sku.Description
 	group := sku.Category.ResourceGroup
 
-	// Exclude non-egress/auxiliary networking lines (IP reservations, DNS, peering, internal Google service replication)
+	// Exclude non-egress/auxiliary networking lines (IP reservations, DNS, peering, internal Google service replication, CDN cache fill, storage cross-region transfer)
 	if strings.Contains(desc, "IP address") || strings.Contains(desc, "to Google Services") ||
 		strings.Contains(desc, "Carrier Peering") || strings.Contains(desc, "Direct Peering") ||
-		strings.Contains(desc, "Replication Networking Traffic") {
+		strings.Contains(desc, "Replication Networking Traffic") || strings.Contains(desc, "Cloud CDN") ||
+		strings.Contains(desc, "CDN") || strings.Contains(desc, "Storage Data Transfer") ||
+		strings.Contains(desc, "Turbo Replication") || strings.Contains(desc, "Data Transfer between") ||
+		strings.Contains(desc, "peered/interconnect") || strings.Contains(desc, "Rapid Bucket") ||
+		strings.Contains(desc, "Multi-region within") || strings.Contains(desc, "Replication within") {
 		return false
 	}
 
@@ -627,9 +631,26 @@ func isDatabaseProduct(sku gcpSKU) bool {
 }
 
 func isKubernetesProduct(sku gcpSKU) bool {
-	desc := strings.ToLower(sku.Description)
-	return strings.Contains(desc, "kubernetes") || strings.Contains(desc, "gke") ||
-		strings.Contains(desc, "cluster management") || strings.Contains(strings.ToLower(sku.Category.ServiceDisplayName), "kubernetes")
+	if sku.Category.UsageType != "OnDemand" {
+		return false
+	}
+	desc := sku.Description
+
+	// Exclude commitments, discounts, autopilot pod worker resource allocations, GPU/storage add-ons
+	if strings.Contains(desc, "Commitment") || strings.Contains(desc, "Discount") ||
+		strings.Contains(desc, "Autopilot") || strings.Contains(desc, "Pod") ||
+		strings.Contains(desc, "mCPU") || strings.Contains(desc, "CPU") ||
+		strings.Contains(desc, "Memory") || strings.Contains(desc, "Storage") ||
+		strings.Contains(desc, "PD") || strings.Contains(desc, "SSD") ||
+		strings.Contains(desc, "Tesla") || strings.Contains(desc, "A100") ||
+		strings.Contains(desc, "H100") || strings.Contains(desc, "L4") ||
+		strings.Contains(desc, "T4") || strings.Contains(desc, "TPU") ||
+		strings.Contains(desc, "Accelerator") || strings.Contains(desc, "Backup") ||
+		strings.Contains(desc, "Security Posture") {
+		return false
+	}
+
+	return true
 }
 
 func isComputeComponent(sku gcpSKU) bool {
