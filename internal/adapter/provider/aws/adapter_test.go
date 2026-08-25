@@ -324,10 +324,11 @@ func TestNormalize_SkipsMassiveReservedBlocksWithoutSpike(t *testing.T) {
 
 	payloadStr := b.String()
 
-	obs, err := Normalize(strings.NewReader(payloadStr), time.Now().UTC())
+	res, err := Normalize(strings.NewReader(payloadStr), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("Normalize() failed: %v", err)
 	}
+	obs := res.Observations
 	if len(obs) != 1 {
 		t.Fatalf("expected 1 observation, got %d", len(obs))
 	}

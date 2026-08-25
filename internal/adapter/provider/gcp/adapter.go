@@ -81,6 +81,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	firstGCSPath := fmt.Sprintf("raw/gcp/%s/%s/%s-page0.json", category, dateStr, fetchID)
 
 	var allObservations []domain.PriceObservation
+	var totalIgnoredCount int
 	var pageToken string
 	pageIdx := 0
 	const maxPages = 500
@@ -114,7 +115,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		pr, pw := io.Pipe()
 		tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
 
-		var pageObservations []domain.PriceObservation
+		var pageResult domain.NormalizationResult
 		var pageNextToken string
 		g, _ := errgroup.WithContext(ctx)
 
@@ -126,7 +127,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 				}
 			}()
 			var normErr error
-			pageObservations, pageNextToken, normErr = Normalize(pr, fetchedAt, qSink)
+			pageResult, pageNextToken, normErr = Normalize(pr, fetchedAt, qSink)
 			if normErr != nil {
 				_ = pr.CloseWithError(normErr)
 				return fmt.Errorf("gcp adapter: normalize page %d: %w", pageIdx, normErr)
@@ -161,7 +162,8 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		}
 		_ = body.Close()
 
-		allObservations = append(allObservations, pageObservations...)
+		allObservations = append(allObservations, pageResult.Observations...)
+		totalIgnoredCount += pageResult.IgnoredCount
 
 		if pageNextToken == "" {
 			break
@@ -184,11 +186,12 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	span.SetStatus(codes.Ok, "")
 	span.SetAttributes(attribute.Int("observations.count", len(allObservations)))
 	a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
-	slog.InfoContext(ctx, "gcp fetch completed", "observations", len(allObservations), "pages", pageIdx, "unmapped", qSink.Count())
+	slog.InfoContext(ctx, "gcp fetch completed", "observations", len(allObservations), "pages", pageIdx+1, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
 
 	return domain.FetchResult{
 		Observations:  allObservations,
 		RawGCSPath:    firstGCSPath,
 		UnmappedCount: qSink.Count(),
+		IgnoredCount:  totalIgnoredCount,
 	}, nil
 }

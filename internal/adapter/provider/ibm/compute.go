@@ -63,9 +63,19 @@ func (n *computeNormalizer) recordQuarantine(kind, rawValue, skuID, category str
 	})
 }
 
+func (n *computeNormalizer) sinkCount() int {
+	if n.sink == nil {
+		return 0
+	}
+	if counter, ok := n.sink.(interface{ Count() int }); ok {
+		return counter.Count()
+	}
+	return 0
+}
+
 // Normalize parses an IBM Cloud Global Catalog API JSON stream and returns normalized domain observations.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting.
-func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -73,7 +83,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 	var resp CatalogResponse
 	if err := json.NewDecoder(r).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("ibm normalize: decode json: %w", err)
+		return domain.NormalizationResult{}, fmt.Errorf("ibm normalize: decode json: %w", err)
 	}
 
 	normalizer := &computeNormalizer{
@@ -83,15 +93,28 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 	}
 
 	var observations []domain.PriceObservation
+	var ignoredCount int
+
 	for _, resource := range resp.Resources {
+		sinkCountBefore := normalizer.sinkCount()
+		obsCountBefore := len(observations)
+
 		obs, err := normalizer.processResource(resource, defaultIBMRegions)
 		if err != nil {
-			return nil, err
+			return domain.NormalizationResult{}, err
 		}
 		observations = append(observations, obs...)
+
+		if len(observations) == obsCountBefore && normalizer.sinkCount() == sinkCountBefore {
+			slog.Debug("ibm normalize: ignoring out-of-scope resource", "id", resource.ID, "name", resource.Name)
+			ignoredCount++
+		}
 	}
 
-	return observations, nil
+	return domain.NormalizationResult{
+		Observations: observations,
+		IgnoredCount: ignoredCount,
+	}, nil
 }
 
 func (n *computeNormalizer) processResource(

@@ -116,11 +116,19 @@ To prevent Cartesian explosion in the database, multi-meter services are ingeste
 
 ---
 
-## Runtime Taxonomy Isolation via Quarantine Sink
+## Runtime Taxonomy Isolation via Quarantine Sink & 3-Way Classification
 
-When provider APIs return new or unrecognized taxonomy values (regions, storage classes, transfer types, database engines, Kubernetes tiers, or serverless units):
-1. The normalizer isolates the unmapped record to `quarantine.Sink`.
-2. Parsing continues for all valid items in the stream.
-3. Quarantined records are flushed to GCS at `quarantine/<provider>/<category>/<date>/<fetchID>.jsonl`.
-4. If `unmapped / (unmapped + valid) > MaxUnmappedRatio` (default 5%), the job fails loudly with `ErrPermanentFailure` and logs an incident to Redis DLQ to alert engineering of upstream API breaking changes.
-5. Quarantined records can be digested into taxonomy PR code using `cmd/quarantine-digest`.
+When provider APIs return raw pricing streams, the normalizer triages records into three distinct classifications:
+1. **In-Scope Valid (`ItemClassificationNormalized`)**: Successfully parsed into domain `PriceObservation` records.
+2. **In-Scope Unknown (`ItemClassificationQuarantined`)**: In-scope resources with unmapped taxonomy attributes (unknown shape, tier, region, database engine). These records route to `quarantine.Sink` and increment `UnmappedCount`.
+3. **Out-of-Scope Discarded (`ItemClassificationIgnored`)**: Unmodeled provider catalog lines (such as network egress under database feeds, non-IaaS enterprise services, and unsupported commitments). These records are excluded from quarantine and increment `IgnoredCount`.
+
+### Threshold Invariant Formula
+To prevent out-of-scope catalog noise from skewing the quarantine threshold, the unmapped ratio is computed strictly against in-scope items:
+```
+in_scope_total = unmapped_count + valid_observations_count
+ratio = unmapped_count / in_scope_total
+```
+- If `ratio > MaxUnmappedRatio` (default 5%), the job fails with `ErrPermanentFailure` and logs a blocked incident to Redis DLQ to alert engineers of breaking upstream API taxonomy changes.
+- If `ratio <= MaxUnmappedRatio`, valid observations proceed to database upsert and cache warming.
+- Quarantined records are flushed to GCS at `quarantine/<provider>/<category>/<date>/<fetchID>.jsonl` and digested with `cmd/quarantine-digest`.

@@ -103,7 +103,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
 
 	qSink := quarantine.NewStorageSink(a.storage, "alibaba", category, fetchID, fetchedAt)
-	var observations []domain.PriceObservation
+	var normResult domain.NormalizationResult
 	g, _ := errgroup.WithContext(ctx)
 
 	// Goroutine 1: Normalize reads from pr
@@ -115,7 +115,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 			}
 		}()
 		var normErr error
-		observations, normErr = Normalize(pr, fetchedAt, qSink)
+		normResult, normErr = Normalize(pr, fetchedAt, qSink)
 		if normErr != nil {
 			_ = pr.CloseWithError(normErr)
 			return fmt.Errorf("alibaba adapter: normalize: %w", normErr)
@@ -162,15 +162,16 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	}
 
 	span.SetStatus(codes.Ok, "")
-	span.SetAttributes(attribute.Int("observations.count", len(observations)))
+	span.SetAttributes(attribute.Int("observations.count", len(normResult.Observations)))
 	if a.fetchCounter != nil {
 		a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
 	}
-	slog.InfoContext(ctx, "alibaba fetch completed", "observations", len(observations), "unmapped", qSink.Count())
+	slog.InfoContext(ctx, "alibaba fetch completed", "observations", len(normResult.Observations), "unmapped", qSink.Count(), "ignored", normResult.IgnoredCount)
 
 	return domain.FetchResult{
-		Observations:  observations,
+		Observations:  normResult.Observations,
 		RawGCSPath:    gcsPath,
 		UnmappedCount: qSink.Count(),
+		IgnoredCount:  normResult.IgnoredCount,
 	}, nil
 }

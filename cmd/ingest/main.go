@@ -80,12 +80,19 @@ func run() error {
 	defer dbPool.Close()
 
 	// --- Storage ---
+	var rawStorage storage.RawStorage
 	gcsClient, err := gcsstorage.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create GCS client: %w", err)
+		if cfg.Primary.Environment == "development" {
+			slog.WarnContext(ctx, "failed to create GCS client, falling back to in-memory raw storage for development", "error", err)
+			rawStorage = storage.NewMemoryRawStorage()
+		} else {
+			return fmt.Errorf("failed to create GCS client: %w", err)
+		}
+	} else {
+		defer func() { _ = gcsClient.Close() }()
+		rawStorage = storage.NewGCSStorage(gcsClient, cfg.Storage.GCSBucketName)
 	}
-	defer func() { _ = gcsClient.Close() }()
-	rawStorage := storage.NewGCSStorage(gcsClient, cfg.Storage.GCSBucketName)
 
 	// --- Redis ---
 	var redisClient redis.Cmdable

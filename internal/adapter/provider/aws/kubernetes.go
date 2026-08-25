@@ -20,10 +20,27 @@ func isKubernetesProduct(product awsProduct, attrs map[string]string) bool {
 	if attrs == nil {
 		return false
 	}
+
+	usageType := attrs["usagetype"]
+	group := attrs["group"]
+	desc := attrs["description"]
+
+	// Exclude EKS Auto Mode management surcharges
+	if strings.Contains(usageType, "EKS-Auto") || strings.Contains(group, "EKS-Auto") || strings.Contains(desc, "Auto Mode") || strings.Contains(desc, "EKS Auto") {
+		return false
+	}
+	// Exclude Fargate compute allocations and CRD/controller items
+	if strings.Contains(usageType, "Fargate") || strings.Contains(group, "Fargate") || strings.Contains(desc, "Fargate") {
+		return false
+	}
+	if strings.Contains(usageType, "Controller") || strings.Contains(usageType, "CRD") {
+		return false
+	}
+
 	if attrs["servicecode"] == "AmazonEKS" {
 		return true
 	}
-	if strings.Contains(attrs["usagetype"], "AmazonEKS") || strings.Contains(attrs["group"], "AmazonEKS") {
+	if strings.Contains(usageType, "AmazonEKS") || strings.Contains(group, "AmazonEKS") {
 		return true
 	}
 	return false

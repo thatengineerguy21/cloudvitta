@@ -15,10 +15,11 @@ func TestAWSNormalize_Database(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, err := Normalize(f, fixedTime)
+	res, err := Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() error = %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 6 {
 		t.Fatalf("expected 6 observations, got %d", len(obs))

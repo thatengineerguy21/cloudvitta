@@ -19,10 +19,11 @@ func TestNormalize_AzureServerlessGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := azure.Normalize(f, fixedTime)
+	res, _, err := azure.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 4 {
 		t.Fatalf("expected 4 observations, got %d", len(obs))
@@ -87,10 +88,11 @@ func TestNormalize_AzureServerless_UnmappedArchQuarantine(t *testing.T) {
 	}`
 
 	sink := &mockQuarantineSink{}
-	obs, _, err := azure.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	res, _, err := azure.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Fatalf("expected 0 normalized observations for unmapped arch, got %d", len(obs))
@@ -101,7 +103,7 @@ func TestNormalize_AzureServerless_UnmappedArchQuarantine(t *testing.T) {
 	}
 
 	item := sink.items[0]
-	if item.Provider != "azure" || item.Category != "serverless" || item.Kind != "serverless_architecture" || item.SkuID != "SKU-AZURE-UNKNOWN-ARM" {
+	if item.Provider != "azure" || item.Category != "serverless" || item.Kind != "serverless_architecture" || !strings.HasPrefix(item.SkuID, "SKU-AZURE-UNKNOWN-ARM") {
 		t.Errorf("unexpected quarantine item: %+v", item)
 	}
 }

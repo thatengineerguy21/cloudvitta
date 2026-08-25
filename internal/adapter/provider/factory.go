@@ -74,23 +74,24 @@ func (j Job) Fetch(ctx context.Context) (domain.FetchResult, error) {
 		return domain.FetchResult{}, err
 	}
 
-	// Enforce unmapped threshold check (Phase 3)
-	total := result.UnmappedCount + len(result.Observations)
-	if total > 0 {
-		ratio := float64(result.UnmappedCount) / float64(total)
+	// Enforce unmapped threshold check excluding ignored items (3-way classification)
+	inScopeTotal := result.UnmappedCount + len(result.Observations)
+	if inScopeTotal > 0 {
+		ratio := float64(result.UnmappedCount) / float64(inScopeTotal)
 		maxRatio := j.MaxUnmappedRatio
 		if maxRatio <= 0 {
 			maxRatio = 0.05
 		}
 
 		if ratio > maxRatio {
-			threshErr := fmt.Errorf("%w: unmapped item ratio %.2f%% exceeds threshold %.2f%% (%d unmapped / %d total items)",
-				ErrPermanentFailure, ratio*100, maxRatio*100, result.UnmappedCount, total)
+			threshErr := fmt.Errorf("%w: unmapped item ratio %.2f%% exceeds threshold %.2f%% (%d unmapped / %d in-scope items, %d ignored)",
+				ErrPermanentFailure, ratio*100, maxRatio*100, result.UnmappedCount, inScopeTotal, result.IgnoredCount)
 			slog.ErrorContext(ctx, "provider fetch failed due to unmapped threshold",
 				"provider", j.Provider,
 				"category", j.Category,
 				"unmapped_count", result.UnmappedCount,
 				"observation_count", len(result.Observations),
+				"ignored_count", result.IgnoredCount,
 				"ratio", ratio,
 				"threshold", maxRatio,
 			)
@@ -103,6 +104,7 @@ func (j Job) Fetch(ctx context.Context) (domain.FetchResult, error) {
 				"category", j.Category,
 				"unmapped_count", result.UnmappedCount,
 				"observation_count", len(result.Observations),
+				"ignored_count", result.IgnoredCount,
 				"ratio", ratio,
 			)
 		}
@@ -113,6 +115,7 @@ func (j Job) Fetch(ctx context.Context) (domain.FetchResult, error) {
 		"category", j.Category,
 		"observations", len(result.Observations),
 		"unmapped", result.UnmappedCount,
+		"ignored", result.IgnoredCount,
 		"elapsed", elapsed,
 	)
 	return result, nil

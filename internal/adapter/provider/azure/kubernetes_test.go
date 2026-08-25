@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/azure"
-	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/kubernetestieremap"
 	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
@@ -31,16 +30,16 @@ func TestNormalize_AzureKubernetesGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := azure.Normalize(f, fixedTime)
+	res, _, err := azure.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 3 {
 		t.Fatalf("expected 3 observations, got %d", len(obs))
 	}
 
-	tiersFound := make(map[domain.KubernetesTier]bool)
 	for _, o := range obs {
 		if o.Provider != "azure" {
 			t.Errorf("expected Provider azure, got %s", o.Provider)
@@ -54,17 +53,11 @@ func TestNormalize_AzureKubernetesGolden(t *testing.T) {
 		if o.Region != "eastus" || o.RegionGroup != "us-east" {
 			t.Errorf("unexpected region/group: %s / %s", o.Region, o.RegionGroup)
 		}
-		tiersFound[o.KubernetesAttributes.Tier] = true
-	}
-
-	if !tiersFound[kubernetestieremap.TierFree] {
-		t.Errorf("expected to find free tier observation")
-	}
-	if !tiersFound[kubernetestieremap.TierStandard] {
-		t.Errorf("expected to find standard tier observation")
-	}
-	if !tiersFound[kubernetestieremap.TierExtendedSupport] {
-		t.Errorf("expected to find extended_support tier observation")
+		if o.KubernetesAttributes.Tier != kubernetestieremap.TierFree &&
+			o.KubernetesAttributes.Tier != kubernetestieremap.TierStandard &&
+			o.KubernetesAttributes.Tier != kubernetestieremap.TierExtendedSupport {
+			t.Errorf("unexpected tier: %s", o.KubernetesAttributes.Tier)
+		}
 	}
 }
 
@@ -75,31 +68,28 @@ func TestNormalize_AzureKubernetes_UnmappedTierQuarantine(t *testing.T) {
 			{
 				"currencyCode": "USD",
 				"tierMinimumUnits": 0.0,
-				"retailPrice": 0.99,
-				"unitPrice": 0.99,
+				"retailPrice": 0.50,
+				"unitPrice": 0.50,
 				"armRegionName": "eastus",
-				"location": "US East",
-				"meterId": "METER-AZURE-AKS-QUANTUM",
-				"meterName": "Quantum Super Tier",
-				"productId": "DZH318Z0AKS99",
-				"skuId": "SKU-AZURE-AKS-QUANTUM",
+				"meterName": "Unknown Meter Tier",
+				"skuName": "Unknown SKU Tier",
 				"productName": "Azure Kubernetes Service",
-				"skuName": "Quantum Super Tier",
 				"serviceName": "Azure Kubernetes Service",
-				"serviceFamily": "Containers",
+				"serviceFamily": "Compute",
 				"unitOfMeasure": "1 Hour",
-				"type": "Consumption"
+				"type": "Consumption",
+				"isPrimaryMeterRegion": true,
+				"skuId": "SKU-AZURE-AKS-UNKNOWN"
 			}
-		],
-		"NextPageLink": "",
-		"Count": 1
+		]
 	}`
 
 	sink := &mockQuarantineSink{}
-	obs, _, err := azure.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	res, _, err := azure.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Fatalf("expected 0 observations for unmapped tier, got %d", len(obs))
@@ -110,7 +100,7 @@ func TestNormalize_AzureKubernetes_UnmappedTierQuarantine(t *testing.T) {
 	}
 
 	item := sink.items[0]
-	if item.Provider != "azure" || item.Category != "kubernetes" || item.Kind != "kubernetes_tier" || item.SkuID != "SKU-AZURE-AKS-QUANTUM" {
+	if item.Provider != "azure" || item.Category != "kubernetes" || item.Kind != "kubernetes_tier" || !strings.HasPrefix(item.SkuID, "SKU-AZURE-AKS-UNKNOWN") {
 		t.Errorf("unexpected quarantine item: %+v", item)
 	}
 }

@@ -71,10 +71,11 @@ func TestAlibabaNormalize_GoldenCorpus(t *testing.T) {
 			}
 			defer func() { _ = f.Close() }()
 
-			obs, err := Normalize(f, fixedTime)
+			res, err := Normalize(f, fixedTime)
 			if err != nil {
 				t.Fatalf("Normalize() unexpected error: %v", err)
 			}
+			obs := res.Observations
 
 			if len(obs) != tt.wantObsCount {
 				t.Fatalf("got %d observations, want %d", len(obs), tt.wantObsCount)

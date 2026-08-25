@@ -30,10 +30,11 @@ func TestNormalize_GCPKubernetesGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := gcp.Normalize(f, fixedTime)
+	res, _, err := gcp.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 1 {
 		t.Fatalf("expected 1 observation, got %d", len(obs))
@@ -99,10 +100,11 @@ func TestNormalize_GCPKubernetes_UnmappedTierQuarantine(t *testing.T) {
 	}`
 
 	sink := &mockQuarantineSink{}
-	obs, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	res, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Fatalf("expected 0 observations for unmapped tier, got %d", len(obs))

@@ -17,10 +17,11 @@ func TestNormalize_GCPDatabaseNoSQLGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := gcp.Normalize(f, fixedTime)
+	res, _, err := gcp.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 3 {
 		t.Fatalf("expected 3 observations, got %d", len(obs))

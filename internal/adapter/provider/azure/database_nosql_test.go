@@ -17,10 +17,11 @@ func TestNormalize_AzureDatabaseNoSQLGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := azure.Normalize(f, fixedTime)
+	res, _, err := azure.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 4 {
 		t.Fatalf("expected 4 observations, got %d", len(obs))

@@ -17,10 +17,11 @@ func TestNormalize_AWSDatabaseNoSQLGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, err := aws.Normalize(f, fixedTime)
+	res, err := aws.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 6 {
 		t.Fatalf("expected 6 observations, got %d", len(obs))

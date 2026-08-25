@@ -44,3 +44,4 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0034-kubernetes-conditional-control-plane-credit.md](0034-kubernetes-conditional-control-plane-credit.md): Kubernetes Conditional Control-Plane Credit
 - [0035-fx-rate-ingestion-and-persistence.md](0035-fx-rate-ingestion-and-persistence.md): Foreign Exchange Rate Ingestion and Persistence Architecture
 - [0036-digitalocean-declared-catalog-scope.md](0036-digitalocean-declared-catalog-scope.md): DigitalOcean Declared Catalog Scope and Exclusion of Unsupported Categories
+- [0037-live-ingestion-3-way-triage-classification.md](0037-live-ingestion-3-way-triage-classification.md): Live Ingestion 3-Way Triage Classification and Component Composition

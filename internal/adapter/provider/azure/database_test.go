@@ -2,6 +2,7 @@ package azure
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -15,10 +16,11 @@ func TestAzureNormalize_Database(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := Normalize(f, fixedTime)
+	res, _, err := Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() error = %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 5 {
 		t.Fatalf("expected 5 observations, got %d", len(obs))
@@ -41,7 +43,7 @@ func TestAzureNormalize_Database(t *testing.T) {
 		multiAZ bool
 	}
 	for _, o := range obs {
-		if o.SkuID == "SKU-AZURE-PG-GP-4VCORE" {
+		if strings.HasPrefix(o.SkuID, "SKU-AZURE-PG-GP-4VCORE") && !strings.Contains(o.SkuID, "HA") {
 			pgInst = &struct {
 				engine  string
 				vcpu    float64
@@ -67,13 +69,16 @@ func TestAzureNormalize_Database(t *testing.T) {
 
 	// Check PG storage observation
 	var pgStor *struct {
+		family  string
 		multiAZ bool
 	}
 	for _, o := range obs {
-		if o.SkuID == "SKU-AZURE-PG-STORAGE-HA" {
+		if strings.HasPrefix(o.SkuID, "SKU-AZURE-PG-STORAGE-HA") {
 			pgStor = &struct {
+				family  string
 				multiAZ bool
 			}{
+				family:  o.DatabaseRDBMSAttributes.StorageFamily,
 				multiAZ: o.DatabaseRDBMSAttributes.MultiAZ,
 			}
 			if o.DatabaseRDBMSAttributes.ComponentType != "storage" {

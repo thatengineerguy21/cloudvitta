@@ -80,6 +80,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	}
 
 	var allObservations []domain.PriceObservation
+	var totalIgnoredCount int
 	var firstGCSPath string
 
 	qSink := quarantine.NewStorageSink(a.storage, "azure", category, fetchID, fetchedAt)
@@ -111,14 +112,14 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		pr, pw := io.Pipe()
 		tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
 
-		var pageObservations []domain.PriceObservation
+		var pageResult domain.NormalizationResult
 		var pageNextLink string
 		g, _ := errgroup.WithContext(ctx)
 
 		// Goroutine 1: Normalize reads from pr
 		g.Go(func() error {
 			var normErr error
-			pageObservations, pageNextLink, normErr = Normalize(pr, fetchedAt, qSink)
+			pageResult, pageNextLink, normErr = Normalize(pr, fetchedAt, qSink)
 			if normErr != nil {
 				_ = pr.CloseWithError(normErr)
 				return fmt.Errorf("azure adapter: normalize page %d: %w", pageIdx, normErr)
@@ -147,7 +148,8 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		}
 		_ = body.Close()
 
-		allObservations = append(allObservations, pageObservations...)
+		allObservations = append(allObservations, pageResult.Observations...)
+		totalIgnoredCount += pageResult.IgnoredCount
 
 		if pageNextLink == "" {
 			break
@@ -170,11 +172,12 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	span.SetStatus(codes.Ok, "")
 	span.SetAttributes(attribute.Int("observations.count", len(allObservations)))
 	a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
-	slog.InfoContext(ctx, "azure fetch completed", "observations", len(allObservations), "pages", pageIdx, "unmapped", qSink.Count())
+	slog.InfoContext(ctx, "azure fetch completed", "observations", len(allObservations), "pages", pageIdx, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
 
 	return domain.FetchResult{
 		Observations:  allObservations,
 		RawGCSPath:    firstGCSPath,
 		UnmappedCount: qSink.Count(),
+		IgnoredCount:  totalIgnoredCount,
 	}, nil
 }

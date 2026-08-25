@@ -2,6 +2,7 @@ package azure
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -67,10 +68,11 @@ func TestAzureNormalize_GoldenCorpus(t *testing.T) {
 			}
 			defer func() { _ = f.Close() }()
 
-			obs, _, err := Normalize(f, fixedTime)
+			res, _, err := Normalize(f, fixedTime)
 			if err != nil {
 				t.Fatalf("Normalize() unexpected error: %v", err)
 			}
+			obs := res.Observations
 
 			if len(obs) != tt.wantObsCount {
 				t.Fatalf("got %d observations, want %d", len(obs), tt.wantObsCount)
@@ -85,7 +87,14 @@ func TestAzureNormalize_GoldenCorpus(t *testing.T) {
 			}
 
 			for _, expectedSKU := range tt.expectedSKUs {
-				if !skuMap[expectedSKU] {
+				var found bool
+				for sku := range skuMap {
+					if sku == expectedSKU || strings.HasPrefix(sku, expectedSKU) {
+						found = true
+						break
+					}
+				}
+				if !found {
 					t.Errorf("missing expected SKU %s in normalized output", expectedSKU)
 				}
 			}

@@ -127,8 +127,17 @@ var knownGCPVMSpecs = map[string]domain.ComputeAttributes{
 }
 
 // Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
+type gcpComponentSpec struct {
+	corePrice decimal.Decimal
+	ramPrice  decimal.Decimal
+	unit      string
+	currency  string
+	regions   []string
+}
+
+// Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
-func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, string, error) {
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, string, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -138,24 +147,26 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 	var observations []domain.PriceObservation
 	var nextPageToken string
+	var ignoredCount int
+	components := make(map[string]*gcpComponentSpec)
 
 	// Advance to the first token
 	t, err := dec.Token()
 	if err != nil {
 		if err == io.EOF {
-			return nil, "", nil
+			return domain.NormalizationResult{}, "", nil
 		}
-		return nil, "", fmt.Errorf("gcp normalize: %w", err)
+		return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: %w", err)
 	}
 
 	if delim, ok := t.(json.Delim); !ok || delim != '{' {
-		return nil, "", fmt.Errorf("gcp normalize: expected '{' at start of response")
+		return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: expected '{' at start of response")
 	}
 
 	for dec.More() {
 		t, err := dec.Token()
 		if err != nil {
-			return nil, "", fmt.Errorf("gcp normalize: read key: %w", err)
+			return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: read key: %w", err)
 		}
 		key, ok := t.(string)
 		if !ok {
@@ -166,16 +177,34 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		case "skus":
 			t, err = dec.Token()
 			if err != nil {
-				return nil, "", fmt.Errorf("gcp normalize: read 'skus' value: %w", err)
+				return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: read 'skus' value: %w", err)
 			}
 			if delim, ok := t.(json.Delim); !ok || delim != '[' {
-				return nil, "", fmt.Errorf("gcp normalize: expected '[' after 'skus'")
+				return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: expected '[' after 'skus'")
 			}
 
 			for dec.More() {
 				var sku gcpSKU
 				if err := dec.Decode(&sku); err != nil {
-					return nil, "", fmt.Errorf("gcp normalize: decode sku: %w", err)
+					return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: decode sku: %w", err)
+				}
+
+				sinkCountBefore := 0
+				if sink != nil {
+					if counter, ok := sink.(interface{ Count() int }); ok {
+						sinkCountBefore = counter.Count()
+					}
+				}
+				obsCountBefore := len(observations)
+
+				// Network SKUs published under Compute Engine service display name must route to network
+				if isNetworkProduct(sku) {
+					skuObs, nErr := normalizeNetworkSKU(sku, "network", fetchedAt, sink)
+					if nErr != nil {
+						return domain.NormalizationResult{}, "", nErr
+					}
+					observations = append(observations, skuObs...)
+					continue
 				}
 
 				// Filter 1: Check service category mapping (fails loudly if unmapped)
@@ -199,48 +228,84 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 						slog.Warn("gcp normalize: skipping SKU due to unmapped product", "sku", sku.SkuID, "product", serviceName)
 						continue
 					}
-					return nil, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+					return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 				}
 
 				var skuObs []domain.PriceObservation
 				switch category {
 				case "compute":
-					skuObs, err = normalizeComputeSKU(sku, category, fetchedAt, sink)
+					if isComputeInstance(sku) {
+						skuObs, err = normalizeComputeSKU(sku, category, fetchedAt, sink)
+					}
+					if isComputeComponent(sku) {
+						collectComponentPricing(sku, components)
+					}
 				case "storage":
-					skuObs, err = normalizeStorageSKU(sku, category, fetchedAt, sink)
+					if isStorageProduct(sku) {
+						skuObs, err = normalizeStorageSKU(sku, category, fetchedAt, sink)
+					}
 				case "network":
 					skuObs, err = normalizeNetworkSKU(sku, category, fetchedAt, sink)
 				case "database_rdbms":
-					skuObs, err = normalizeDatabaseSKU(sku, category, fetchedAt, sink)
+					if isDatabaseProduct(sku) {
+						skuObs, err = normalizeDatabaseSKU(sku, category, fetchedAt, sink)
+					}
 				case "database_nosql":
 					skuObs, err = normalizeDatabaseNoSQLSKU(sku, category, fetchedAt, sink)
 				case "kubernetes":
-					skuObs, err = normalizeKubernetesSKU(sku, category, fetchedAt, sink)
+					if isKubernetesProduct(sku) {
+						skuObs, err = normalizeKubernetesSKU(sku, category, fetchedAt, sink)
+					}
 				case "serverless":
 					skuObs, err = normalizeServerlessSKU(sku, category, fetchedAt, sink)
 				}
 				if err != nil {
-					return nil, "", err
+					return domain.NormalizationResult{}, "", err
 				}
 				observations = append(observations, skuObs...)
+
+				if len(observations) == obsCountBefore && !isComputeComponent(sku) {
+					sinkCountAfter := 0
+					if sink != nil {
+						if counter, ok := sink.(interface{ Count() int }); ok {
+							sinkCountAfter = counter.Count()
+						}
+					}
+					if sinkCountAfter == sinkCountBefore {
+						slog.Debug("gcp normalize: ignoring out-of-scope SKU", "sku", sku.SkuID, "desc", sku.Description)
+						ignoredCount++
+					}
+				}
 			}
 			// Consume ']'
 			if _, err := dec.Token(); err != nil {
-				return nil, "", err
+				return domain.NormalizationResult{}, "", err
 			}
 		case "nextPageToken":
 			if err := dec.Decode(&nextPageToken); err != nil {
-				return nil, "", fmt.Errorf("gcp normalize: decode nextPageToken: %w", err)
+				return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: decode nextPageToken: %w", err)
 			}
 		default:
 			// Discard other top-level keys
 			if err := provider.SkipJSONValue(dec); err != nil {
-				return nil, "", fmt.Errorf("gcp normalize: skip key %s: %w", key, err)
+				return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize: skip key %s: %w", key, err)
 			}
 		}
 	}
 
-	return observations, nextPageToken, nil
+	// Synthesize machine type pricing from collected compute component SKUs
+	if len(components) > 0 {
+		composedObs, err := composeMachineTypePricing(components, fetchedAt, sink)
+		if err != nil {
+			return domain.NormalizationResult{}, "", err
+		}
+		observations = append(observations, composedObs...)
+	}
+
+	return domain.NormalizationResult{
+		Observations: observations,
+		IgnoredCount: ignoredCount,
+	}, nextPageToken, nil
 }
 
 func extractUnitPrice(unitPrice gcpUnitPrice) (decimal.Decimal, error) {
@@ -531,6 +596,193 @@ func isNetworkProduct(sku gcpSKU) bool {
 	return false
 }
 
+func isDatabaseProduct(sku gcpSKU) bool {
+	if sku.Category.UsageType != "OnDemand" {
+		return false
+	}
+	desc := sku.Description
+	family := sku.Category.ResourceFamily
+	group := sku.Category.ResourceGroup
+
+	// Exclude network egress/data transfer line items
+	if family == "Network" || strings.Contains(desc, "Network") || strings.Contains(desc, "Egress") ||
+		strings.Contains(desc, "Data Transfer") || strings.Contains(desc, "Internet") ||
+		strings.Contains(group, "Egress") || strings.Contains(group, "Interconnect") {
+		return false
+	}
+	// Exclude commitments, discounts, licenses, and non-database services
+	if strings.Contains(desc, "Commitment") || strings.Contains(desc, "Discount") || strings.Contains(desc, "License") {
+		return false
+	}
+	// Must be Cloud SQL, AlloyDB, or database instance/storage resource
+	if strings.Contains(desc, "Cloud SQL") || strings.Contains(desc, "AlloyDB") ||
+		strings.Contains(family, "ApplicationServices") || strings.Contains(group, "SQLServer") ||
+		strings.Contains(group, "PostgreSQL") || strings.Contains(group, "MySQL") ||
+		strings.Contains(group, "PD") || strings.Contains(desc, "Storage") ||
+		strings.Contains(desc, "Instance") || strings.Contains(desc, "Core") || strings.Contains(desc, "RAM") {
+		return true
+	}
+	return false
+}
+
+func isKubernetesProduct(sku gcpSKU) bool {
+	desc := strings.ToLower(sku.Description)
+	return strings.Contains(desc, "kubernetes") || strings.Contains(desc, "gke") ||
+		strings.Contains(desc, "cluster management") || strings.Contains(strings.ToLower(sku.Category.ServiceDisplayName), "kubernetes")
+}
+
+func isComputeComponent(sku gcpSKU) bool {
+	if sku.Category.UsageType != "OnDemand" {
+		return false
+	}
+	desc := sku.Description
+	if strings.Contains(desc, "Windows") || strings.Contains(desc, "SQL Server") || strings.Contains(desc, "RHEL") || strings.Contains(desc, "SLES") ||
+		strings.Contains(desc, "Spot") || strings.Contains(desc, "Preemptible") || strings.Contains(desc, "Commitment") || strings.Contains(desc, "Sole Tenancy") ||
+		strings.Contains(desc, "GPU") || strings.Contains(desc, "Hyperdisk") {
+		return false
+	}
+	descLower := strings.ToLower(desc)
+	// If it contains both Core and RAM (e.g. "Core and Ram"), it is a predefined monolithic VM, not a standalone component SKU
+	if strings.Contains(descLower, "core") && strings.Contains(descLower, "ram") {
+		return false
+	}
+	isCoreOrRAM := strings.Contains(desc, "Instance Core") || strings.Contains(desc, "Instance Ram") || strings.Contains(desc, "Instance RAM") ||
+		strings.Contains(desc, "Core running") || strings.Contains(desc, "Ram running") || strings.Contains(desc, "RAM running")
+	return isCoreOrRAM
+}
+
+func parseGCPComponent(sku gcpSKU) (string, bool, bool) {
+	desc := sku.Description
+	descLower := strings.ToLower(desc)
+
+	var family string
+	switch {
+	case strings.Contains(desc, "N2D"):
+		family = "n2d"
+	case strings.Contains(desc, "N2"):
+		family = "n2"
+	case strings.Contains(desc, "N1"):
+		family = "n1"
+	case strings.Contains(desc, "E2"):
+		family = "e2"
+	case strings.Contains(desc, "C2D"):
+		family = "c2d"
+	case strings.Contains(desc, "C2") || strings.Contains(descLower, "compute optimized"):
+		family = "c2"
+	case strings.Contains(desc, "C3"):
+		family = "c3"
+	case strings.Contains(desc, "T2D"):
+		family = "t2d"
+	case strings.Contains(desc, "T2A"):
+		family = "t2a"
+	default:
+		return "", false, false
+	}
+
+	isCore := strings.Contains(descLower, "core")
+	isRAM := strings.Contains(descLower, "ram")
+	return family, isCore, isRAM
+}
+
+func collectComponentPricing(sku gcpSKU, components map[string]*gcpComponentSpec) {
+	if len(sku.PricingInfo) == 0 || len(sku.PricingInfo[0].PricingExpression.TieredRates) == 0 {
+		return
+	}
+	family, isCore, isRAM := parseGCPComponent(sku)
+	if family == "" || (!isCore && !isRAM) {
+		return
+	}
+	unitPrice := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice
+	priceAmount, err := extractUnitPrice(unitPrice)
+	if err != nil || priceAmount.IsZero() {
+		return
+	}
+
+	comp, ok := components[family]
+	if !ok {
+		regions := sku.ServiceRegions
+		if len(regions) == 0 {
+			regions = []string{"global"}
+		}
+		currency := unitPrice.CurrencyCode
+		if currency == "" {
+			currency = "USD"
+		}
+		unit := sku.PricingInfo[0].PricingExpression.UsageUnit
+		if unit == "h" || unit == "hour" {
+			unit = "Hrs"
+		}
+		comp = &gcpComponentSpec{
+			unit:     unit,
+			currency: currency,
+			regions:  regions,
+		}
+		components[family] = comp
+	}
+
+	if isCore {
+		comp.corePrice = priceAmount
+	}
+	if isRAM {
+		comp.ramPrice = priceAmount
+	}
+	if len(sku.ServiceRegions) > 0 {
+		comp.regions = sku.ServiceRegions
+	}
+}
+
+func composeMachineTypePricing(components map[string]*gcpComponentSpec, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
+	var observations []domain.PriceObservation
+	for family, comp := range components {
+		if comp.corePrice.IsZero() || comp.ramPrice.IsZero() {
+			continue
+		}
+		for machineType, spec := range knownGCPVMSpecs {
+			if spec.Family != family {
+				continue
+			}
+			hourlyPrice := comp.corePrice.Mul(decimal.NewFromFloat(spec.VCPU)).Add(comp.ramPrice.Mul(decimal.NewFromFloat(spec.RAMGB)))
+			skuID := fmt.Sprintf("SKU-GCP-VM-%s", strings.ToUpper(machineType))
+
+			for _, region := range comp.regions {
+				regionGroup, err := regionmap.MapGCPRegion(region)
+				if err != nil {
+					if errors.Is(err, regionmap.ErrUnmappedRegion) {
+						if sink != nil {
+							_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+								Provider:   "gcp",
+								Category:   "compute",
+								Kind:       "region",
+								RawValue:   region,
+								SkuID:      skuID,
+								ObservedAt: fetchedAt,
+							})
+						}
+						continue
+					}
+					return nil, fmt.Errorf("gcp compose region %s: %w", region, err)
+				}
+
+				observations = append(observations, domain.PriceObservation{
+					Provider:        "gcp",
+					ServiceCategory: "compute",
+					SkuID:           skuID,
+					DisplayName:     machineType,
+					Region:          region,
+					RegionGroup:     regionGroup,
+					Unit:            "Hrs",
+					PriceAmount:     hourlyPrice,
+					PriceCurrency:   comp.currency,
+					PricingModel:    "OnDemand",
+					Attributes:      spec,
+					FetchedAt:       fetchedAt,
+				})
+			}
+		}
+	}
+	return observations, nil
+}
+
 func isComputeInstance(sku gcpSKU) bool {
 	// Must be OnDemand
 	if sku.Category.UsageType != "OnDemand" {
@@ -762,7 +1014,7 @@ func normalizeDatabaseSKU(sku gcpSKU, category string, fetchedAt time.Time, sink
 
 func parseGCPDatabaseEngine(sku gcpSKU) (string, error) {
 	for _, text := range []string{sku.Description, sku.Category.ResourceGroup, sku.Category.ServiceDisplayName, sku.Name} {
-		for _, cand := range []string{"PostgreSQL", "AlloyDB", "MySQL", "SQL Server"} {
+		for _, cand := range []string{"PostgreSQL", "Postgres", "AlloyDB", "MySQL", "SQL Server", "SQLServer"} {
 			if strings.Contains(text, cand) {
 				return databaseenginemap.MapGCPEngine(cand)
 			}

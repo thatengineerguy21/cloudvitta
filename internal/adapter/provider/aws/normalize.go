@@ -60,7 +60,7 @@ type awsProductMeta struct {
 // on large provider files. It enforces that products precede terms, returning ErrPermanentFailure
 // if the payload order violates this streaming invariant.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
-func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -70,18 +70,19 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 	// Advance to opening '{' of root object
 	if err := consumeDelim(dec, '{'); err != nil {
-		return nil, fmt.Errorf("aws normalize: stream start: %w", err)
+		return domain.NormalizationResult{}, fmt.Errorf("aws normalize: stream start: %w", err)
 	}
 
 	filteredProducts := make(map[string]awsProductMeta)
 	var observations []domain.PriceObservation
 	var productsParsed bool
 	var offerCode string
+	var ignoredCount int
 
 	for dec.More() {
 		keyToken, err := dec.Token()
 		if err != nil {
-			return nil, fmt.Errorf("aws normalize: read top-level key: %w", err)
+			return domain.NormalizationResult{}, fmt.Errorf("aws normalize: read top-level key: %w", err)
 		}
 		key := fmt.Sprintf("%v", keyToken)
 
@@ -89,71 +90,95 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 		case "offerCode":
 			var val string
 			if err := dec.Decode(&val); err != nil {
-				return nil, fmt.Errorf("aws normalize: decode offerCode: %w", err)
+				return domain.NormalizationResult{}, fmt.Errorf("aws normalize: decode offerCode: %w", err)
 			}
 			offerCode = val
 
 		case "products":
-			prods, err := parseProductsMap(dec, offerCode, fetchedAt, sink)
+			prods, ignored, err := parseProductsMap(dec, offerCode, fetchedAt, sink)
 			if err != nil {
-				return nil, err
+				return domain.NormalizationResult{}, err
 			}
 			filteredProducts = prods
+			ignoredCount = ignored
 			productsParsed = true
 
 		case "terms":
 			if !productsParsed {
-				return nil, fmt.Errorf("%w: aws normalize: terms encountered before products in payload", provider.ErrPermanentFailure)
+				return domain.NormalizationResult{}, fmt.Errorf("%w: aws normalize: terms encountered before products in payload", provider.ErrPermanentFailure)
 			}
 
 			obs, err := parseTermsMap(dec, filteredProducts, fetchedAt)
 			if err != nil {
-				return nil, err
+				return domain.NormalizationResult{}, err
 			}
 			observations = append(observations, obs...)
 
 		default:
 			// Discard unknown top-level section without memory allocation
 			if err := provider.SkipJSONValue(dec); err != nil {
-				return nil, fmt.Errorf("aws normalize: skip top-level key %s: %w", key, err)
+				return domain.NormalizationResult{}, fmt.Errorf("aws normalize: skip top-level key %s: %w", key, err)
 			}
 		}
 	}
 
-	return observations, nil
+	return domain.NormalizationResult{
+		Observations: observations,
+		IgnoredCount: ignoredCount,
+	}, nil
 }
 
-func parseProductsMap(dec *json.Decoder, offerCode string, fetchedAt time.Time, sink quarantine.Sink) (map[string]awsProductMeta, error) {
+func parseProductsMap(dec *json.Decoder, offerCode string, fetchedAt time.Time, sink quarantine.Sink) (map[string]awsProductMeta, int, error) {
 	if err := consumeDelim(dec, '{'); err != nil {
-		return nil, fmt.Errorf("aws normalize: products open delim: %w", err)
+		return nil, 0, fmt.Errorf("aws normalize: products open delim: %w", err)
 	}
 
 	filteredProducts := make(map[string]awsProductMeta)
+	var ignoredCount int
+
 	for dec.More() {
 		skuToken, err := dec.Token()
 		if err != nil {
-			return nil, fmt.Errorf("aws normalize: read sku key: %w", err)
+			return nil, 0, fmt.Errorf("aws normalize: read sku key: %w", err)
 		}
 		sku := fmt.Sprintf("%v", skuToken)
 
 		var prod awsProduct
 		if err := dec.Decode(&prod); err != nil {
-			return nil, fmt.Errorf("aws normalize: decode product %s: %w", sku, err)
+			return nil, 0, fmt.Errorf("aws normalize: decode product %s: %w", sku, err)
+		}
+
+		sinkCountBefore := 0
+		if sink != nil {
+			if counter, ok := sink.(interface{ Count() int }); ok {
+				sinkCountBefore = counter.Count()
+			}
 		}
 
 		meta, err := parseSingleProduct(prod, sku, offerCode, fetchedAt, sink)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if meta != nil {
 			filteredProducts[sku] = *meta
+		} else {
+			sinkCountAfter := 0
+			if sink != nil {
+				if counter, ok := sink.(interface{ Count() int }); ok {
+					sinkCountAfter = counter.Count()
+				}
+			}
+			if sinkCountAfter == sinkCountBefore {
+				slog.Debug("aws normalize: ignoring out-of-scope product", "sku", sku, "product_family", prod.ProductFamily)
+				ignoredCount++
+			}
 		}
 	}
 
 	if err := consumeDelim(dec, '}'); err != nil {
-		return nil, fmt.Errorf("aws normalize: products close delim: %w", err)
+		return nil, 0, fmt.Errorf("aws normalize: products close delim: %w", err)
 	}
-	return filteredProducts, nil
+	return filteredProducts, ignoredCount, nil
 }
 
 func parseSingleProduct(prod awsProduct, sku, offerCode string, fetchedAt time.Time, sink quarantine.Sink) (*awsProductMeta, error) {

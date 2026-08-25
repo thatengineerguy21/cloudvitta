@@ -30,10 +30,11 @@ func TestNormalize_AWSKubernetesGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, err := aws.Normalize(f, fixedTime)
+	res, err := aws.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 2 {
 		t.Fatalf("expected 2 observations, got %d", len(obs))
@@ -100,10 +101,11 @@ func TestNormalize_AWSKubernetes_UnmappedTierQuarantine(t *testing.T) {
 	}`
 
 	sink := &mockQuarantineSink{}
-	obs, err := aws.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	res, err := aws.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Fatalf("expected 0 normalized observations for unmapped tier, got %d", len(obs))

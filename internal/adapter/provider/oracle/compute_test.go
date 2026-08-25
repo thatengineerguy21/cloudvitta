@@ -87,10 +87,11 @@ func TestNormalize_OCPUtoVCPU_x86_vs_Arm(t *testing.T) {
 	}`
 
 	now := time.Now().UTC()
-	obs, err := Normalize(strings.NewReader(jsonPayload), now)
+	res, err := Normalize(strings.NewReader(jsonPayload), now)
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 
 	var foundE4_2vCPU, foundA1_1vCPU bool
 	for _, o := range obs {
@@ -166,10 +167,11 @@ func TestNormalize_FixedShapes(t *testing.T) {
 	}`
 
 	now := time.Now().UTC()
-	obs, err := Normalize(strings.NewReader(jsonPayload), now)
+	res, err := Normalize(strings.NewReader(jsonPayload), now)
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 2 {
 		t.Fatalf("expected 2 fixed observations, got %d", len(obs))
@@ -225,24 +227,25 @@ func TestNormalize_QuarantineUnmappedItems(t *testing.T) {
 
 	sink := &memoryQuarantineSink{}
 	now := time.Now().UTC()
-	obs, err := Normalize(strings.NewReader(jsonPayload), now, sink)
+	res, err := Normalize(strings.NewReader(jsonPayload), now, sink)
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Errorf("expected 0 valid observations, got %d", len(obs))
 	}
 
-	if sink.Count() != 2 {
-		t.Fatalf("expected 2 quarantined items (unmapped product + unmapped region), got %d", sink.Count())
+	if sink.Count() != 1 {
+		t.Fatalf("expected 1 quarantined item (unmapped region, out-of-scope product is ignored), got %d", sink.Count())
+	}
+	if res.IgnoredCount != 1 {
+		t.Errorf("expected 1 ignored item for out-of-scope product, got %d", res.IgnoredCount)
 	}
 
-	if sink.items[0].Kind != "product" || sink.items[0].RawValue != "Quantum AI Service" {
-		t.Errorf("expected quarantined product, got %+v", sink.items[0])
-	}
-	if sink.items[1].Kind != "region" || sink.items[1].RawValue != "unmapped-mars-region" {
-		t.Errorf("expected quarantined region, got %+v", sink.items[1])
+	if sink.items[0].Kind != "region" || sink.items[0].RawValue != "unmapped-mars-region" {
+		t.Errorf("expected quarantined region, got %+v", sink.items[0])
 	}
 }
 
@@ -273,10 +276,11 @@ func TestNormalize_MissingRegion_Quarantined(t *testing.T) {
 	}`
 
 	sink := &memoryQuarantineSink{}
-	obs, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC(), sink)
+	res, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC(), sink)
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 	if len(obs) != 0 {
 		t.Errorf("expected 0 observations for item with missing regions, got %d", len(obs))
 	}
@@ -308,10 +312,11 @@ func TestNormalize_UnrecognizedFlexShape_Quarantined(t *testing.T) {
 	}`
 
 	sink := &memoryQuarantineSink{}
-	obs, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC(), sink)
+	res, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC(), sink)
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 	if len(obs) != 0 {
 		t.Errorf("expected 0 observations for unrecognized flex shape, got %d", len(obs))
 	}
@@ -343,10 +348,11 @@ func TestNormalize_MissingRAMPriceComponent_DoesNotSynthesize(t *testing.T) {
 		]
 	}`
 
-	obs, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC())
+	res, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 	if len(obs) != 0 {
 		t.Errorf("expected 0 synthesized observations when RAM price component is missing, got %d", len(obs))
 	}

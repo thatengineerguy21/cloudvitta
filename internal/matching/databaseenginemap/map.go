@@ -13,6 +13,7 @@ const (
 	EngineSQLServer  = "sqlserver"
 	EngineMariaDB    = "mariadb"
 	EngineOracle     = "oracle"
+	EngineDb2        = "db2"
 )
 
 // ErrUnmappedDatabaseEngine is returned when a raw engine value cannot be mapped to canonical taxonomy.
@@ -44,7 +45,7 @@ func ResolveCanonicalEngine(rawEngine string) (string, error) {
 
 	lower := strings.ToLower(trimmed)
 	switch lower {
-	case EnginePostgreSQL, EngineMySQL, EngineSQLServer, EngineMariaDB, EngineOracle:
+	case EnginePostgreSQL, EngineMySQL, EngineSQLServer, EngineMariaDB, EngineOracle, EngineDb2:
 		return lower, nil
 	}
 

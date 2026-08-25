@@ -90,10 +90,11 @@ func TestNormalize_VPCProfiles(t *testing.T) {
 	}`
 
 	now := time.Now().UTC()
-	obs, err := Normalize(strings.NewReader(jsonPayload), now)
+	res, err := Normalize(strings.NewReader(jsonPayload), now)
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 
 	// 5 profiles * 2 regions = 10 observations
 	if len(obs) != 10 {
@@ -213,10 +214,11 @@ func TestNormalize_QuarantineUnmappedItems(t *testing.T) {
 
 	sink := &memoryQuarantineSink{}
 	now := time.Now().UTC()
-	obs, err := Normalize(strings.NewReader(jsonPayload), now, sink)
+	res, err := Normalize(strings.NewReader(jsonPayload), now, sink)
 	if err != nil {
 		t.Fatalf("Normalize failed: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Errorf("expected 0 valid observations, got %d", len(obs))
@@ -236,10 +238,11 @@ func TestNormalize_InvalidJSON(t *testing.T) {
 
 func TestNormalize_EmptyResource_NoPanic(t *testing.T) {
 	jsonPayload := `{"resources": []}`
-	obs, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC())
+	res, err := Normalize(strings.NewReader(jsonPayload), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("unexpected error on empty resources: %v", err)
 	}
+	obs := res.Observations
 	if len(obs) != 0 {
 		t.Errorf("expected 0 observations, got %d", len(obs))
 	}

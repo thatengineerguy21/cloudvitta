@@ -139,11 +139,12 @@ CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS=Authorization=Basic MTIzNDU2OmdsY19leUouLi
 ### Service C: Google Cloud Storage (Raw Payloads & Quarantine Sinks)
 1. **Create Bucket**: Log in to the [Google Cloud Console](https://console.cloud.google.com/) and create a Cloud Storage bucket (e.g. `cloudvitta-raw-dev`).
 2. **Configure Key**: Set `CLOUDVITTA_STORAGE_GCS_BUCKET_NAME=cloudvitta-raw-dev` in `.env`.
-3. **Authenticate Local Environment**: Authenticate your local machine using Application Default Credentials:
+3. **Authenticate Local Environment (Optional for local dev)**: Authenticate your local machine using Application Default Credentials:
    ```bash
    gcloud auth application-default login
    ```
    The Go Google Cloud SDK uses these local credentials automatically when executing `cmd/ingest`.
+   *Note: If GCS credentials are not found in the `development` environment, the ingestion runner logs a warning and automatically falls back to in-memory raw storage.*
 
 ---
 

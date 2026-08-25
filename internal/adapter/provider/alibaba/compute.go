@@ -48,9 +48,19 @@ func (n *computeNormalizer) recordQuarantine(kind, rawValue, skuID, category str
 	})
 }
 
+func (n *computeNormalizer) sinkCount() int {
+	if n.sink == nil {
+		return 0
+	}
+	if counter, ok := n.sink.(interface{ Count() int }); ok {
+		return counter.Count()
+	}
+	return 0
+}
+
 // Normalize parses an Alibaba Cloud ECS catalog or pricing JSON stream and returns normalized domain observations.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting.
-func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]domain.PriceObservation, error) {
+func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -58,7 +68,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 
 	var resp CatalogResponse
 	if err := json.NewDecoder(r).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("alibaba normalize: decode json: %w", err)
+		return domain.NormalizationResult{}, fmt.Errorf("alibaba normalize: decode json: %w", err)
 	}
 
 	normalizer := &computeNormalizer{
@@ -81,15 +91,28 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) ([]do
 	}
 
 	var observations []domain.PriceObservation
+	var ignoredCount int
+
 	for _, item := range items {
+		sinkCountBefore := normalizer.sinkCount()
+		obsCountBefore := len(observations)
+
 		obsList, err := normalizer.processItem(item)
 		if err != nil {
-			return nil, err
+			return domain.NormalizationResult{}, err
 		}
 		observations = append(observations, obsList...)
+
+		if len(observations) == obsCountBefore && normalizer.sinkCount() == sinkCountBefore {
+			slog.Debug("alibaba normalize: ignoring out-of-scope item", "instance_type", item.InstanceTypeID, "product", item.ProductCode)
+			ignoredCount++
+		}
 	}
 
-	return observations, nil
+	return domain.NormalizationResult{
+		Observations: observations,
+		IgnoredCount: ignoredCount,
+	}, nil
 }
 
 func (n *computeNormalizer) processItem(item InstanceTypeItem) ([]domain.PriceObservation, error) {

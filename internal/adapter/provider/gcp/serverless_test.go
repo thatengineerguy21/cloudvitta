@@ -19,10 +19,11 @@ func TestNormalize_GCPServerlessGolden(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	obs, _, err := gcp.Normalize(f, fixedTime)
+	res, _, err := gcp.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 3 {
 		t.Fatalf("expected 3 observations (request_fee, duration_fee_cpu, duration_fee_memory), got %d", len(obs))
@@ -100,10 +101,11 @@ func TestNormalize_GCPServerless_UnmappedArchQuarantine(t *testing.T) {
 	}`
 
 	sink := &mockQuarantineSink{}
-	obs, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	res, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Fatalf("expected 0 normalized observations for unmapped arch, got %d", len(obs))
@@ -160,10 +162,11 @@ func TestNormalize_GCPServerless_UnmappedUnitQuarantine(t *testing.T) {
 	}`
 
 	sink := &mockQuarantineSink{}
-	obs, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
+	res, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime, sink)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
+	obs := res.Observations
 
 	if len(obs) != 0 {
 		t.Fatalf("expected 0 normalized observations, got %d", len(obs))
