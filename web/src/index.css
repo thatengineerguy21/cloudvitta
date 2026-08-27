@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-surface-page: #F5F5DC;
+    --color-surface-card: #FCF9F8;
+    --color-surface-raised: #F0EDED;
+    --color-border-default: #DCD9D9;
+    --color-border-accent: #E2725B;
+    --color-text-primary: #1B1C1C;
+    --color-text-secondary: #54433C;
+    --color-status-match-exact: #0C5D00;
+    --color-status-match-close: #823B18;
+    --color-status-match-approximate: #6E5300;
+    --color-status-stale: #944925;
+    --color-status-partial: #005691;
+    --color-status-anomaly: #BA1A1A;
+  }
+
+  .dark {
+    --color-surface-page: #0B0E14;
+    --color-surface-card: #14171D;
+    --color-surface-raised: #1C2027;
+    --color-border-default: #2A2D35;
+    --color-border-accent: #E2725B;
+    --color-text-primary: #F5F5F5;
+    --color-text-secondary: #A48B86;
+    --color-status-match-exact: #00FF41;
+    --color-status-match-close: #FFB4A5;
+    --color-status-match-approximate: #5CDBCE;
+    --color-status-stale: #FFB596;
+    --color-status-partial: #70B8FF;
+    --color-status-anomaly: #FFB4AB;
+  }
+
+  body {
+    background-color: var(--color-surface-page);
+    color: var(--color-text-primary);
+    font-family: 'Manrope', 'Hanken Grotesk', sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    border-radius: 0px !important;
+  }
+}

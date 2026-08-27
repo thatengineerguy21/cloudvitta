@@ -83,6 +83,15 @@ Create directories only when their stage implementation requires them.
 │       ├── ci.yml               # GitHub Actions CI workflow
 │       └── deploy.yml           # GitHub Actions Cloud Run deploy workflow
 │
+├── web/                         # React, Vite, TypeScript, and Tailwind frontend SPA
+│   ├── src/                     # React source code, components, design tokens, and utilities
+│   ├── public/                  # Static assets (favicons, manifest)
+│   ├── index.html               # SPA HTML entry point
+│   ├── vite.config.ts           # Vite bundler configuration
+│   ├── tailwind.config.js       # Tailwind 0px geometry and theme tokens
+│   ├── tsconfig.json            # TypeScript project reference root
+│   └── package.json             # Frontend dependencies and scripts
+│
 ├── Taskfile.yml                 # task runner automation configuration
 ├── Dockerfile                   # multi-stage container build
 ├── sqlc.yaml                    # SQLC code generator configuration
