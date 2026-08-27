@@ -91,3 +91,28 @@ tasks:
     cmds:
       - go clean
       - rm -f coverage.out
+
+  web:dev:
+    desc: Run frontend development server (Vite)
+    dir: web
+    cmds:
+      - npm run dev
+
+  web:lint:
+    desc: Run ESLint on frontend source files
+    dir: web
+    cmds:
+      - npm run lint
+
+  web:typecheck:
+    desc: Run TypeScript type checking on frontend
+    dir: web
+    cmds:
+      - npm run typecheck
+
+  web:build:
+    desc: Build production frontend bundle
+    dir: web
+    cmds:
+      - npm run build
+
