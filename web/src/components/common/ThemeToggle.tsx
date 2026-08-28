@@ -1,40 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
+import { Theme } from '../../types';
 
 export const ThemeToggle: React.FC = () => {
-  const [isDark, setIsDark] = useState<boolean>(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage?.getItem('cv_theme');
-      if (stored) {
-        return stored === 'dark';
+      if (stored === 'dark' || stored === 'light') {
+        return stored;
       }
-      return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
+      return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
     }
-    return false;
+    return 'light';
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    if (isDark) {
+    if (theme === 'dark') {
       root.classList.add('dark');
       localStorage.setItem('cv_theme', 'dark');
     } else {
       root.classList.remove('dark');
       localStorage.setItem('cv_theme', 'light');
     }
-  }, [isDark]);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   return (
     <button
-      onClick={() => setIsDark((prev) => !prev)}
+      onClick={toggleTheme}
       className="p-2 border border-border-default hover:border-border-accent bg-surface-card text-text-primary transition-colors flex items-center justify-center cursor-pointer"
       aria-label="Toggle visual theme"
-      title={isDark ? 'Switch to Light Editorial' : 'Switch to Dark Obsidian'}
+      title={theme === 'dark' ? 'Switch to Light Editorial' : 'Switch to Dark Obsidian'}
     >
-      {isDark ? (
-        <Sun className="w-4 h-4 text-border-accent" />
+      {theme === 'dark' ? (
+        <Sun className="w-4 h-4 text-border-accent" aria-hidden="true" />
       ) : (
-        <Moon className="w-4 h-4 text-text-secondary" />
+        <Moon className="w-4 h-4 text-text-secondary" aria-hidden="true" />
       )}
     </button>
   );
