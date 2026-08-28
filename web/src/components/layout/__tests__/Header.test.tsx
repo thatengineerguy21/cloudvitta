@@ -4,21 +4,38 @@ import userEvent from '@testing-library/user-event';
 import { Header } from '../Header';
 import { AuthProvider } from '../../../auth/AuthContext';
 import { Router } from '../../../router';
-import { authApi } from '../../../api/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
+import { authApi, providerApi } from '../../../api/client';
+
+const createWrapper = () => {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={qc}>
+      <Router>
+        <AuthProvider>{children}</AuthProvider>
+      </Router>
+    </QueryClientProvider>
+  );
+};
 
 describe('Header Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Mock provider status for live health badge
+    vi.spyOn(providerApi, 'getStatus').mockResolvedValue({
+      provider: 'aws',
+      status: 'healthy',
+      stale: false,
+      categories: {},
+      warnings: [],
+    });
   });
 
   it('renders branding, 7 category links, calculate, swagger, and theme toggle', () => {
-    render(
-      <Router>
-        <AuthProvider>
-          <Header />
-        </AuthProvider>
-      </Router>
-    );
+    render(<Header />, { wrapper: createWrapper() });
 
     expect(screen.getByText('CloudVitta')).toBeInTheDocument();
     expect(screen.getByText('API Engine')).toBeInTheDocument();
@@ -33,15 +50,46 @@ describe('Header Component', () => {
     expect(screen.getByText('Swagger')).toBeInTheDocument();
   });
 
+  it('renders live health badge with dynamic telemetry label', async () => {
+    render(<Header />, { wrapper: createWrapper() });
+
+    // Initially loading, then shows label
+    await waitFor(() => {
+      expect(screen.getByText('7/7 Providers Active')).toBeInTheDocument();
+    });
+  });
+
+  it('renders degraded health badge when providers are stale', async () => {
+    vi.spyOn(providerApi, 'getStatus').mockImplementation((provider) => {
+      if (provider === 'aws') {
+        return Promise.resolve({
+          provider: 'aws',
+          status: 'stale',
+          stale: true,
+          categories: {},
+          warnings: [],
+        });
+      }
+      return Promise.resolve({
+        provider: provider as string,
+        status: 'healthy',
+        stale: false,
+        categories: {},
+        warnings: [],
+      });
+    });
+
+    render(<Header />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      // With 1 stale + 6 healthy => degraded state
+      expect(screen.getByText(/Active/)).toBeInTheDocument();
+    });
+  });
+
   it('renders Sign In button when unauthenticated and opens AuthModal on click', async () => {
     const user = userEvent.setup();
-    render(
-      <Router>
-        <AuthProvider>
-          <Header />
-        </AuthProvider>
-      </Router>
-    );
+    render(<Header />, { wrapper: createWrapper() });
 
     const signInBtn = screen.getByRole('button', { name: /sign in/i });
     expect(signInBtn).toBeInTheDocument();
@@ -63,13 +111,7 @@ describe('Header Component', () => {
     });
     vi.spyOn(authApi, 'logout').mockResolvedValue({ message: 'revoked' });
 
-    render(
-      <Router>
-        <AuthProvider>
-          <Header />
-        </AuthProvider>
-      </Router>
-    );
+    render(<Header />, { wrapper: createWrapper() });
 
     // Open AuthModal
     await user.click(screen.getByRole('button', { name: /sign in/i }));

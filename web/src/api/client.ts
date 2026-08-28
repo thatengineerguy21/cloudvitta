@@ -277,9 +277,10 @@ export const authApi = {
 
 // Typed Provider Status API
 export const providerApi = {
-  getStatus: (provider: Provider) =>
+  getStatus: (provider: Provider, options?: RequestOptions) =>
     apiFetch<ProviderStatusResponse>(`/api/v1/providers/${encodeURIComponent(provider)}/status`, {
       method: 'GET',
+      ...options,
     }),
 };
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Github, ExternalLink } from 'lucide-react';
+import { Link } from '../../router';
 
 export const Footer: React.FC = () => {
   return (
@@ -28,12 +29,12 @@ export const Footer: React.FC = () => {
 
           {/* Col 3: Links */}
           <div className="flex items-center justify-start md:justify-end space-x-4">
-            <a
-              href="#/status"
+            <Link
+              to="/status"
               className="text-xs uppercase font-bold tracking-wider text-text-secondary hover:text-text-primary transition-colors"
             >
               Provider Status
-            </a>
+            </Link>
             <a
               href="/docs/"
               target="_blank"

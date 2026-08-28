@@ -4,12 +4,24 @@ import { ThemeToggle } from '../common/ThemeToggle';
 import { AuthModal } from '../auth/AuthModal';
 import { useAuth } from '../../auth/AuthContext';
 import { Link, useLocation } from '../../router';
+import { cn } from '../../lib/utils';
+import { useProviderHealthSummary, type HealthSummaryState } from '../../api/queries/useProviderStatusQueries';
 import { ExternalLink, Activity, User, LogOut } from 'lucide-react';
+
+const HEALTH_BADGE_COLORS: Record<HealthSummaryState, string> = {
+  healthy: 'text-status-matchExact',
+  degraded: 'text-status-stale',
+  error: 'text-status-anomaly',
+  loading: 'text-text-secondary',
+};
 
 export const Header: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { pathname } = useLocation();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const { summaryState, summaryLabel, isLoading } = useProviderHealthSummary();
+
+  const healthBadgeColor = HEALTH_BADGE_COLORS[summaryState];
 
   const navCategories = [
     { label: 'Compute', href: '/compare/compute' },
@@ -38,14 +50,14 @@ export const Header: React.FC = () => {
                 </span>
               </Link>
 
-              {/* Provider Health Status Affordance */}
+              {/* Provider Health Status Affordance — Live Telemetry */}
               <Link
                 to="/status"
                 className="hidden lg:flex items-center space-x-2 text-xs font-semibold text-text-secondary hover:text-text-primary px-2.5 py-1 border border-border-default bg-surface-raised transition-colors"
                 activeClassName="border-border-accent text-text-primary bg-surface-raised"
               >
-                <Activity className="w-3.5 h-3.5 text-status-matchExact" />
-                <span>7/7 Providers Active</span>
+                <Activity className={cn('w-3.5 h-3.5', healthBadgeColor)} />
+                <span className={isLoading ? 'animate-pulse' : ''}>{summaryLabel}</span>
               </Link>
             </div>
 
