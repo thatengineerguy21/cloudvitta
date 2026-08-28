@@ -85,9 +85,14 @@ Create directories only when their stage implementation requires them.
 │
 ├── web/                         # React, Vite, TypeScript, and Tailwind frontend SPA
 │   ├── src/                     # React source code, components, design tokens, and utilities
+│   │   ├── api/                 # fetch wrapper, RFC 7807 parsing, 401 singleflight mutex
+│   │   ├── auth/                # in-memory AuthProvider and useAuth context
+│   │   ├── components/          # layout, auth modals, and UI primitives
+│   │   ├── lib/                 # validation schemas (zod) and class merging utils
+│   │   └── types/               # generated OpenAPI types and domain honesty models
 │   ├── public/                  # Static assets (favicons, manifest)
 │   ├── index.html               # SPA HTML entry point
-│   ├── vite.config.ts           # Vite bundler configuration
+│   ├── vite.config.ts           # Vite bundler and Vitest test configuration
 │   ├── tailwind.config.js       # Tailwind 0px geometry and theme tokens
 │   ├── tsconfig.json            # TypeScript project reference root
 │   └── package.json             # Frontend dependencies and scripts
