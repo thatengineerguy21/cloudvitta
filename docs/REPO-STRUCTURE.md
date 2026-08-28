@@ -87,10 +87,10 @@ Create directories only when their stage implementation requires them.
 │   ├── src/                     # React source code, components, design tokens, and utilities
 │   │   ├── api/                 # fetch wrapper, RFC 7807 parsing, 401 mutex, TanStack Query hooks
 │   │   ├── auth/                # in-memory AuthProvider and useAuth context
-│   │   ├── components/          # layout, bento grid, honesty badges, auth modals, and compare template
+│   │   ├── components/          # layout, bento grid, honesty badges, auth modals, compare template, and calculate builder
 │   │   ├── hooks/               # custom hooks (useUrlParams two-way query synchronization)
-│   │   ├── lib/                 # formatting, query client configuration, and class merging utils
-│   │   ├── pages/               # compare category views (compute, storage, network, db, k8s, serverless)
+│   │   ├── lib/                 # formatting, workload URL serialization, query client configuration, and class merging utils
+│   │   ├── pages/               # compare category views (compute, storage, network, db, k8s, serverless) and composite calculator
 │   │   ├── router/              # HTML5 pushState/replaceState Router, Link, and location hooks
 │   │   └── types/               # generated OpenAPI types and domain honesty models
 │   ├── public/                  # Static assets (favicons, manifest)
