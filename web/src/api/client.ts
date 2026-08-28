@@ -295,26 +295,26 @@ export function buildComparisonUrl(
 
 // Typed Comparison and Calculator APIs
 export const pricesApi = {
-  getCompute: (query: ComputeQueryParams) =>
-    apiFetch<ComputeComparisonResponse>(buildComparisonUrl('/api/v1/prices/compute', query)),
+  getCompute: (query: ComputeQueryParams, options?: RequestOptions) =>
+    apiFetch<ComputeComparisonResponse>(buildComparisonUrl('/api/v1/prices/compute', query), options),
 
-  getStorage: (query: StorageQueryParams) =>
-    apiFetch<StorageComparisonResponse>(buildComparisonUrl('/api/v1/prices/storage', query)),
+  getStorage: (query: StorageQueryParams, options?: RequestOptions) =>
+    apiFetch<StorageComparisonResponse>(buildComparisonUrl('/api/v1/prices/storage', query), options),
 
-  getNetwork: (query: NetworkQueryParams) =>
-    apiFetch<NetworkComparisonResponse>(buildComparisonUrl('/api/v1/prices/network', query)),
+  getNetwork: (query: NetworkQueryParams, options?: RequestOptions) =>
+    apiFetch<NetworkComparisonResponse>(buildComparisonUrl('/api/v1/prices/network', query), options),
 
-  getDatabase: (query: DatabaseQueryParams) =>
-    apiFetch<DatabaseComparisonResponse>(buildComparisonUrl('/api/v1/prices/database', query)),
+  getDatabase: (query: DatabaseQueryParams, options?: RequestOptions) =>
+    apiFetch<DatabaseComparisonResponse>(buildComparisonUrl('/api/v1/prices/database', query), options),
 
-  getDatabaseNoSQL: (query: DatabaseNoSQLQueryParams) =>
-    apiFetch<DatabaseNoSQLComparisonResponse>(buildComparisonUrl('/api/v1/prices/database-nosql', query)),
+  getDatabaseNoSQL: (query: DatabaseNoSQLQueryParams, options?: RequestOptions) =>
+    apiFetch<DatabaseNoSQLComparisonResponse>(buildComparisonUrl('/api/v1/prices/database-nosql', query), options),
 
-  getKubernetes: (query: KubernetesQueryParams) =>
-    apiFetch<KubernetesComparisonResponse>(buildComparisonUrl('/api/v1/prices/kubernetes', query)),
+  getKubernetes: (query: KubernetesQueryParams, options?: RequestOptions) =>
+    apiFetch<KubernetesComparisonResponse>(buildComparisonUrl('/api/v1/prices/kubernetes', query), options),
 
-  getServerless: (query: ServerlessQueryParams) =>
-    apiFetch<ServerlessComparisonResponse>(buildComparisonUrl('/api/v1/prices/serverless', query)),
+  getServerless: (query: ServerlessQueryParams, options?: RequestOptions) =>
+    apiFetch<ServerlessComparisonResponse>(buildComparisonUrl('/api/v1/prices/serverless', query), options),
 };
 
 export const calculateApi = {

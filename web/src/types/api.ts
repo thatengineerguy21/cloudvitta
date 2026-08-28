@@ -47,6 +47,7 @@ export type ProviderWarning = definitions['rest.ProviderWarning'];
 export type QueryParamValue = string | number | boolean | undefined | null;
 
 export interface BaseQueryParams {
+  region?: string;
   region_group?: string;
   currency?: string;
   provider?: string;
@@ -56,6 +57,8 @@ export interface BaseQueryParams {
 export interface ComputeQueryParams extends BaseQueryParams {
   vcpu?: number | string;
   ram_gb?: number | string;
+  family?: string;
+  strict_family?: boolean | string;
 }
 
 export interface StorageQueryParams extends BaseQueryParams {
@@ -79,25 +82,28 @@ export interface DatabaseQueryParams extends BaseQueryParams {
 }
 
 export interface DatabaseNoSQLQueryParams extends BaseQueryParams {
-  data_model?: 'key_value' | 'document' | 'wide_column' | string;
-  pricing_mode?: 'on_demand' | 'provisioned' | string;
+  data_model?: 'document' | 'key_value' | 'wide_column' | 'graph' | 'multi_model' | string;
+  pricing_mode?: 'provisioned' | 'on_demand' | 'serverless' | string;
   read_units?: number | string;
   write_units?: number | string;
   storage_gb?: number | string;
+  storage_class?: string;
   multi_region?: boolean | string;
 }
 
 export interface KubernetesQueryParams extends BaseQueryParams {
-  tier?: 'standard' | 'enterprise' | string;
-  cluster_topology?: 'regional' | 'zonal' | string;
+  tier?: 'free' | 'standard' | 'extended_support' | string;
+  cluster_topology?: 'zonal' | 'regional' | 'autopilot' | string;
 }
 
 export interface ServerlessQueryParams extends BaseQueryParams {
-  tier?: 'standard' | 'provisioned' | string;
-  cpu_architecture?: 'x86_64' | 'arm64' | string;
+  architecture?: 'x86_64' | 'arm64' | string;
+  cpu_architecture?: string;
+  tier?: 'consumption' | 'flex_consumption' | '1st_gen' | '2nd_gen' | string;
   requests_per_month?: number | string;
-  duration_ms?: number | string;
   memory_mb?: number | string;
+  execution_duration_ms?: number | string;
+  duration_ms?: number | string;
 }
 
 // RFC 7807 Error Definition

@@ -3,21 +3,23 @@ import React, { useState } from 'react';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { AuthModal } from '../auth/AuthModal';
 import { useAuth } from '../../auth/AuthContext';
+import { Link, useLocation } from '../../router';
 import { ExternalLink, Activity, User, LogOut } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { pathname } = useLocation();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const navCategories = [
-    { label: 'Compute', href: '#/compare/compute' },
-    { label: 'Storage', href: '#/compare/storage' },
-    { label: 'Network', href: '#/compare/network' },
-    { label: 'RDBMS', href: '#/compare/database' },
-    { label: 'NoSQL', href: '#/compare/database-nosql' },
-    { label: 'Kubernetes', href: '#/compare/kubernetes' },
-    { label: 'Serverless', href: '#/compare/serverless' },
-    { label: 'Calculate', href: '#/calculate' },
+    { label: 'Compute', href: '/compare/compute' },
+    { label: 'Storage', href: '/compare/storage' },
+    { label: 'Network', href: '/compare/network' },
+    { label: 'RDBMS', href: '/compare/database' },
+    { label: 'NoSQL', href: '/compare/database-nosql' },
+    { label: 'Kubernetes', href: '/compare/kubernetes' },
+    { label: 'Serverless', href: '/compare/serverless' },
+    { label: 'Calculate', href: '/calculate' },
   ];
 
   return (
@@ -27,36 +29,44 @@ export const Header: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             {/* Brand Logo & Name */}
             <div className="flex items-center space-x-6">
-              <a href="#/" className="flex items-center space-x-3">
+              <Link to="/" className="flex items-center space-x-3" exact>
                 <span className="font-display text-2xl font-bold tracking-tight text-text-primary">
                   CloudVitta
                 </span>
                 <span className="text-xs uppercase tracking-widest px-1.5 py-0.5 border border-border-accent text-border-accent font-bold">
                   API Engine
                 </span>
-              </a>
+              </Link>
 
               {/* Provider Health Status Affordance */}
-              <a
-                href="#/status"
+              <Link
+                to="/status"
                 className="hidden lg:flex items-center space-x-2 text-xs font-semibold text-text-secondary hover:text-text-primary px-2.5 py-1 border border-border-default bg-surface-raised transition-colors"
+                activeClassName="border-border-accent text-text-primary bg-surface-raised"
               >
                 <Activity className="w-3.5 h-3.5 text-status-matchExact" />
                 <span>7/7 Providers Active</span>
-              </a>
+              </Link>
             </div>
 
             {/* Navigation Links */}
             <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
-              {navCategories.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className="px-2.5 py-1 text-xs uppercase font-bold tracking-wider text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                >
-                  {item.label}
-                </a>
-              ))}
+              {navCategories.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.href}
+                    className={`px-2.5 py-1 text-xs uppercase font-bold tracking-wider transition-colors border ${
+                      isActive
+                        ? 'border-border-accent text-text-primary bg-surface-raised'
+                        : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-raised'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
 
             {/* Action Bar (Auth, Swagger, Theme Toggle) */}

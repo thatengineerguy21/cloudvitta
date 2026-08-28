@@ -3,6 +3,7 @@ import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Header } from '../Header';
 import { AuthProvider } from '../../../auth/AuthContext';
+import { Router } from '../../../router';
 import { authApi } from '../../../api/client';
 
 describe('Header Component', () => {
@@ -12,9 +13,11 @@ describe('Header Component', () => {
 
   it('renders branding, 7 category links, calculate, swagger, and theme toggle', () => {
     render(
-      <AuthProvider>
-        <Header />
-      </AuthProvider>
+      <Router>
+        <AuthProvider>
+          <Header />
+        </AuthProvider>
+      </Router>
     );
 
     expect(screen.getByText('CloudVitta')).toBeInTheDocument();
@@ -33,9 +36,11 @@ describe('Header Component', () => {
   it('renders Sign In button when unauthenticated and opens AuthModal on click', async () => {
     const user = userEvent.setup();
     render(
-      <AuthProvider>
-        <Header />
-      </AuthProvider>
+      <Router>
+        <AuthProvider>
+          <Header />
+        </AuthProvider>
+      </Router>
     );
 
     const signInBtn = screen.getByRole('button', { name: /sign in/i });
@@ -59,9 +64,11 @@ describe('Header Component', () => {
     vi.spyOn(authApi, 'logout').mockResolvedValue({ message: 'revoked' });
 
     render(
-      <AuthProvider>
-        <Header />
-      </AuthProvider>
+      <Router>
+        <AuthProvider>
+          <Header />
+        </AuthProvider>
+      </Router>
     );
 
     // Open AuthModal
