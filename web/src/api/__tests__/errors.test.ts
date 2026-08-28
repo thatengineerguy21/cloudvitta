@@ -102,7 +102,7 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage(err)).toBe('Rate limit exceeded. Please wait a moment before trying again.');
   });
 
-  it('returns upstream provider unavailable message for 502/503', () => {
+  it('returns API unavailable message for 502/503', () => {
     const err502 = new ApiError({
       type: 'https://cloudvitta.dev/errors/bad-gateway',
       title: 'Bad Gateway',
@@ -117,8 +117,8 @@ describe('getErrorMessage', () => {
       detail: '',
       instance: '/api/v1/prices/storage',
     });
-    expect(getErrorMessage(err502)).toBe('Cloud provider service is temporarily unavailable. Please retry shortly.');
-    expect(getErrorMessage(err503)).toBe('Cloud provider service is temporarily unavailable. Please retry shortly.');
+    expect(getErrorMessage(err502)).toBe('The CloudVitta API is temporarily unreachable. Please retry shortly.');
+    expect(getErrorMessage(err503)).toBe('The CloudVitta API is temporarily unreachable. Please retry shortly.');
   });
 
   it('handles standard Error and AbortError', () => {

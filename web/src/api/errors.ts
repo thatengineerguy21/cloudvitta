@@ -41,8 +41,10 @@ export function getErrorMessage(error: unknown): string {
     if (error.status === 429) {
       return 'Rate limit exceeded. Please wait a moment before trying again.';
     }
+    // Upstream provider fetch failures return HTTP 200 with warnings[].code: "fetch_failed" (12-API-CONTRACT.md).
+    // A 502/503 from this API indicates that the CloudVitta API gateway or service itself is unreachable.
     if (error.status === 502 || error.status === 503) {
-      return 'Cloud provider service is temporarily unavailable. Please retry shortly.';
+      return 'The CloudVitta API is temporarily unreachable. Please retry shortly.';
     }
     return error.detail || error.title || `API error (${error.status})`;
   }

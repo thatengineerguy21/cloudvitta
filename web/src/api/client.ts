@@ -1,5 +1,5 @@
 import { ApiError } from './errors';
-import type { RFC7807ProblemDetails, AuthTokens } from '../types';
+import type { RFC7807ProblemDetails, AuthTokens, Provider } from '../types';
 import {
   setAuthTokenProvider,
   getAuthTokenProvider,
@@ -24,6 +24,14 @@ import type {
   DatabaseNoSQLComparisonResponse,
   KubernetesComparisonResponse,
   ServerlessComparisonResponse,
+  ComputeQueryParams,
+  StorageQueryParams,
+  NetworkQueryParams,
+  DatabaseQueryParams,
+  DatabaseNoSQLQueryParams,
+  KubernetesQueryParams,
+  ServerlessQueryParams,
+  QueryParamValue,
 } from '../types/api';
 
 export { setAuthTokenProvider };
@@ -50,22 +58,47 @@ export function mapAuthTokens(res: LoginResponse | RefreshResponse): AuthTokens 
 }
 
 /**
- * Combines timeout signal with any caller-supplied AbortSignal without discarding user cancellation.
+ * Combines timeout signal with any caller-supplied AbortSignal without discarding user cancellation or leaking listeners.
  */
-function combineSignals(timeoutSignal: AbortSignal, callerSignal?: AbortSignal | null): AbortSignal {
-  if (!callerSignal) return timeoutSignal;
+export function combineSignals(
+  timeoutSignal: AbortSignal,
+  callerSignal?: AbortSignal | null
+): { signal: AbortSignal; cleanup: () => void } {
+  if (!callerSignal) {
+    return { signal: timeoutSignal, cleanup: () => {} };
+  }
+
+  // If AbortSignal.any is natively available, use it (no listener cleanup required)
   if (typeof AbortSignal !== 'undefined' && 'any' in AbortSignal && typeof AbortSignal.any === 'function') {
-    return AbortSignal.any([timeoutSignal, callerSignal]);
+    return {
+      signal: AbortSignal.any([timeoutSignal, callerSignal]),
+      cleanup: () => {},
+    };
   }
+
+  // Fallback for environments without AbortSignal.any
   const controller = new AbortController();
-  const onAbort = () => controller.abort();
-  if (timeoutSignal.aborted || callerSignal.aborted) {
-    controller.abort();
-    return controller.signal;
+  if (timeoutSignal.aborted) {
+    controller.abort(timeoutSignal.reason);
+    return { signal: controller.signal, cleanup: () => {} };
   }
-  timeoutSignal.addEventListener('abort', onAbort, { once: true });
-  callerSignal.addEventListener('abort', onAbort, { once: true });
-  return controller.signal;
+  if (callerSignal.aborted) {
+    controller.abort(callerSignal.reason);
+    return { signal: controller.signal, cleanup: () => {} };
+  }
+
+  const onTimeoutAbort = () => controller.abort(timeoutSignal.reason);
+  const onCallerAbort = () => controller.abort(callerSignal.reason);
+
+  timeoutSignal.addEventListener('abort', onTimeoutAbort, { once: true });
+  callerSignal.addEventListener('abort', onCallerAbort, { once: true });
+
+  const cleanup = () => {
+    timeoutSignal.removeEventListener('abort', onTimeoutAbort);
+    callerSignal.removeEventListener('abort', onCallerAbort);
+  };
+
+  return { signal: controller.signal, cleanup };
 }
 
 /**
@@ -97,10 +130,13 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  // Configure request timeout signal and combine with caller signal
+  // Configure request timeout signal and combine with caller signal without leaking listeners
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
-  const activeSignal = combineSignals(timeoutController.signal, callerSignal);
+  const { signal: activeSignal, cleanup: cleanupSignals } = combineSignals(
+    timeoutController.signal,
+    callerSignal
+  );
 
   const url = `${BASE_URL}${endpoint}`;
 
@@ -110,8 +146,6 @@ export async function apiFetch<T>(
       headers,
       signal: activeSignal,
     });
-
-    clearTimeout(timeoutId);
 
     // Handle 401 Unauthorized with singleflight refresh
     if (response.status === 401 && !_retry && !skipAuth && tokenProvider?.getRefreshToken()) {
@@ -180,7 +214,6 @@ export async function apiFetch<T>(
 
     return (await response.json()) as T;
   } catch (err: unknown) {
-    clearTimeout(timeoutId);
     if (err instanceof ApiError) {
       throw err;
     }
@@ -205,6 +238,9 @@ export async function apiFetch<T>(
       detail: (err as Error)?.message || 'Failed to communicate with the CloudVitta API server',
       instance: endpoint,
     });
+  } finally {
+    clearTimeout(timeoutId);
+    cleanupSignals();
   }
 }
 
@@ -241,34 +277,44 @@ export const authApi = {
 
 // Typed Provider Status API
 export const providerApi = {
-  getStatus: (provider: string) =>
+  getStatus: (provider: Provider) =>
     apiFetch<ProviderStatusResponse>(`/api/v1/providers/${encodeURIComponent(provider)}/status`, {
       method: 'GET',
     }),
 };
 
+/**
+ * Builds comparison endpoint URLs with filtered query parameters.
+ */
+export function buildComparisonUrl(
+  path: string,
+  query: Record<string, QueryParamValue>
+): string {
+  return `${path}?${new URLSearchParams(cleanQueryParams(query))}`;
+}
+
 // Typed Comparison and Calculator APIs
 export const pricesApi = {
-  getCompute: (query: Record<string, string | number | boolean | undefined>) =>
-    apiFetch<ComputeComparisonResponse>(`/api/v1/prices/compute?${new URLSearchParams(cleanQueryParams(query))}`),
+  getCompute: (query: ComputeQueryParams) =>
+    apiFetch<ComputeComparisonResponse>(buildComparisonUrl('/api/v1/prices/compute', query)),
 
-  getStorage: (query: Record<string, string | number | boolean | undefined>) =>
-    apiFetch<StorageComparisonResponse>(`/api/v1/prices/storage?${new URLSearchParams(cleanQueryParams(query))}`),
+  getStorage: (query: StorageQueryParams) =>
+    apiFetch<StorageComparisonResponse>(buildComparisonUrl('/api/v1/prices/storage', query)),
 
-  getNetwork: (query: Record<string, string | number | boolean | undefined>) =>
-    apiFetch<NetworkComparisonResponse>(`/api/v1/prices/network?${new URLSearchParams(cleanQueryParams(query))}`),
+  getNetwork: (query: NetworkQueryParams) =>
+    apiFetch<NetworkComparisonResponse>(buildComparisonUrl('/api/v1/prices/network', query)),
 
-  getDatabase: (query: Record<string, string | number | boolean | undefined>) =>
-    apiFetch<DatabaseComparisonResponse>(`/api/v1/prices/database?${new URLSearchParams(cleanQueryParams(query))}`),
+  getDatabase: (query: DatabaseQueryParams) =>
+    apiFetch<DatabaseComparisonResponse>(buildComparisonUrl('/api/v1/prices/database', query)),
 
-  getDatabaseNoSQL: (query: Record<string, string | number | boolean | undefined>) =>
-    apiFetch<DatabaseNoSQLComparisonResponse>(`/api/v1/prices/database-nosql?${new URLSearchParams(cleanQueryParams(query))}`),
+  getDatabaseNoSQL: (query: DatabaseNoSQLQueryParams) =>
+    apiFetch<DatabaseNoSQLComparisonResponse>(buildComparisonUrl('/api/v1/prices/database-nosql', query)),
 
-  getKubernetes: (query: Record<string, string | number | boolean | undefined>) =>
-    apiFetch<KubernetesComparisonResponse>(`/api/v1/prices/kubernetes?${new URLSearchParams(cleanQueryParams(query))}`),
+  getKubernetes: (query: KubernetesQueryParams) =>
+    apiFetch<KubernetesComparisonResponse>(buildComparisonUrl('/api/v1/prices/kubernetes', query)),
 
-  getServerless: (query: Record<string, string | number | boolean | undefined>) =>
-    apiFetch<ServerlessComparisonResponse>(`/api/v1/prices/serverless?${new URLSearchParams(cleanQueryParams(query))}`),
+  getServerless: (query: ServerlessQueryParams) =>
+    apiFetch<ServerlessComparisonResponse>(buildComparisonUrl('/api/v1/prices/serverless', query)),
 };
 
 export const calculateApi = {
@@ -279,7 +325,7 @@ export const calculateApi = {
     }),
 };
 
-function cleanQueryParams(params: Record<string, string | number | boolean | undefined>): Record<string, string> {
+function cleanQueryParams(params: Record<string, QueryParamValue>): Record<string, string> {
   const result: Record<string, string> = {};
   Object.entries(params).forEach(([key, val]) => {
     if (val !== undefined && val !== null && val !== '') {
@@ -288,3 +334,4 @@ function cleanQueryParams(params: Record<string, string | number | boolean | und
   });
   return result;
 }
+

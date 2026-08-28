@@ -331,4 +331,36 @@ describe('apiFetch & client wrappers', () => {
 
     await expect(promise).rejects.toThrow('The operation was aborted');
   });
+
+  it('removes event listeners from caller AbortSignal on request completion in fallback combiner', async () => {
+    const callerController = new AbortController();
+    const addSpy = vi.spyOn(callerController.signal, 'addEventListener');
+    const removeSpy = vi.spyOn(callerController.signal, 'removeEventListener');
+
+    const globalFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: vi.fn().mockResolvedValue({ status: 'healthy' }),
+    });
+    vi.stubGlobal('fetch', globalFetch);
+
+    // Force fallback path by temporarily removing AbortSignal.any if present
+    const originalAny = (AbortSignal as unknown as { any?: unknown }).any;
+    delete (AbortSignal as unknown as { any?: unknown }).any;
+
+    try {
+      await apiFetch('/api/v1/providers/aws/status', {
+        signal: callerController.signal,
+      });
+
+      expect(addSpy).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
+      expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+      expect(addSpy.mock.calls.length).toBe(removeSpy.mock.calls.length);
+    } finally {
+      if (originalAny) {
+        (AbortSignal as unknown as { any?: unknown }).any = originalAny;
+      }
+    }
+  });
 });

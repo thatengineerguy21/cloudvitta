@@ -64,32 +64,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setFieldErrors({});
     setApiError(null);
 
-    if (mode === 'login') {
-      const result = loginSchema.safeParse({ email, password });
-      if (!result.success) {
-        setFieldErrors(formatZodErrors(result.error.issues));
-        return;
-      }
+    const isLogin = mode === 'login';
+    const formConfig = isLogin
+      ? {
+          schema: loginSchema,
+          data: { email, password },
+          action: () => login(email, password),
+        }
+      : {
+          schema: signupSchema,
+          data: { email, password, confirmPassword },
+          action: () => signup(email, password),
+        };
 
-      try {
-        await login(email, password);
-        onClose();
-      } catch (err) {
-        setApiError(getErrorMessage(err));
-      }
-    } else {
-      const result = signupSchema.safeParse({ email, password, confirmPassword });
-      if (!result.success) {
-        setFieldErrors(formatZodErrors(result.error.issues));
-        return;
-      }
+    const validation = formConfig.schema.safeParse(formConfig.data);
+    if (!validation.success) {
+      setFieldErrors(formatZodErrors(validation.error.issues));
+      return;
+    }
 
-      try {
-        await signup(email, password);
-        onClose();
-      } catch (err) {
-        setApiError(getErrorMessage(err));
-      }
+    try {
+      await formConfig.action();
+      onClose();
+    } catch (err) {
+      setApiError(getErrorMessage(err));
     }
   };
 
