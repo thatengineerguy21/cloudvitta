@@ -318,8 +318,9 @@ export const pricesApi = {
 };
 
 export const calculateApi = {
-  calculate: (body: CalculateRequestBody) =>
+  calculate: (body: CalculateRequestBody, options?: RequestOptions) =>
     apiFetch<CalculateResponse>('/api/v1/calculate', {
+      ...options,
       method: 'POST',
       body: JSON.stringify(body),
     }),

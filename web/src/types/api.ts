@@ -43,6 +43,16 @@ export type ServerlessComparisonResponse = definitions['rest.ServerlessCompariso
 export type PriceDetail = definitions['rest.PriceDetail'];
 export type ProviderWarning = definitions['rest.ProviderWarning'];
 
+// Domain Attribute Types for Workloads
+export type ComputeAttributes = definitions['domain.ComputeAttributes'];
+export type StorageAttributes = definitions['domain.StorageAttributes'];
+export type NetworkAttributes = definitions['domain.NetworkAttributes'];
+export type DatabaseRDBMSAttributes = definitions['domain.DatabaseRDBMSAttributes'];
+export type DatabaseNoSQLAttributes = definitions['domain.DatabaseNoSQLAttributes'];
+export type KubernetesAttributes = definitions['domain.KubernetesAttributes'];
+export type ServerlessWorkloadPayload = definitions['rest.ServerlessWorkloadPayload'];
+export type ServerlessRateAttributes = definitions['domain.ServerlessRateAttributes'];
+
 // Query Parameter Interfaces for Comparison APIs
 export type QueryParamValue = string | number | boolean | undefined | null;
 

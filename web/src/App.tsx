@@ -17,6 +17,7 @@ import {
   KubernetesCompare,
   ServerlessCompare,
 } from './pages/compare';
+import { CalculatePage } from './pages/CalculatePage';
 import { ArrowRight, Server, Database, Network, Box, Cpu, HardDrive } from 'lucide-react';
 
 interface CategoryCardItem {
@@ -98,19 +99,7 @@ export const AppRoutes: React.FC = () => {
     case '/compare/serverless':
       return <ServerlessCompare />;
     case '/calculate':
-      return (
-        <div className="border border-border-default bg-surface-card p-8 space-y-4">
-          <span className="text-xs uppercase tracking-widest text-border-accent font-bold">
-            Sub-Stage 5.5 &bull; Composite Calculator
-          </span>
-          <h1 className="font-display text-3xl font-medium text-text-primary">
-            Composite Workload Calculator
-          </h1>
-          <p className="text-xs text-text-secondary max-w-2xl">
-            Configure full multi-category architectures across compute, storage, databases, and containers in a single request with strict ADR 0022 Honesty Contract enforcement.
-          </p>
-        </div>
-      );
+      return <CalculatePage />;
     case '/status':
       return (
         <div className="border border-border-default bg-surface-card p-8 space-y-4">
