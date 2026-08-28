@@ -3,7 +3,10 @@ import React from 'react';
 import { Link } from '../router';
 import { BentoCard, BentoCardProps } from '../components/bento/BentoCard';
 import { BentoGrid } from '../components/bento/BentoGrid';
-import { useProviderHealthSummary, type HealthSummaryState } from '../api/queries/useProviderStatusQueries';
+import {
+  useProviderHealthSummary,
+  HEALTH_BADGE_COLORS,
+} from '../api/queries/useProviderStatusQueries';
 import { cn } from '../lib/utils';
 import {
   ArrowRight,
@@ -79,13 +82,6 @@ const CATEGORY_CARDS: CategoryCardItem[] = [
   },
 ];
 
-const HEALTH_BADGE_COLORS: Record<HealthSummaryState, string> = {
-  healthy: 'text-status-matchExact',
-  degraded: 'text-status-stale',
-  error: 'text-status-anomaly',
-  loading: 'text-text-secondary',
-};
-
 /**
  * Landing Page (`/`).
  * Instant load time with zero blocking API dependencies.
@@ -156,13 +152,13 @@ export const LandingPage: React.FC = () => {
             </div>
           }
           footer={
-            <Link
-              to="/compare/compute"
+            <a
+              href="#category-grid"
               className="inline-flex items-center space-x-1.5 text-xs uppercase font-bold tracking-wider text-border-accent hover:text-text-primary transition-colors"
             >
-              <span>Start Comparing</span>
+              <span>Select Category</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            </a>
           }
         >
           <p className="text-xs text-text-secondary pt-1">
@@ -199,37 +195,39 @@ export const LandingPage: React.FC = () => {
       </BentoGrid>
 
       {/* 7 Category Cards */}
-      <BentoGrid columns={12} gap="md">
-        {CATEGORY_CARDS.map((cat) => {
-          const Icon = cat.icon;
-          return (
-            <BentoCard
-              key={cat.title}
-              colSpan={cat.colSpan}
-              isHoverable
-              header={
-                <div className="flex items-center space-x-2">
-                  <Icon className="w-4 h-4 text-border-accent" />
-                  <span className="font-display text-lg font-medium text-text-primary">
-                    {cat.title}
-                  </span>
-                </div>
-              }
-              footer={
-                <Link
-                  to={cat.href}
-                  className="inline-flex items-center space-x-1.5 text-xs uppercase font-bold tracking-wider text-border-accent hover:text-text-primary transition-colors"
-                >
-                  <span>Open Comparison</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              }
-            >
-              <p className="text-xs text-text-secondary pt-1">{cat.desc}</p>
-            </BentoCard>
-          );
-        })}
-      </BentoGrid>
+      <div id="category-grid" className="scroll-mt-20">
+        <BentoGrid columns={12} gap="md">
+          {CATEGORY_CARDS.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <BentoCard
+                key={cat.title}
+                colSpan={cat.colSpan}
+                isHoverable
+                header={
+                  <div className="flex items-center space-x-2">
+                    <Icon className="w-4 h-4 text-border-accent" />
+                    <span className="font-display text-lg font-medium text-text-primary">
+                      {cat.title}
+                    </span>
+                  </div>
+                }
+                footer={
+                  <Link
+                    to={cat.href}
+                    className="inline-flex items-center space-x-1.5 text-xs uppercase font-bold tracking-wider text-border-accent hover:text-text-primary transition-colors"
+                  >
+                    <span>Open Comparison</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                }
+              >
+                <p className="text-xs text-text-secondary pt-1">{cat.desc}</p>
+              </BentoCard>
+            );
+          })}
+        </BentoGrid>
+      </div>
     </div>
   );
 };

@@ -70,4 +70,11 @@ describe('LandingPage', () => {
     const githubLink = screen.getByText('GitHub').closest('a');
     expect(githubLink).toHaveAttribute('href', 'https://github.com/thatengineerguy21/cloudvitta');
   });
+
+  it('anchors category selection CTA to category grid', () => {
+    render(<LandingPage />, { wrapper: createWrapper() });
+
+    const ctaLink = screen.getByText('Select Category').closest('a');
+    expect(ctaLink).toHaveAttribute('href', '#category-grid');
+  });
 });

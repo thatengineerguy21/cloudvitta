@@ -56,6 +56,14 @@ export function useAllProviderStatuses(): AllProviderStatuses {
 
 export type HealthSummaryState = 'loading' | 'healthy' | 'degraded' | 'error';
 
+/** Maps health summary states to text color tokens. */
+export const HEALTH_BADGE_COLORS: Record<HealthSummaryState, string> = {
+  healthy: 'text-status-matchExact',
+  degraded: 'text-status-stale',
+  error: 'text-status-anomaly',
+  loading: 'text-text-secondary',
+};
+
 export interface ProviderHealthSummary {
   total: number;
   healthyCount: number;
@@ -122,15 +130,15 @@ export function useProviderHealthSummary(): ProviderHealthSummary {
   if (isLoading) {
     summaryState = 'loading';
     summaryLabel = 'Checking...';
-  } else if (allErrored) {
+  } else if (allErrored || errorCount === total) {
     summaryState = 'error';
     summaryLabel = 'Telemetry Offline';
-  } else if (degradedCount === 0 && errorCount === 0) {
+  } else if (healthyCount === total) {
     summaryState = 'healthy';
     summaryLabel = `${total}/${total} Providers Active`;
   } else {
     summaryState = 'degraded';
-    const activeCount = healthyCount + notIngestedCount;
+    const activeCount = healthyCount;
     summaryLabel = `${activeCount}/${total} Active`;
   }
 

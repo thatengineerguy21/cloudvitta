@@ -5,15 +5,11 @@ import { AuthModal } from '../auth/AuthModal';
 import { useAuth } from '../../auth/AuthContext';
 import { Link, useLocation } from '../../router';
 import { cn } from '../../lib/utils';
-import { useProviderHealthSummary, type HealthSummaryState } from '../../api/queries/useProviderStatusQueries';
+import {
+  useProviderHealthSummary,
+  HEALTH_BADGE_COLORS,
+} from '../../api/queries/useProviderStatusQueries';
 import { ExternalLink, Activity, User, LogOut } from 'lucide-react';
-
-const HEALTH_BADGE_COLORS: Record<HealthSummaryState, string> = {
-  healthy: 'text-status-matchExact',
-  degraded: 'text-status-stale',
-  error: 'text-status-anomaly',
-  loading: 'text-text-secondary',
-};
 
 export const Header: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();

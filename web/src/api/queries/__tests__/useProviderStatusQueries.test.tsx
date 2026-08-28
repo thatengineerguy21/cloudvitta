@@ -116,6 +116,7 @@ describe('useProviderStatusQueries', () => {
       expect(result.current.summaryState).toBe('degraded');
       expect(result.current.degradedCount).toBe(2);
       expect(result.current.healthyCount).toBe(5);
+      expect(result.current.summaryLabel).toBe('5/7 Active');
     });
 
     it('calculates error when all queries fail', async () => {
@@ -134,7 +135,7 @@ describe('useProviderStatusQueries', () => {
       expect(result.current.errorCount).toBe(7);
     });
 
-    it('includes not_yet_ingested in active count for healthy summary', async () => {
+    it('reports not_yet_ingested providers as degraded and reports activeCount accurately', async () => {
       vi.spyOn(providerApi, 'getStatus').mockImplementation((provider) => {
         if (provider === 'oracle' || provider === 'ibm') {
           return Promise.resolve(mockStatus(provider, 'not_yet_ingested'));
@@ -150,10 +151,54 @@ describe('useProviderStatusQueries', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      // All reachable, no stale/degraded/blocked, so should be healthy
-      expect(result.current.summaryState).toBe('healthy');
+      expect(result.current.summaryState).toBe('degraded');
       expect(result.current.notIngestedCount).toBe(2);
       expect(result.current.healthyCount).toBe(5);
+      expect(result.current.summaryLabel).toBe('5/7 Active');
+    });
+
+    it('escalates to degraded when a provider is blocked due to DLQ failure coexisting with healthy providers', async () => {
+      vi.spyOn(providerApi, 'getStatus').mockImplementation((provider) => {
+        if (provider === 'digitalocean') {
+          return Promise.resolve(mockStatus(provider, 'blocked'));
+        }
+        return Promise.resolve(mockStatus(provider, 'healthy'));
+      });
+
+      const { result } = renderHook(() => useProviderHealthSummary(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.summaryState).toBe('degraded');
+      expect(result.current.errorCount).toBe(1);
+      expect(result.current.healthyCount).toBe(6);
+      expect(result.current.summaryLabel).toBe('6/7 Active');
+    });
+
+    it('escalates to degraded on partial query network failures', async () => {
+      vi.spyOn(providerApi, 'getStatus').mockImplementation((provider) => {
+        if (provider === 'azure' || provider === 'gcp') {
+          return Promise.reject(new Error('Connection timeout'));
+        }
+        return Promise.resolve(mockStatus(provider, 'healthy'));
+      });
+
+      const { result } = renderHook(() => useProviderHealthSummary(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.summaryState).toBe('degraded');
+      expect(result.current.errorCount).toBe(2);
+      expect(result.current.healthyCount).toBe(5);
+      expect(result.current.summaryLabel).toBe('5/7 Active');
     });
   });
 });

@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { useProviderStatus } from '../../api/queries/useProviderStatusQueries';
 import { ProviderStatusSkeleton } from './ProviderStatusSkeleton';
 import { WarningsBanner } from '../honesty/WarningsBanner';
+import { formatRelativeTime } from '../../lib/format';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import type { Provider } from '../../types';
 import type { CategoryStatusResponse, DLQStatusResponse } from '../../types/api';
@@ -31,20 +32,6 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   blocked: 'bg-status-anomaly/10 text-status-anomaly border-status-anomaly',
   not_yet_ingested: 'bg-surface-raised text-text-secondary border-border-default',
 };
-
-/**
- * Formats an ISO 8601 timestamp into a human-readable relative time string.
- * All computation uses the backend-provided timestamp — zero client-side arithmetic.
- */
-function formatRelativeTime(isoString: string): string {
-  const diffMs = Date.now() - new Date(isoString).getTime();
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const days = Math.floor(hours / 24);
-
-  if (hours < 1) return 'Less than 1 hour ago';
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-}
 
 /**
  * Renders the status of a single cloud provider.

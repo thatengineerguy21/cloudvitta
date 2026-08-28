@@ -7,11 +7,12 @@ import { CardErrorBoundary } from '../components/common/CardErrorBoundary';
 import {
   ALL_PROVIDERS,
   useProviderHealthSummary,
+  type HealthSummaryState,
 } from '../api/queries/useProviderStatusQueries';
 import { cn } from '../lib/utils';
 import { Activity } from 'lucide-react';
 
-const SUMMARY_STATE_COLORS: Record<string, string> = {
+const SUMMARY_STATE_COLORS: Record<HealthSummaryState, string> = {
   healthy: 'text-status-matchExact border-status-matchExact',
   degraded: 'text-status-stale border-status-stale',
   error: 'text-status-anomaly border-status-anomaly',
@@ -26,7 +27,7 @@ const SUMMARY_STATE_COLORS: Record<string, string> = {
  */
 export const ProviderStatusPage: React.FC = () => {
   const { summaryState, summaryLabel, isLoading } = useProviderHealthSummary();
-  const stateColor = SUMMARY_STATE_COLORS[summaryState] || SUMMARY_STATE_COLORS.loading;
+  const stateColor = SUMMARY_STATE_COLORS[summaryState];
 
   return (
     <div className="space-y-6" data-testid="provider-status-page">
