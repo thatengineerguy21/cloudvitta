@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TextInput } from '../TextInput';
 import { NumberInput } from '../NumberInput';
 import { SelectInput } from '../SelectInput';
+import { FormField } from '../FormField';
 
 describe('Form Controls (TextInput, NumberInput, SelectInput)', () => {
   describe('TextInput', () => {
@@ -65,6 +66,29 @@ describe('Form Controls (TextInput, NumberInput, SelectInput)', () => {
 
       fireEvent.change(select, { target: { value: 'eu-west' } });
       expect(handleChange).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('FormField', () => {
+    it('renders label, children, error, and helperText correctly', () => {
+      const { rerender } = render(
+        <FormField label="Storage Capacity" htmlFor="storage-cap" helperText="Capacity in GB">
+          <input id="storage-cap" />
+        </FormField>
+      );
+
+      expect(screen.getByText('Storage Capacity')).toBeInTheDocument();
+      expect(screen.getByText('Capacity in GB')).toBeInTheDocument();
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+
+      rerender(
+        <FormField label="Storage Capacity" htmlFor="storage-cap" error="Value must be positive">
+          <input id="storage-cap" />
+        </FormField>
+      );
+
+      expect(screen.getByText('Value must be positive')).toBeInTheDocument();
+      expect(screen.queryByText('Capacity in GB')).not.toBeInTheDocument();
     });
   });
 });

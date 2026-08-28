@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
+import { FormField } from './FormField';
 
 export interface TextInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -12,15 +13,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
     return (
-      <div className="flex flex-col space-y-1.5 w-full">
-        {label && (
-          <label
-            htmlFor={inputId}
-            className="text-xs uppercase font-bold tracking-widest text-text-secondary"
-          >
-            {label}
-          </label>
-        )}
+      <FormField label={label} htmlFor={inputId} error={error} helperText={helperText}>
         <input
           ref={ref}
           id={inputId}
@@ -32,11 +25,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(
           )}
           {...props}
         />
-        {error && <span className="text-xs text-status-anomaly font-medium">{error}</span>}
-        {!error && helperText && (
-          <span className="text-xs text-text-secondary font-normal">{helperText}</span>
-        )}
-      </div>
+      </FormField>
     );
   }
 );

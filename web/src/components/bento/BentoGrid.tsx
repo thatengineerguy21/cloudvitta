@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 export interface BentoGridProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   columns?: 12 | 6 | 4 | 3;
-  gap?: 'none' | 'sm' | 'md' | 'lg';
+  gap?: 'none' | '1px' | '12px' | 'sm' | 'md' | 'lg';
 }
 
 export const BentoGrid: React.FC<BentoGridProps> = ({
@@ -23,6 +23,8 @@ export const BentoGrid: React.FC<BentoGridProps> = ({
 
   const gapClasses: Record<string, string> = {
     none: 'gap-0',
+    '1px': 'gap-px',
+    '12px': 'gap-3',
     sm: 'gap-2',
     md: 'gap-4',
     lg: 'gap-6',

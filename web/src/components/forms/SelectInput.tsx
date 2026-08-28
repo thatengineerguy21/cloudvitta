@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 import { ChevronDown } from 'lucide-react';
+import { FormField } from './FormField';
 
 export interface SelectOption {
   value: string;
@@ -20,15 +21,7 @@ export const SelectInput = React.forwardRef<HTMLSelectElement, SelectInputProps>
     const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
     return (
-      <div className="flex flex-col space-y-1.5 w-full">
-        {label && (
-          <label
-            htmlFor={selectId}
-            className="text-xs uppercase font-bold tracking-widest text-text-secondary"
-          >
-            {label}
-          </label>
-        )}
+      <FormField label={label} htmlFor={selectId} error={error} helperText={helperText}>
         <div className="relative">
           <select
             ref={ref}
@@ -57,11 +50,7 @@ export const SelectInput = React.forwardRef<HTMLSelectElement, SelectInputProps>
             aria-hidden="true"
           />
         </div>
-        {error && <span className="text-xs text-status-anomaly font-medium">{error}</span>}
-        {!error && helperText && (
-          <span className="text-xs text-text-secondary font-normal">{helperText}</span>
-        )}
-      </div>
+      </FormField>
     );
   }
 );
