@@ -194,4 +194,47 @@ describe('CalculateResultsMatrix & ADR 0022 Honesty Contract', () => {
     // AWS (complete) must appear before GCP (partial) in document order
     expect(awsBadge.compareDocumentPosition(gcpBadge)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
+
+  it('pins composite total currency to USD even when non-USD currency is requested (Honesty Contract)', () => {
+    render(
+      <CalculateResultsMatrix
+        results={mockResults}
+        requestedCategories={['compute', 'storage']}
+        currency="EUR"
+      />
+    );
+
+    const completeTotalAws = screen.getByTestId('complete-total-aws');
+    expect(completeTotalAws).toHaveTextContent('USD 0.2540');
+    expect(completeTotalAws).not.toHaveTextContent('EUR');
+
+    const partialTotalGcp = screen.getByTestId('partial-total-gcp');
+    expect(partialTotalGcp).toHaveTextContent('USD 0.1280');
+    expect(partialTotalGcp).not.toHaveTextContent('EUR');
+  });
+
+  it('renders anomaly flag in expanded category breakdown when provider has pricing_anomaly_flagged warning', () => {
+    const anomalyWarnings: ProviderWarning[] = [
+      {
+        provider: 'aws',
+        code: 'pricing_anomaly_flagged',
+        message: 'AWS compute price jumped >10x and is flagged pending review.',
+      },
+    ];
+
+    render(
+      <CalculateResultsMatrix
+        results={mockResults}
+        warnings={anomalyWarnings}
+        requestedCategories={['compute', 'storage']}
+        currency="USD"
+      />
+    );
+
+    // Expand AWS card to inspect component breakdown
+    const expandAwsBtn = screen.getByRole('button', { name: /collapse aws|expand aws/i });
+    fireEvent.click(expandAwsBtn);
+
+    expect(screen.getAllByText('Under Review').length).toBeGreaterThan(0);
+  });
 });

@@ -5,7 +5,7 @@ import { MissingAttributesIndicator } from '../honesty/MissingAttributesIndicato
 import { StaleDataBadge } from '../honesty/StaleDataBadge';
 import { AnomalyFlag } from '../honesty/AnomalyFlag';
 import { PriceDisplay } from '../honesty/PriceDisplay';
-import type { CalculateCategoryResult } from '../../types/api';
+import type { CalculateCategoryResult, ProviderWarning } from '../../types/api';
 import {
   Cpu,
   HardDrive,
@@ -37,12 +37,22 @@ const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
 export interface CalculateCategoryBreakdownProps {
   categories?: Record<string, CalculateCategoryResult>;
   requestedCategories: string[];
+  provider?: string;
+  warnings?: ProviderWarning[];
 }
 
 export const CalculateCategoryBreakdown: React.FC<CalculateCategoryBreakdownProps> = ({
   categories = {},
   requestedCategories,
+  provider,
+  warnings,
 }) => {
+  const hasProviderAnomaly = warnings?.some(
+    (w) =>
+      w.code === 'pricing_anomaly_flagged' &&
+      (!w.provider || (provider && w.provider.toLowerCase() === provider.toLowerCase()))
+  );
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-2">
       {requestedCategories.map((catKey) => {
@@ -112,7 +122,7 @@ export const CalculateCategoryBreakdown: React.FC<CalculateCategoryBreakdownProp
                   <MissingAttributesIndicator missingAttributes={result.missing_attributes} />
                 )}
                 {result.stale && <StaleDataBadge />}
-                {Boolean((result as Record<string, unknown>).has_anomaly) && <AnomalyFlag />}
+                {hasProviderAnomaly && <AnomalyFlag />}
               </div>
             </div>
           </div>

@@ -46,7 +46,6 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
   results = [],
   warnings = [],
   requestedCategories,
-  currency = 'USD',
   isLoading = false,
   isError = false,
   error,
@@ -236,7 +235,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                         <span>Partial Estimate:</span>
                         <PriceDisplay
                           amount={result.partial_total_normalized_hourly_usd}
-                          currency={currency}
+                          currency="USD"
                           unit="/hr"
                           isPartial
                           className="inline-flex space-y-0"
@@ -251,7 +250,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                     <div className="flex flex-col items-end" data-testid={`complete-total-${provider}`}>
                       <PriceDisplay
                         amount={result.total_normalized_hourly_usd}
-                        currency={currency}
+                        currency="USD"
                         unit="/hr"
                       />
                       <span className="text-[10px] text-text-secondary uppercase tracking-widest font-mono">
@@ -283,6 +282,8 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                   <CalculateCategoryBreakdown
                     categories={result.categories}
                     requestedCategories={requestedCategories}
+                    provider={provider}
+                    warnings={warnings}
                   />
                 </div>
               )}
