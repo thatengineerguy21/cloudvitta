@@ -111,3 +111,22 @@ export const INSTANCE_FAMILY_OPTIONS: SelectOption[] = [
   { value: 'storage_optimized', label: 'Storage Optimized (e.g. i3, Standard_L, z3)' },
   { value: 'gpu', label: 'Accelerated / GPU (e.g. g4dn, Standard_NC, a2)' },
 ];
+
+// 12. Storage Family Options for Managed Relational Database (internal/domain/database_rdbms.go)
+export const STORAGE_FAMILY_OPTIONS: SelectOption[] = [
+  { value: '', label: 'Any / Default Storage Family' },
+  { value: 'gp3', label: 'General Purpose SSD (gp3 / Balanced)' },
+  { value: 'gp2', label: 'General Purpose SSD (gp2)' },
+  { value: 'io1', label: 'Provisioned IOPS SSD (io1 / Premium)' },
+  { value: 'ssd', label: 'Standard SSD' },
+  { value: 'hdd', label: 'Standard HDD / Magnetic' },
+];
+
+// 13. Serverless Tier Options (internal/domain/serverless.go)
+export const SERVERLESS_TIER_OPTIONS: SelectOption[] = [
+  { value: 'consumption', label: 'Consumption (Default / Standard)' },
+  { value: 'flex_consumption', label: 'Flex Consumption (Azure)' },
+  { value: '1st_gen', label: '1st Gen (GCP Cloud Functions)' },
+  { value: '2nd_gen', label: '2nd Gen (GCP Cloud Functions)' },
+];
+

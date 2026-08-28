@@ -12,6 +12,8 @@ import {
   CLUSTER_TOPOLOGY_OPTIONS,
   SERVERLESS_ARCH_OPTIONS,
   INSTANCE_FAMILY_OPTIONS,
+  STORAGE_FAMILY_OPTIONS,
+  SERVERLESS_TIER_OPTIONS,
 } from './options';
 
 export const RegionSelect: React.FC<Omit<SelectInputProps, 'options'>> = (props) => (
@@ -54,6 +56,15 @@ export const ServerlessArchSelect: React.FC<Omit<SelectInputProps, 'options'>> =
   <SelectInput label="CPU Architecture" options={SERVERLESS_ARCH_OPTIONS} {...props} />
 );
 
+export const ServerlessTierSelect: React.FC<Omit<SelectInputProps, 'options'>> = (props) => (
+  <SelectInput label="Serverless Tier" options={SERVERLESS_TIER_OPTIONS} {...props} />
+);
+
 export const InstanceFamilySelect: React.FC<Omit<SelectInputProps, 'options'>> = (props) => (
   <SelectInput label="Instance Family" options={INSTANCE_FAMILY_OPTIONS} {...props} />
 );
+
+export const StorageFamilySelect: React.FC<Omit<SelectInputProps, 'options'>> = (props) => (
+  <SelectInput label="Storage Family" options={STORAGE_FAMILY_OPTIONS} {...props} />
+);
+

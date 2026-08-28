@@ -9,7 +9,7 @@ import { MissingAttributesIndicator } from '../honesty/MissingAttributesIndicato
 import { StaleDataBadge } from '../honesty/StaleDataBadge';
 import { PriceDisplay, PriceDisplayProps } from '../honesty/PriceDisplay';
 import { CompareSkeleton } from './CompareSkeleton';
-import { formatProviderName } from '../../lib/format';
+import { formatProviderName, formatRelativeTime } from '../../lib/format';
 import { ArrowUpDown, RotateCcw, AlertTriangle, RefreshCw } from 'lucide-react';
 import type { ProviderWarning, PriceDetail } from '../../types/api';
 import { ApiError } from '../../api/errors';
@@ -96,8 +96,9 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
 
   const sortedResults = useMemo(() => {
     return [...results].sort((a, b) => {
-      const priceA = Number(a.normalized_hourly_usd ?? a.monthly_cost_usd ?? a.price?.amount ?? 0);
-      const priceB = Number(b.normalized_hourly_usd ?? b.monthly_cost_usd ?? b.price?.amount ?? 0);
+      const priceA = a.normalized_hourly_usd != null ? Number(a.normalized_hourly_usd) : Infinity;
+      const priceB = b.normalized_hourly_usd != null ? Number(b.normalized_hourly_usd) : Infinity;
+      if (priceA === priceB) return 0;
       return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
     });
   }, [results, sortOrder]);
@@ -347,7 +348,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                               <StaleDataBadge fetchedAt={row.fetched_at} />
                             ) : (
                               <span className="text-text-secondary text-[11px] font-mono">
-                                {row.fetched_at ? new Date(row.fetched_at).toLocaleDateString() : 'Active'}
+                                {row.fetched_at ? formatRelativeTime(row.fetched_at) : 'Active'}
                               </span>
                             )}
                           </td>

@@ -4,7 +4,7 @@ import { useUrlParams } from '../../hooks/useUrlParams';
 import { useDatabaseComparison } from '../../api/queries/useComparisonQueries';
 import { CompareTemplate, ComparisonResultRow } from '../../components/compare/CompareTemplate';
 import { DebouncedInput } from '../../components/forms/DebouncedInput';
-import { DatabaseEngineSelect } from '../../components/forms/taxonomy/TaxonomySelects';
+import { DatabaseEngineSelect, StorageFamilySelect } from '../../components/forms/taxonomy/TaxonomySelects';
 import { MissingAttributesIndicator } from '../../components/honesty/MissingAttributesIndicator';
 import type { DatabaseQueryParams } from '../../types/api';
 
@@ -39,6 +39,12 @@ export const DatabaseCompare: React.FC = () => {
         value={params.engine || 'postgresql'}
         onChange={(e) => setParams({ engine: e.target.value })}
         data-testid="database-engine-select"
+      />
+
+      <StorageFamilySelect
+        value={params.storage_family || ''}
+        onChange={(e) => setParams({ storage_family: e.target.value })}
+        data-testid="database-storage-family-select"
       />
 
       <DebouncedInput

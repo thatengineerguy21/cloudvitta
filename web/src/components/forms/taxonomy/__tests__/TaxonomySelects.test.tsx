@@ -12,6 +12,8 @@ import {
   CLUSTER_TOPOLOGY_OPTIONS,
   SERVERLESS_ARCH_OPTIONS,
   INSTANCE_FAMILY_OPTIONS,
+  STORAGE_FAMILY_OPTIONS,
+  SERVERLESS_TIER_OPTIONS,
 } from '../options';
 import {
   RegionSelect,
@@ -24,7 +26,9 @@ import {
   KubernetesTierSelect,
   ClusterTopologySelect,
   ServerlessArchSelect,
+  ServerlessTierSelect,
   InstanceFamilySelect,
+  StorageFamilySelect,
 } from '../TaxonomySelects';
 
 describe('TaxonomySelects Components & Options Arrays', () => {
@@ -86,9 +90,19 @@ describe('TaxonomySelects Components & Options Arrays', () => {
     expect(INSTANCE_FAMILY_OPTIONS.map((o) => o.value)).toEqual([
       'general_purpose', 'compute_optimized', 'memory_optimized', 'storage_optimized', 'gpu',
     ]);
+
+    // 12. Storage Families (relational database)
+    expect(STORAGE_FAMILY_OPTIONS.map((o) => o.value)).toEqual([
+      '', 'gp3', 'gp2', 'io1', 'ssd', 'hdd',
+    ]);
+
+    // 13. Serverless Tiers
+    expect(SERVERLESS_TIER_OPTIONS.map((o) => o.value)).toEqual([
+      'consumption', 'flex_consumption', '1st_gen', '2nd_gen',
+    ]);
   });
 
-  it('renders all 11 concrete select components with their respective labels', () => {
+  it('renders all concrete select components with their respective labels', () => {
     const { unmount } = render(
       <div>
         <RegionSelect value="us-east" onChange={() => {}} />
@@ -101,7 +115,9 @@ describe('TaxonomySelects Components & Options Arrays', () => {
         <KubernetesTierSelect value="standard" onChange={() => {}} />
         <ClusterTopologySelect value="regional" onChange={() => {}} />
         <ServerlessArchSelect value="x86_64" onChange={() => {}} />
+        <ServerlessTierSelect value="consumption" onChange={() => {}} />
         <InstanceFamilySelect value="general_purpose" onChange={() => {}} />
+        <StorageFamilySelect value="" onChange={() => {}} />
       </div>
     );
 
@@ -115,8 +131,11 @@ describe('TaxonomySelects Components & Options Arrays', () => {
     expect(screen.getByLabelText('Management Tier')).toBeInTheDocument();
     expect(screen.getByLabelText('Cluster Topology')).toBeInTheDocument();
     expect(screen.getByLabelText('CPU Architecture')).toBeInTheDocument();
+    expect(screen.getByLabelText('Serverless Tier')).toBeInTheDocument();
     expect(screen.getByLabelText('Instance Family')).toBeInTheDocument();
+    expect(screen.getByLabelText('Storage Family')).toBeInTheDocument();
 
     unmount();
   });
 });
+

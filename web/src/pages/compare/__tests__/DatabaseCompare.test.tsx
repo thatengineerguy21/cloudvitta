@@ -67,6 +67,7 @@ describe('DatabaseCompare Page', () => {
       screen.getByText('Relational Database (RDBMS) Pricing Comparison')
     ).toBeInTheDocument();
     expect(screen.getByTestId('database-engine-select')).toHaveValue('postgresql');
+    expect(screen.getByTestId('database-storage-family-select')).toHaveValue('');
     expect(screen.getByTestId('database-vcpu-input')).toHaveValue(4);
 
     await waitFor(() => {
@@ -90,7 +91,7 @@ describe('DatabaseCompare Page', () => {
     );
   });
 
-  it('updates engine dropdown and multi_az toggle in URL', async () => {
+  it('updates engine dropdown, storage_family dropdown, and multi_az toggle in URL', async () => {
     vi.spyOn(pricesApi, 'getDatabase').mockResolvedValue({
       results: [],
       warnings: [],
@@ -101,10 +102,14 @@ describe('DatabaseCompare Page', () => {
     const engineSelect = screen.getByTestId('database-engine-select');
     fireEvent.change(engineSelect, { target: { value: 'mysql' } });
 
+    const storageFamilySelect = screen.getByTestId('database-storage-family-select');
+    fireEvent.change(storageFamilySelect, { target: { value: 'gp3' } });
+
     const multiAzCheckbox = screen.getByTestId('database-multiaz-checkbox');
     fireEvent.click(multiAzCheckbox);
 
     expect(window.location.search).toContain('engine=mysql');
+    expect(window.location.search).toContain('storage_family=gp3');
     expect(window.location.search).toContain('multi_az=true');
   });
 });

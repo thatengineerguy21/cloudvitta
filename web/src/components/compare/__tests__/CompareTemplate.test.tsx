@@ -69,6 +69,7 @@ describe('CompareTemplate Component', () => {
     expect(screen.getByText('Close Match')).toBeInTheDocument();
     expect(screen.getByText('Approximate')).toBeInTheDocument();
     expect(screen.getByText(/1 unverified/i)).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument(); // GCP (no fetched_at)
   });
 
   it('renders loading skeleton when isLoading is true', () => {

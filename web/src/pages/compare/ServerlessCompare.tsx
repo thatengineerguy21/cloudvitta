@@ -4,17 +4,9 @@ import { useUrlParams } from '../../hooks/useUrlParams';
 import { useServerlessComparison } from '../../api/queries/useComparisonQueries';
 import { CompareTemplate, ComparisonResultRow } from '../../components/compare/CompareTemplate';
 import { DebouncedInput } from '../../components/forms/DebouncedInput';
-import { SelectInput } from '../../components/forms/SelectInput';
-import { ServerlessArchSelect } from '../../components/forms/taxonomy/TaxonomySelects';
+import { ServerlessArchSelect, ServerlessTierSelect } from '../../components/forms/taxonomy/TaxonomySelects';
 import { MissingAttributesIndicator } from '../../components/honesty/MissingAttributesIndicator';
 import type { ServerlessQueryParams } from '../../types/api';
-
-const SERVERLESS_TIER_OPTIONS = [
-  { value: 'consumption', label: 'Consumption (Default / Standard)' },
-  { value: 'flex_consumption', label: 'Flex Consumption (Azure)' },
-  { value: '1st_gen', label: '1st Gen (GCP Cloud Functions)' },
-  { value: '2nd_gen', label: '2nd Gen (GCP Cloud Functions)' },
-];
 
 const DEFAULT_SERVERLESS_PARAMS: ServerlessQueryParams = {
   region: 'us-east',
@@ -47,9 +39,7 @@ export const ServerlessCompare: React.FC = () => {
         data-testid="serverless-arch-select"
       />
 
-      <SelectInput
-        label="Serverless Tier"
-        options={SERVERLESS_TIER_OPTIONS}
+      <ServerlessTierSelect
         value={params.tier || 'consumption'}
         onChange={(e) => setParams({ tier: e.target.value })}
         data-testid="serverless-tier-select"
