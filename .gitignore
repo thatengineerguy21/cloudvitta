@@ -44,9 +44,10 @@ node_modules
 
 # Build Outputs
 out/
-build
-dist
-tmp
+build/
+/dist/
+web/dist/
+tmp/
 
 # Debug
 npm-debug.log*
@@ -69,3 +70,7 @@ cloudvitta
 
 # User Context Documents
 /.user
+
+# Playwright Test Outputs
+playwright-report/
+test-results/

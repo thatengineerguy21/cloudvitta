@@ -23,16 +23,22 @@ Comparing cloud costs today requires visiting each provider's calculator or pric
 
 ```mermaid
 flowchart TD
-    Client(["Client / Browser / Agent"]) --> CORS["CORS Middleware"]
-    CORS --> AuthMW["Auth Middleware"]
-    AuthMW --> RateLimiter["4-Step Tiered Rate Limiter"]
-    RateLimiter --> Router["Standard Lib HTTP Router"]
+    Client(["Client / Browser / Agent"]) --> RootMux["Go net/http Root ServeMux"]
+    
+    RootMux -->|/healthz, /readyz| Probes["Health & Readiness Probes"]
+    RootMux -->|/metrics| Metrics["Prometheus Metrics"]
+    RootMux -->|/docs/*| Swagger["OpenAPI Swagger UI"]
+    RootMux -->|/mcp| MCP["MCP Streamable HTTP Server"]
+    RootMux -->|/api/v1/*| REST["REST Router & 4-Step Rate Limiter"]
+    RootMux -->|/*| SPA["Embedded SPA Static Asset Handler"]
     
     subgraph CoreService["CloudVitta Service Layer"]
-        Router --> PricingSvc["Pricing Service"]
-        Router --> CalcSvc["Calculate Service"]
-        Router --> AuthSvc["Auth Service"]
-        Router --> FreshSvc["Freshness Service"]
+        REST --> PricingSvc["Pricing Service"]
+        REST --> CalcSvc["Calculate Service"]
+        REST --> AuthSvc["Auth Service"]
+        REST --> FreshSvc["Freshness Service"]
+        MCP --> PricingSvc
+        MCP --> FreshSvc
         
         PricingSvc --> Matching["7 Strategy SKU Scorers"]
         CalcSvc --> PricingSvc
@@ -71,8 +77,8 @@ flowchart TD
 | [Calculator Request Lifecycle](docs/diagrams/04-calculator-request-lifecycle.md) | Single-category cache-miss flow, composite calculation fan-out, and 9 MCP tools lifecycle |
 | [Auth Token Rotation & Theft Containment](docs/diagrams/05-auth-token-rotation.md) | Refresh token family rotation, idempotency replay cache, and theft detection |
 | [Package Structure & Dependencies](docs/diagrams/06-package-structure.md) | Modular monolith package hierarchy and dependency rules |
-| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 36 architectural decision records with context, trade-offs, and alternatives |
-| [Master Development Guide](docs/DEVELOPMENT_GUIDE.md) | Local environment setup, coding conventions, testing guidelines, and quality standards |
+| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 40 architectural decision records with context, trade-offs, and alternatives |
+| [Master Development Guide](docs/DEVELOPMENT_GUIDE.md) | Local environment setup, frontend & backend testing, and quality standards |
 | [Production Deployment Guide](docs/devops/01-deployment-guide.md) | Cloud Run service configuration, Google Cloud Secret Manager wiring, and CI/CD pipelines |
 
 ---
@@ -80,7 +86,8 @@ flowchart TD
 ## Local Development Quickstart
 
 ### 1. Prerequisites
-- Go 1.22+ installed
+- Go 1.26+ installed
+- Node.js 22+ installed
 - PostgreSQL instance (or Neon connection string)
 - Redis instance (or Upstash connection string)
 - `tern` migration tool: `go install github.com/jackc/tern/v2@latest`
@@ -101,15 +108,24 @@ tern migrate -m migrations -c tern.conf
 # Start API server (port 8080)
 go run cmd/api/main.go
 
+# Start Frontend development server (port 3000)
+cd web && npm run dev
+
 # Run Ingestion worker
 go run cmd/ingest/main.go
 ```
 
 ### 5. Run Test Suite
 ```bash
-# Run unit and race detection tests
+# Backend unit and race detection tests
 go test -race ./...
 
-# Run static analysis
+# Backend static analysis
 go vet ./...
+
+# Frontend component & E2E tests
+cd web
+npm test
+npm run test:e2e
 ```
+

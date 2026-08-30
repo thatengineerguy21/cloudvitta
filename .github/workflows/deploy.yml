@@ -1,9 +1,13 @@
 name: CD - Deploy to Cloud Run
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches:
       - main
+    types:
+      - completed
+  workflow_dispatch:
 
 env:
   GCP_REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION || 'asia-southeast1' }}
@@ -11,11 +15,13 @@ env:
   GAR_REPO: ${{ vars.GAR_REPO || secrets.GAR_REPO || 'cloudvitta-repo' }}
   SERVICE_NAME: ${{ vars.SERVICE_NAME || secrets.SERVICE_NAME || 'cloudvitta-api' }}
   INGEST_JOB_NAME: ${{ vars.INGEST_JOB_NAME || secrets.INGEST_JOB_NAME || 'cloudvitta-ingest' }}
+  COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   deploy:
     name: Build, Migrate, and Deploy
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success') }}
     
     # These permissions are required for Workload Identity Federation
     permissions:
@@ -25,6 +31,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
 
       - name: Google Auth
         id: auth
@@ -48,7 +56,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ env.COMMIT_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -82,7 +90,7 @@ jobs:
         with:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.GCP_REGION }}
-          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ env.COMMIT_SHA }}
           flags: '--allow-unauthenticated'
           env_vars: |
             DATABASE_URL=${{ secrets.NEON_PROD_DSN }}
@@ -97,20 +105,20 @@ jobs:
             CLOUDVITTA_ALIBABA_ACCESS_KEY_ID=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_ID || secrets.ALIBABA_ACCESS_KEY_ID || '' }}
             CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET || secrets.ALIBABA_ACCESS_KEY_SECRET || '' }}
             CLOUDVITTA_DIGITALOCEAN_TOKEN=${{ secrets.CLOUDVITTA_DIGITALOCEAN_TOKEN || secrets.DIGITALOCEAN_TOKEN || '' }}
-            CLOUDVITTA_CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS || secrets.CORS_ALLOWED_ORIGINS || 'https://cloudvitta.dev' }}
+            CLOUDVITTA_CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS || secrets.CORS_ALLOWED_ORIGINS || 'https://thatengineerguy.in,https://*.thatengineerguy.in,https://cloudvitta.dev,http://localhost:3000' }}
             OTEL_EXPORTER_OTLP_ENDPOINT=${{ secrets.GRAFANA_OTLP_ENDPOINT || vars.GRAFANA_OTLP_ENDPOINT || secrets.OTEL_EXPORTER_OTLP_ENDPOINT || vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
             OTEL_EXPORTER_OTLP_HEADERS=${{ secrets.GRAFANA_OTLP_HEADERS || secrets.OTEL_EXPORTER_OTLP_HEADERS }}
 
       - name: Deploy Cloud Run Ingest Job
         run: |
           gcloud run jobs deploy ${{ env.INGEST_JOB_NAME }} \
-            --image=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --image=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ env.COMMIT_SHA }} \
             --region=${{ env.GCP_REGION }} \
             --command=/ingest \
             --memory=2Gi \
             --cpu=2 \
             --task-timeout=20m \
-            --set-env-vars="^||^DATABASE_URL=${{ secrets.NEON_PROD_DSN }}||REDIS_URL=${{ secrets.REDIS_URL }}||CLOUDVITTA_STORAGE_GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME || secrets.GCS_BUCKET_NAME || 'cloudvitta-raw-fixtures' }}||CLOUDVITTA_PRIMARY_ENVIRONMENT=production||CLOUDVITTA_PRIMARY_LOG_LEVEL=info||CLOUDVITTA_AUTH_JWT_SECRET=${{ secrets.CLOUDVITTA_AUTH_JWT_SECRET || secrets.JWT_SECRET }}||CLOUDVITTA_AUTH_ANON_COOKIE_SECRET=${{ secrets.CLOUDVITTA_AUTH_ANON_COOKIE_SECRET || secrets.ANON_COOKIE_SECRET || secrets.CLOUDVITTA_AUTH_JWT_SECRET || secrets.JWT_SECRET }}||CLOUDVITTA_GCP_API_KEY=${{ secrets.CLOUDVITTA_GCP_API_KEY || secrets.GCP_API_KEY || '' }}||CLOUDVITTA_IBM_API_KEY=${{ secrets.CLOUDVITTA_IBM_API_KEY || secrets.IBM_API_KEY || '' }}||CLOUDVITTA_ALIBABA_ACCESS_KEY_ID=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_ID || secrets.ALIBABA_ACCESS_KEY_ID || '' }}||CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET || secrets.ALIBABA_ACCESS_KEY_SECRET || '' }}||CLOUDVITTA_DIGITALOCEAN_TOKEN=${{ secrets.CLOUDVITTA_DIGITALOCEAN_TOKEN || secrets.DIGITALOCEAN_TOKEN || '' }}||CLOUDVITTA_CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS || secrets.CORS_ALLOWED_ORIGINS || 'https://cloudvitta.dev' }}||OTEL_EXPORTER_OTLP_ENDPOINT=${{ secrets.GRAFANA_OTLP_ENDPOINT || vars.GRAFANA_OTLP_ENDPOINT || secrets.OTEL_EXPORTER_OTLP_ENDPOINT || vars.OTEL_EXPORTER_OTLP_ENDPOINT }}||OTEL_EXPORTER_OTLP_HEADERS=${{ secrets.GRAFANA_OTLP_HEADERS || secrets.OTEL_EXPORTER_OTLP_HEADERS }}"
+            --set-env-vars="^||^DATABASE_URL=${{ secrets.NEON_PROD_DSN }}||REDIS_URL=${{ secrets.REDIS_URL }}||CLOUDVITTA_STORAGE_GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME || secrets.GCS_BUCKET_NAME || 'cloudvitta-raw-fixtures' }}||CLOUDVITTA_PRIMARY_ENVIRONMENT=production||CLOUDVITTA_PRIMARY_LOG_LEVEL=info||CLOUDVITTA_AUTH_JWT_SECRET=${{ secrets.CLOUDVITTA_AUTH_JWT_SECRET || secrets.JWT_SECRET }}||CLOUDVITTA_AUTH_ANON_COOKIE_SECRET=${{ secrets.CLOUDVITTA_AUTH_ANON_COOKIE_SECRET || secrets.ANON_COOKIE_SECRET || secrets.CLOUDVITTA_AUTH_JWT_SECRET || secrets.JWT_SECRET }}||CLOUDVITTA_GCP_API_KEY=${{ secrets.CLOUDVITTA_GCP_API_KEY || secrets.GCP_API_KEY || '' }}||CLOUDVITTA_IBM_API_KEY=${{ secrets.CLOUDVITTA_IBM_API_KEY || secrets.IBM_API_KEY || '' }}||CLOUDVITTA_ALIBABA_ACCESS_KEY_ID=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_ID || secrets.ALIBABA_ACCESS_KEY_ID || '' }}||CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET || secrets.ALIBABA_ACCESS_KEY_SECRET || '' }}||CLOUDVITTA_DIGITALOCEAN_TOKEN=${{ secrets.CLOUDVITTA_DIGITALOCEAN_TOKEN || secrets.DIGITALOCEAN_TOKEN || '' }}||CLOUDVITTA_CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS || secrets.CORS_ALLOWED_ORIGINS || 'https://thatengineerguy.in,https://*.thatengineerguy.in,https://cloudvitta.dev,http://localhost:3000' }}||OTEL_EXPORTER_OTLP_ENDPOINT=${{ secrets.GRAFANA_OTLP_ENDPOINT || vars.GRAFANA_OTLP_ENDPOINT || secrets.OTEL_EXPORTER_OTLP_ENDPOINT || vars.OTEL_EXPORTER_OTLP_ENDPOINT }}||OTEL_EXPORTER_OTLP_HEADERS=${{ secrets.GRAFANA_OTLP_HEADERS || secrets.OTEL_EXPORTER_OTLP_HEADERS }}"
 
       - name: Execute Cloud Run Ingest Job (Post-Deploy Warmup)
         run: |

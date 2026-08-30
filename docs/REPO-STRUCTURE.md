@@ -44,7 +44,8 @@ Create directories only when their stage implementation requires them.
 │   │
 │   ├── transport/
 │   │   ├── rest/                # HTTP REST transport handlers, routing, and RFC 7807 error mappings
-│   │   └── mcp/                 # Model Context Protocol Streamable HTTP tool handlers
+│   │   ├── mcp/                 # Model Context Protocol Streamable HTTP tool handlers
+│   │   └── spa/                 # embedded SPA static asset delivery, SPA fallback routing, and API guards
 │   │
 │   ├── config/                  # Koanf configuration loader and startup validation
 │   │
@@ -83,8 +84,29 @@ Create directories only when their stage implementation requires them.
 │       ├── ci.yml               # GitHub Actions CI workflow
 │       └── deploy.yml           # GitHub Actions Cloud Run deploy workflow
 │
+├── web/                         # React, Vite, TypeScript, and Tailwind frontend SPA
+│   ├── e2e/                     # Playwright end-to-end smoke test specs
+│   ├── src/                     # React source code, components, design tokens, and utilities
+│   │   ├── api/                 # fetch wrapper, RFC 7807 parsing, 401 mutex, TanStack Query hooks
+│   │   ├── auth/                # in-memory AuthProvider and useAuth context
+│   │   ├── components/          # layout, bento grid, honesty badges, auth modals, compare template, and calculate builder
+│   │   ├── hooks/               # custom hooks (useUrlParams two-way query synchronization)
+│   │   ├── lib/                 # formatting, workload URL serialization, query client configuration, and class merging utils
+│   │   ├── pages/               # compare category views (compute, storage, network, db, k8s, serverless) and composite calculator
+│   │   ├── router/              # HTML5 pushState/replaceState Router, Link, and location hooks
+│   │   └── types/               # generated OpenAPI types and domain honesty models
+│   ├── public/                  # Static assets (favicons, manifest)
+│   ├── index.html               # SPA HTML entry point
+│   ├── nginx.conf               # Hardened Nginx configuration for SPA routing fallback and security headers
+│   ├── playwright.config.ts     # Playwright E2E configuration
+│   ├── vite.config.ts           # Vite bundler and Vitest test configuration
+│   ├── tailwind.config.js       # Tailwind 0px geometry and theme tokens
+│   ├── tsconfig.json            # TypeScript project reference root
+│   └── package.json             # Frontend dependencies and scripts
+│
 ├── Taskfile.yml                 # task runner automation configuration
-├── Dockerfile                   # multi-stage container build
+├── Dockerfile                   # multi-stage unified container build (Node web-builder, Go static compiler with embedded SPA, Distroless runtime)
+├── Dockerfile.web               # multi-stage Vite SPA + Nginx production container build (standalone option)
 ├── sqlc.yaml                    # SQLC code generator configuration
 ├── .golangci.yml                # linter configuration
 ├── .env.example                 # sample environment variables
@@ -97,4 +119,4 @@ Create directories only when their stage implementation requires them.
 - **Fixture Files**: Test fixtures live alongside provider adapters in `testdata/` directories, each containing recorded timestamps for freshness evaluation.
 - **`internal/store`**: Contains SQLC-generated queries and the database pool constructor (`pool.go`). Code in `internal/service` interacts with `store.Querier` and never imports `pgx` driver types directly.
 - **`internal/service`**: Transport-agnostic domain engine. It is the only package where matching algorithms, pricing math, and totaling occur.
-- **Transport Packages**: `internal/transport/rest` and `internal/transport/mcp` handle protocol encoding, parameter extraction, and input validation before delegating to `service`.
+- **Transport Packages**: `internal/transport/rest` and `internal/transport/mcp` handle protocol encoding, parameter extraction, and input validation before delegating to `service`. `internal/transport/spa` delivers embedded frontend SPA assets, manages HTML5 history fallback routing, and enforces strict API route guards.

@@ -87,3 +87,43 @@ jobs:
 
       - name: Build All Targets
         run: task build
+
+  web-ci:
+    name: Frontend Lint, Typecheck, and Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint Frontend
+        run: npm run lint
+
+      - name: Typecheck Frontend
+        run: npm run typecheck
+
+      - name: Run Vitest Tests
+        run: npm test
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Smoke Tests
+        run: npm run test:e2e
+

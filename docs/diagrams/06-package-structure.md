@@ -10,6 +10,7 @@ classDiagram
     class transport {
         rest
         mcp
+        spa
     }
 
     class middleware {

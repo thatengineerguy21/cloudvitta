@@ -18,6 +18,11 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/middleware"
 )
 
+// SwaggerHandler returns the OpenAPI Swagger documentation HTTP handler.
+func SwaggerHandler() http.Handler {
+	return httpSwagger.WrapHandler
+}
+
 // NewRouter constructs a net/http.ServeMux with all REST API routes, health probes, metrics, and middlewares wired.
 func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, freshnessSvc *service.FreshnessService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
@@ -29,6 +34,11 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 
 	// OpenAPI Documentation (unlimited)
 	mux.Handle("/docs/", httpSwagger.WrapHandler)
+
+	// Fallback for unmapped API routes within REST subsystem
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		middleware.WriteJSONError(w, r, http.StatusNotFound, "https://cloudvitta.dev/errors/not-found", "Not Found", "The requested API endpoint does not exist.")
+	})
 
 	var jwtSecret []byte
 	var anonCookieSecret []byte

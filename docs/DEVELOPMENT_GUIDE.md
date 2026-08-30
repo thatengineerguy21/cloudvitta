@@ -500,3 +500,69 @@ Metrics track HTTP request rates, error rates, latencies, and custom application
   2. Select your Prometheus data source.
   3. Query `cache_requests_total` to inspect cache hit and miss counts.
 
+---
+
+## 9. Frontend SPA Development & Unified Monolith (Model B)
+
+CloudVitta includes a React 19 single-page application (SPA) located in the `web/` directory.
+
+### 1. Local Development with Zero-CORS Vite Proxy
+Start the Go backend server on port 8080:
+```bash
+task dev:api
+```
+Start the local Vite development server with hot module replacement (HMR) on port 3000:
+```bash
+task web:dev
+# or
+cd web && npm run dev
+```
+The Vite development server is pre-configured to proxy `/api` and `/mcp` requests directly to `http://localhost:8080`, providing zero-CORS local development with hot reloading.
+
+### 2. Frontend Unit and Component Tests (Vitest)
+Execute the complete component and utility test suite:
+```bash
+task web:test
+# or
+cd web && npm test
+```
+
+### 3. End-to-End Smoke Tests (Playwright)
+Execute end-to-end smoke tests against Chromium:
+```bash
+task web:test:e2e
+# or
+cd web && npm run test:e2e
+```
+*Optional*: Run tests with the interactive visual UI:
+```bash
+cd web && npm run test:e2e:ui
+```
+
+### 4. Production Build & Unified Containerization (Model B)
+In production (Model B), the Go backend binary embeds the compiled `web/dist` frontend bundle via standard library `//go:embed all:dist` (in `internal/transport/spa`):
+
+To build frontend assets and compile static Go binaries locally:
+```bash
+task build:full
+```
+
+To build the unified production Docker container:
+```bash
+task docker:build
+# or
+docker build -t cloudvitta:latest .
+```
+
+To run the unified container locally:
+```bash
+docker run -p 8080:8080 cloudvitta:latest
+```
+Navigate to `http://localhost:8080` to access the web UI, Swagger OpenAPI documentation (`/docs/`), Streamable HTTP MCP server (`/mcp`), health probes (`/healthz`, `/readyz`), Prometheus metrics (`/metrics`), and REST APIs (`/api/v1/*`) from a single origin.
+
+### 5. Standalone Nginx Container (Optional)
+The standalone Nginx container (`Dockerfile.web`) remains available as an optional standalone build:
+```bash
+task web:docker:build
+```
+

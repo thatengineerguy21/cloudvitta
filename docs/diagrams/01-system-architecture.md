@@ -22,12 +22,14 @@ flowchart TD
             I_AD --> I_QS
         end
 
-        subgraph "API & Tool Layer (REST / MCP)"
+        subgraph "API & Tool Layer (REST / MCP / SPA)"
             API_R[Standard Lib HTTP Routing]
             API_RL[4-Step Tiered Rate Limiting]
             API_Auth[Auth Middleware]
             API_MCP[MCP Streamable HTTP - 9 Tools]
+            API_SPA[Embedded SPA Static Asset Handler]
             API_R --> API_RL
+            API_R --> API_SPA
             API_RL --> API_Auth
             API_Auth --> API_MCP
         end

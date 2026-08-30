@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
@@ -24,6 +25,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/mcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest"
+	"github.com/thatengineerguy21/CloudVitta/internal/transport/spa"
 )
 
 func main() {
@@ -150,10 +152,15 @@ func main() {
 	limiter := ratelimit.NewRateLimiter(redisClient, rateCfg)
 	authMw := authmw.NewAuthMiddleware([]byte(cfg.Auth.JWTSecret), time.Now)
 
-	// Top-level root mux routing between REST and MCP
+	// Top-level root mux routing between Static SPA, REST, Probes, Metrics, and MCP
 	rootMux := http.NewServeMux()
 	rootMux.Handle("/mcp", authMw(authmw.RequireAuth(limiter.Handler(mcpStreamableHandler))))
-	rootMux.Handle("/", restHandler)
+	rootMux.Handle("/docs/", rest.SwaggerHandler())
+	rootMux.Handle("/api/", restHandler)
+	rootMux.Handle("/healthz", http.HandlerFunc(rest.HandleHealthz))
+	rootMux.Handle("/readyz", rest.HandleReadyz(dbPool, redisClient))
+	rootMux.Handle("/metrics", promhttp.Handler())
+	rootMux.Handle("/", spa.NewHandler())
 
 	// --- HTTP Server ---
 	server := &http.Server{
