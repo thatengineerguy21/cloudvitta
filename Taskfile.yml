@@ -131,7 +131,7 @@ tasks:
   web:sync:
     desc: Sync built frontend dist bundle into internal/transport/spa/dist
     cmds:
-      - node -e "const fs=require('fs'); fs.rmSync('internal/transport/spa/dist', {recursive: true, force: true}); fs.cpSync('web/dist', 'internal/transport/spa/dist', {recursive:true});"
+      - node -e "const fs=require('fs'); fs.rmSync('internal/transport/spa/dist', {recursive:true,force:true}); fs.cpSync('web/dist', 'internal/transport/spa/dist', {recursive:true});"
 
   build:full:
     desc: Build frontend, sync to embedded SPA dist, and build all Go binaries
