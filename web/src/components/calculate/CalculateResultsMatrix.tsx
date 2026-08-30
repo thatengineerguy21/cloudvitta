@@ -111,7 +111,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
           <button
             type="button"
             onClick={refetch}
-            className="flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider px-3 py-2 border border-border-default bg-surface-raised hover:border-border-accent text-text-primary transition-colors"
+            className="flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider px-3 py-2 border border-border-default bg-surface-raised hover:border-border-accent text-text-primary transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Retry Calculation</span>
@@ -156,7 +156,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
           <button
             type="button"
             onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-            className="flex items-center space-x-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary px-2.5 py-1 border border-border-default bg-surface-raised hover:border-border-accent transition-colors"
+            className="flex items-center space-x-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary px-2.5 py-1 border border-border-default bg-surface-raised hover:border-border-accent transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
             title={`Sort by total price (${sortOrder === 'asc' ? 'Lowest First' : 'Highest First'})`}
           >
             <ArrowUpDown className="w-3 h-3" />
@@ -169,7 +169,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
             <button
               type="button"
               onClick={() => setAllExpanded(true)}
-              className="text-border-accent hover:underline font-medium"
+              className="text-border-accent hover:underline font-medium focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
             >
               Expand All
             </button>
@@ -177,7 +177,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
             <button
               type="button"
               onClick={() => setAllExpanded(false)}
-              className="text-text-secondary hover:text-text-primary font-medium"
+              className="text-text-secondary hover:text-text-primary font-medium focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
             >
               Collapse All
             </button>
@@ -207,8 +207,16 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
             >
               {/* Provider Row Summary Header */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => toggleProviderExpanded(provider)}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 cursor-pointer hover:bg-surface-raised/40 transition-colors border-b border-border-default/40 gap-3"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleProviderExpanded(provider);
+                  }
+                }}
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 cursor-pointer hover:bg-surface-raised/40 transition-colors border-b border-border-default/40 gap-3 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
               >
                 {/* Left: Provider Identity & Badge */}
                 <div className="flex items-center space-x-3 min-w-0">
@@ -266,7 +274,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                       toggleProviderExpanded(provider);
                     }}
                     aria-label={isExpanded ? `Collapse ${provider}` : `Expand ${provider}`}
-                    className="p-1 hover:bg-surface-raised text-text-secondary hover:text-text-primary transition-colors"
+                    className="p-1 hover:bg-surface-raised text-text-secondary hover:text-text-primary transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
                   >
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>

@@ -49,7 +49,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
                 onToggleEnabled(!enabled);
               }}
               className={cn(
-                'w-4 h-4 border flex items-center justify-center transition-colors',
+                'w-4 h-4 border flex items-center justify-center transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none',
                 enabled
                   ? 'bg-border-accent border-border-accent text-surface-canvas'
                   : 'bg-surface-card border-border-default hover:border-text-secondary'
@@ -85,8 +85,9 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
           <button
             type="button"
             onClick={onToggleOpen}
+            aria-expanded={isOpen}
             aria-label={isOpen ? `Collapse ${title}` : `Expand ${title}`}
-            className="p-1 hover:bg-surface-raised text-text-secondary hover:text-text-primary transition-colors"
+            className="p-1 hover:bg-surface-raised text-text-secondary hover:text-text-primary transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           >
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -102,7 +103,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
               <button
                 type="button"
                 onClick={() => onToggleEnabled(true)}
-                className="text-xs uppercase font-bold tracking-wider text-border-accent hover:underline ml-2"
+                className="text-xs uppercase font-bold tracking-wider text-border-accent hover:underline ml-2 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
               >
                 Enable Category
               </button>

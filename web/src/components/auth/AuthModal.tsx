@@ -104,7 +104,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <button
           onClick={onClose}
           disabled={isLoading}
-          className="absolute top-4 right-4 p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors disabled:opacity-50"
+          className="absolute top-4 right-4 p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           aria-label="Close dialog"
         >
           <X className="w-4 h-4" />
@@ -135,11 +135,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Form Inputs */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
+            <label htmlFor="auth-email" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
               Email Address
             </label>
             <div className="relative">
               <input
+                id="auth-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -155,11 +156,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
+            <label htmlFor="auth-password" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
               Password
             </label>
             <div className="relative">
               <input
+                id="auth-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -176,11 +178,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {mode === 'signup' && (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
+              <label htmlFor="auth-confirm-password" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                 Confirm Password
               </label>
               <div className="relative">
                 <input
+                  id="auth-confirm-password"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -202,7 +205,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-border-accent text-white hover:opacity-90 font-bold text-xs uppercase tracking-widest transition-opacity flex items-center justify-center space-x-2 rounded-none disabled:opacity-50"
+            className="w-full py-2.5 px-4 bg-border-accent text-white hover:opacity-90 font-bold text-xs uppercase tracking-widest transition-opacity flex items-center justify-center space-x-2 rounded-none disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           >
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
@@ -217,7 +220,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => setMode('signup')}
-                className="font-bold text-border-accent hover:underline ml-1 uppercase tracking-wider"
+                className="font-bold text-border-accent hover:underline ml-1 uppercase tracking-wider focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
               >
                 Sign Up
               </button>
@@ -228,7 +231,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => setMode('login')}
-                className="font-bold text-border-accent hover:underline ml-1 uppercase tracking-wider"
+                className="font-bold text-border-accent hover:underline ml-1 uppercase tracking-wider focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
               >
                 Sign In
               </button>

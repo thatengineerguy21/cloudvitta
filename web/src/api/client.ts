@@ -196,11 +196,16 @@ export async function apiFetch<T>(
         }
       } else {
         const rawText = await response.text();
+        // Strip raw HTML from non-JSON error responses (e.g. reverse proxy 404 pages)
+        const isHtml = contentType.includes('text/html') || rawText.trimStart().startsWith('<');
+        const cleanDetail = isHtml
+          ? `Server returned HTTP ${response.status} (${response.statusText || 'Error'})`
+          : rawText || `Server returned status ${response.status}`;
         problemDetails = {
           type: 'https://cloudvitta.dev/errors/http-error',
           title: response.statusText || 'HTTP Error',
           status: response.status,
-          detail: rawText || `Server returned status ${response.status}`,
+          detail: cleanDetail,
           instance: endpoint,
         };
       }

@@ -140,7 +140,7 @@ export const DatabaseCompare: React.FC = () => {
                 <span className="text-xs text-text-secondary">({row.instance_type})</span>
               )}
               {multiAz && (
-                <span className="text-[10px] uppercase px-1 py-0.2 border border-border-accent text-border-accent font-bold">
+                <span className="text-[10px] uppercase px-1 py-0.5 border border-border-accent text-border-accent font-bold">
                   Multi-AZ
                 </span>
               )}

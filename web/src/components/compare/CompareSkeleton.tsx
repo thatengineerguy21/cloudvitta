@@ -8,7 +8,7 @@ export interface CompareSkeletonProps {
 
 export const CompareSkeleton: React.FC<CompareSkeletonProps> = ({ rows = 4, className = '' }) => {
   return (
-    <div className={`w-full space-y-3 animate-pulse ${className}`} data-testid="compare-skeleton">
+    <div className={`w-full space-y-3 animate-pulse ${className}`} data-testid="compare-skeleton" role="status" aria-label="Loading comparison data">
       <div className="h-9 bg-surface-raised border border-border-default w-full" />
       {Array.from({ length: rows }).map((_, idx) => (
         <div

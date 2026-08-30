@@ -136,4 +136,25 @@ describe('Header Component', () => {
       expect(screen.queryByText('engineer@cloudvitta.dev')).not.toBeInTheDocument();
     });
   });
+
+  it('toggles mobile navigation menu and closes on nav item click', async () => {
+    const user = userEvent.setup();
+    render(<Header />, { wrapper: createWrapper() });
+
+    const hamburgerBtn = screen.getByRole('button', { name: /open menu/i });
+    expect(hamburgerBtn).toBeInTheDocument();
+
+    // Click hamburger button to open mobile menu
+    await user.click(hamburgerBtn);
+    expect(screen.getByRole('button', { name: /close menu/i })).toBeInTheDocument();
+
+    // Verify links are rendered in mobile menu panel
+    const computeLinks = screen.getAllByRole('link', { name: /compute/i });
+    expect(computeLinks.length).toBeGreaterThan(1);
+
+    // Clicking a mobile nav item should close the menu
+    await user.click(computeLinks[computeLinks.length - 1]);
+    expect(screen.getByRole('button', { name: /open menu/i })).toBeInTheDocument();
+  });
 });
+

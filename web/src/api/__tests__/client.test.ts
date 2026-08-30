@@ -363,4 +363,31 @@ describe('apiFetch & client wrappers', () => {
       }
     }
   });
+
+  it('strips raw HTML from non-JSON error responses instead of leaking markup into ApiError.detail', async () => {
+    const htmlBody =
+      '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd"> <html> <head> <title>404 Not Found</title> </head><body> <h1>Not Found</h1> <p>The requested URL was not found on this server.</p> </body></html>';
+    const globalFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      headers: new Headers({ 'content-type': 'text/html' }),
+      text: vi.fn().mockResolvedValue(htmlBody),
+    });
+    vi.stubGlobal('fetch', globalFetch);
+
+    await expect(apiFetch('/api/v1/prices/compute?region=us-east')).rejects.toThrow(ApiError);
+
+    try {
+      await apiFetch('/api/v1/prices/compute?region=us-east');
+    } catch (err) {
+      const apiErr = err as ApiError;
+      expect(apiErr.status).toBe(404);
+      expect(apiErr.title).toBe('Not Found');
+      // Must NOT contain raw HTML tags
+      expect(apiErr.detail).not.toContain('<html>');
+      expect(apiErr.detail).not.toContain('<!DOCTYPE');
+      expect(apiErr.detail).toBe('Server returned HTTP 404 (Not Found)');
+    }
+  });
 });

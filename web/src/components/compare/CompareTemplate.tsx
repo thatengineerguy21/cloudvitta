@@ -171,7 +171,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
               <button
                 type="button"
                 onClick={onReset}
-                className="w-full flex items-center justify-center space-x-1.5 px-3 py-2 text-xs uppercase font-bold tracking-wider text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-border-default bg-surface-card transition-colors"
+                className="w-full flex items-center justify-center space-x-1.5 px-3 py-2 text-xs uppercase font-bold tracking-wider text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-border-default bg-surface-card transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
                 data-testid="reset-query-btn"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -202,7 +202,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                   id="sort-order"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-                  className="px-2 py-1 text-xs bg-surface-raised border border-border-default text-text-primary focus:outline-none focus:border-border-accent"
+                  className="px-2 py-1 text-xs bg-surface-raised border border-border-default text-text-primary focus:outline-none focus:border-border-accent focus-visible:ring-1 focus-visible:ring-border-accent"
                   aria-label="Sort by Price"
                   data-testid="sort-order-select"
                 >
@@ -243,7 +243,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                   <button
                     type="button"
                     onClick={() => refetch()}
-                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase font-bold tracking-wider text-text-primary hover:border-border-accent border border-border-default bg-surface-card transition-colors"
+                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase font-bold tracking-wider text-text-primary hover:border-border-accent border border-border-default bg-surface-card transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
                   >
                     <RefreshCw className="w-3 h-3" />
                     <span>Retry Query</span>
@@ -269,14 +269,14 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
             {/* Results Table */}
             {!isLoading && !isError && sortedResults.length > 0 && (
               <div className="overflow-x-auto border border-border-default">
-                <table className="w-full text-left border-collapse text-xs" data-testid="results-table">
+                <table className="w-full min-w-[640px] text-left border-collapse text-xs" data-testid="results-table" aria-label="Provider Comparison Results">
                   <thead>
                     <tr className="border-b border-border-default bg-surface-raised font-mono text-text-secondary uppercase">
-                      <th className="py-2.5 px-4 font-bold">Provider</th>
-                      <th className="py-2.5 px-4 font-bold">Matched Specification</th>
-                      <th className="py-2.5 px-4 font-bold">Match Quality</th>
-                      <th className="py-2.5 px-4 font-bold">Price</th>
-                      <th className="py-2.5 px-4 font-bold">Freshness</th>
+                      <th scope="col" className="py-2.5 px-4 font-bold">Provider</th>
+                      <th scope="col" className="py-2.5 px-4 font-bold">Matched Specification</th>
+                      <th scope="col" className="py-2.5 px-4 font-bold">Match Quality</th>
+                      <th scope="col" className="py-2.5 px-4 font-bold">Price</th>
+                      <th scope="col" className="py-2.5 px-4 font-bold">Freshness</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default bg-surface-card">

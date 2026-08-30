@@ -12,7 +12,7 @@ export const NotFoundPage: React.FC = () => {
 
   return (
     <div className="max-w-lg mx-auto" data-testid="not-found-page">
-      <div className="border border-border-default bg-surface-card p-12 text-center">
+      <div className="border border-border-default bg-surface-card p-6 sm:p-12 text-center">
         <span className="text-xs font-mono uppercase text-status-anomaly">
           404 &bull; Not Found
         </span>
@@ -21,7 +21,7 @@ export const NotFoundPage: React.FC = () => {
         </h1>
         <p className="text-sm text-text-secondary mt-3">
           The requested path{' '}
-          <code className="text-border-accent font-mono">{pathname}</code>{' '}
+          <code className="text-border-accent font-mono break-all">{pathname}</code>{' '}
           does not exist in the CloudVitta routing registry.
         </p>
         <div className="mt-6">
