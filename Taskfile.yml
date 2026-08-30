@@ -128,8 +128,25 @@ tasks:
     cmds:
       - npm run build
 
+  web:sync:
+    desc: Sync built frontend dist bundle into internal/transport/spa/dist
+    cmds:
+      - node -e "const fs=require('fs'); fs.cpSync('web/dist', 'internal/transport/spa/dist', {recursive:true});"
+
+  build:full:
+    desc: Build frontend, sync to embedded SPA dist, and build all Go binaries
+    cmds:
+      - task: web:build
+      - task: web:sync
+      - task: build
+
+  docker:build:
+    desc: Build unified production CloudVitta Docker container (Go + Embedded SPA)
+    cmds:
+      - docker build -t cloudvitta:latest .
+
   web:docker:build:
-    desc: Build production frontend Docker container
+    desc: Build standalone Nginx frontend Docker container
     cmds:
       - docker build -f Dockerfile.web -t cloudvitta-web:latest .
 
