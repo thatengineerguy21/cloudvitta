@@ -3,8 +3,8 @@
 This guide explains how to set up the infrastructure and manage the deployment of CloudVitta to Google Cloud Run via GitHub Actions.
 
 ## Architecture Overview
-- **CI (`ci.yml`)**: On every push and pull request, the pipeline lints code, runs tests against an ephemeral PostgreSQL container, and validates compilation.
-- **CD (`deploy.yml`)**: On pushes to `main`, the pipeline packages the application into a minimal distroless container image, pushes it to Google Artifact Registry (GAR), applies forward database migrations to Neon via `tern`, deploys the `cloudvitta-api` Cloud Run Service, deploys the `cloudvitta-ingest` Cloud Run Job, and triggers a post-deploy verification execution of the ingestion job.
+- **CI (`ci.yml`)**: On every push and pull request, the pipeline checks formatting, runs Go and frontend static analysis, runs unit and integration tests against an ephemeral PostgreSQL container, runs Playwright E2E smoke tests, and validates builds.
+- **CD (`deploy.yml`)**: Triggered automatically via `workflow_run` only when the **CI** workflow finishes successfully on `main` (or manually through `workflow_dispatch`). The pipeline packages the application into a minimal distroless container image, pushes it to Google Artifact Registry (GAR), applies forward database migrations to Neon via `tern`, deploys the `cloudvitta-api` Cloud Run Service, deploys the `cloudvitta-ingest` Cloud Run Job, and triggers a post-deploy verification execution of the ingestion job.
 - **Authentication**: GitHub Actions communicates with Google Cloud using **Workload Identity Federation** (WIF), which avoids long-lived service account keys.
 - **Scheduling**: Google Cloud Scheduler triggers recurring daily ingestion runs for the Cloud Run Ingestion Job through OpenID Connect (OIDC) authentication.
 
@@ -252,9 +252,10 @@ Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Va
 ## Phase 4: Day-to-Day Operations
 
 ### Deploying new code
-1. Create a branch and push your code. The **CI** pipeline (`ci.yml`) will run tests and linting.
-2. Open a Pull Request.
-3. Merge the Pull Request into `main`. The **CD** pipeline (`deploy.yml`) will automatically trigger.
+1. Create a branch and push your code. The **CI** pipeline (`ci.yml`) will run static analysis, tests, and build validation.
+2. Open a Pull Request. Verify all CI checks pass green before merging.
+3. Merge the Pull Request into `main`. The **CI** workflow will execute on `main`.
+4. When the **CI** workflow finishes with status `success`, GitHub Actions triggers the **CD** pipeline (`deploy.yml`) automatically via `workflow_run`. If CI fails, CD does not start.
 
 ### What happens during CD?
 1. **Build & Push**: The Go application is packaged into a minimal distroless container image containing both `/api` and `/ingest` statically compiled binaries, and pushed to Google Artifact Registry.

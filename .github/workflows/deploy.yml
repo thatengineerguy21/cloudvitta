@@ -1,9 +1,13 @@
 name: CD - Deploy to Cloud Run
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches:
       - main
+    types:
+      - completed
+  workflow_dispatch:
 
 env:
   GCP_REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION || 'asia-southeast1' }}
@@ -11,11 +15,13 @@ env:
   GAR_REPO: ${{ vars.GAR_REPO || secrets.GAR_REPO || 'cloudvitta-repo' }}
   SERVICE_NAME: ${{ vars.SERVICE_NAME || secrets.SERVICE_NAME || 'cloudvitta-api' }}
   INGEST_JOB_NAME: ${{ vars.INGEST_JOB_NAME || secrets.INGEST_JOB_NAME || 'cloudvitta-ingest' }}
+  COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   deploy:
     name: Build, Migrate, and Deploy
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success') }}
     
     # These permissions are required for Workload Identity Federation
     permissions:
@@ -25,6 +31,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
 
       - name: Google Auth
         id: auth
@@ -48,7 +56,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ env.COMMIT_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -82,7 +90,7 @@ jobs:
         with:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.GCP_REGION }}
-          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ env.COMMIT_SHA }}
           flags: '--allow-unauthenticated'
           env_vars: |
             DATABASE_URL=${{ secrets.NEON_PROD_DSN }}
@@ -104,7 +112,7 @@ jobs:
       - name: Deploy Cloud Run Ingest Job
         run: |
           gcloud run jobs deploy ${{ env.INGEST_JOB_NAME }} \
-            --image=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --image=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ steps.auth.outputs.project_id || secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE_NAME }}:${{ env.COMMIT_SHA }} \
             --region=${{ env.GCP_REGION }} \
             --command=/ingest \
             --memory=2Gi \
