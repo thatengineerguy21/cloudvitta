@@ -69,3 +69,7 @@ cloudvitta
 
 # User Context Documents
 /.user
+
+# Playwright Test Outputs
+playwright-report/
+test-results/

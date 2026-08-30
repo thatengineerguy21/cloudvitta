@@ -115,6 +115,15 @@ jobs:
       - name: Typecheck Frontend
         run: npm run typecheck
 
+      - name: Run Vitest Tests
+        run: npm test
+
       - name: Build Frontend
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Smoke Tests
+        run: npm run test:e2e
 

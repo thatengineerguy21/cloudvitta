@@ -110,9 +110,26 @@ tasks:
     cmds:
       - npm run typecheck
 
+  web:test:
+    desc: Run frontend unit and component tests (Vitest)
+    dir: web
+    cmds:
+      - npm test
+
+  web:test:e2e:
+    desc: Run frontend end-to-end smoke tests (Playwright)
+    dir: web
+    cmds:
+      - npm run test:e2e
+
   web:build:
     desc: Build production frontend bundle
     dir: web
     cmds:
       - npm run build
+
+  web:docker:build:
+    desc: Build production frontend Docker container
+    cmds:
+      - docker build -f Dockerfile.web -t cloudvitta-web:latest .
 

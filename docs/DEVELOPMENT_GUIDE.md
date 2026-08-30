@@ -500,3 +500,59 @@ Metrics track HTTP request rates, error rates, latencies, and custom application
   2. Select your Prometheus data source.
   3. Query `cache_requests_total` to inspect cache hit and miss counts.
 
+---
+
+## 9. Frontend SPA Development & Testing
+
+CloudVitta includes a React 19 single-page application (SPA) located in the `web/` directory.
+
+### 1. Local Development Server
+Start the local Vite development server with hot module replacement (HMR):
+```bash
+task web:dev
+# or
+cd web && npm run dev
+```
+The application is available at `http://localhost:3000`.
+
+### 2. Frontend Unit and Component Tests (Vitest)
+Execute the complete component and utility test suite:
+```bash
+task web:test
+# or
+cd web && npm test
+```
+
+### 3. End-to-End Smoke Tests (Playwright)
+Execute end-to-end smoke tests against Chromium:
+```bash
+task web:test:e2e
+# or
+cd web && npm run test:e2e
+```
+*Optional*: Run tests with the interactive visual UI:
+```bash
+cd web && npm run test:e2e:ui
+```
+
+### 4. Production Build & Docker Containerization
+Compile the production static bundle and verify TypeScript types:
+```bash
+task web:build
+# or
+cd web && npm run build
+```
+
+Build the production multi-stage Docker container (`Dockerfile.web` with hardened Nginx runtime):
+```bash
+task web:docker:build
+# or
+docker build -f Dockerfile.web -t cloudvitta-web:latest .
+```
+
+To run the frontend container locally:
+```bash
+docker run -p 8080:8080 cloudvitta-web:latest
+```
+Navigate to `http://localhost:8080` to verify HTML5 SPA routing fallback (`/index.html`), Content Security Policy (CSP), and security headers.
+

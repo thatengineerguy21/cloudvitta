@@ -84,6 +84,7 @@ Create directories only when their stage implementation requires them.
 │       └── deploy.yml           # GitHub Actions Cloud Run deploy workflow
 │
 ├── web/                         # React, Vite, TypeScript, and Tailwind frontend SPA
+│   ├── e2e/                     # Playwright end-to-end smoke test specs
 │   ├── src/                     # React source code, components, design tokens, and utilities
 │   │   ├── api/                 # fetch wrapper, RFC 7807 parsing, 401 mutex, TanStack Query hooks
 │   │   ├── auth/                # in-memory AuthProvider and useAuth context
@@ -95,13 +96,16 @@ Create directories only when their stage implementation requires them.
 │   │   └── types/               # generated OpenAPI types and domain honesty models
 │   ├── public/                  # Static assets (favicons, manifest)
 │   ├── index.html               # SPA HTML entry point
+│   ├── nginx.conf               # Hardened Nginx configuration for SPA routing fallback and security headers
+│   ├── playwright.config.ts     # Playwright E2E configuration
 │   ├── vite.config.ts           # Vite bundler and Vitest test configuration
 │   ├── tailwind.config.js       # Tailwind 0px geometry and theme tokens
 │   ├── tsconfig.json            # TypeScript project reference root
 │   └── package.json             # Frontend dependencies and scripts
 │
 ├── Taskfile.yml                 # task runner automation configuration
-├── Dockerfile                   # multi-stage container build
+├── Dockerfile                   # multi-stage Go backend container build
+├── Dockerfile.web               # multi-stage Vite SPA + Nginx production container build
 ├── sqlc.yaml                    # SQLC code generator configuration
 ├── .golangci.yml                # linter configuration
 ├── .env.example                 # sample environment variables

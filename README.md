@@ -71,8 +71,8 @@ flowchart TD
 | [Calculator Request Lifecycle](docs/diagrams/04-calculator-request-lifecycle.md) | Single-category cache-miss flow, composite calculation fan-out, and 9 MCP tools lifecycle |
 | [Auth Token Rotation & Theft Containment](docs/diagrams/05-auth-token-rotation.md) | Refresh token family rotation, idempotency replay cache, and theft detection |
 | [Package Structure & Dependencies](docs/diagrams/06-package-structure.md) | Modular monolith package hierarchy and dependency rules |
-| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 36 architectural decision records with context, trade-offs, and alternatives |
-| [Master Development Guide](docs/DEVELOPMENT_GUIDE.md) | Local environment setup, coding conventions, testing guidelines, and quality standards |
+| [Architectural Decision Records (ADRs)](docs/adr/README.md) | Index of 39 architectural decision records with context, trade-offs, and alternatives |
+| [Master Development Guide](docs/DEVELOPMENT_GUIDE.md) | Local environment setup, frontend & backend testing, and quality standards |
 | [Production Deployment Guide](docs/devops/01-deployment-guide.md) | Cloud Run service configuration, Google Cloud Secret Manager wiring, and CI/CD pipelines |
 
 ---
@@ -80,7 +80,8 @@ flowchart TD
 ## Local Development Quickstart
 
 ### 1. Prerequisites
-- Go 1.22+ installed
+- Go 1.26+ installed
+- Node.js 22+ installed
 - PostgreSQL instance (or Neon connection string)
 - Redis instance (or Upstash connection string)
 - `tern` migration tool: `go install github.com/jackc/tern/v2@latest`
@@ -101,15 +102,24 @@ tern migrate -m migrations -c tern.conf
 # Start API server (port 8080)
 go run cmd/api/main.go
 
+# Start Frontend development server (port 3000)
+cd web && npm run dev
+
 # Run Ingestion worker
 go run cmd/ingest/main.go
 ```
 
 ### 5. Run Test Suite
 ```bash
-# Run unit and race detection tests
+# Backend unit and race detection tests
 go test -race ./...
 
-# Run static analysis
+# Backend static analysis
 go vet ./...
+
+# Frontend component & E2E tests
+cd web
+npm test
+npm run test:e2e
 ```
+
