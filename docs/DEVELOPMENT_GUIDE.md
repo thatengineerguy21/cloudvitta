@@ -394,6 +394,14 @@ task dev:quarantine
    curl http://localhost:8080/api/v1/providers/digitalocean/status
    ```
 
+   **Provider Operational Status Vocabulary**:
+   - `healthy`: All declared and supported categories have fresh ingested pricing data within the staleness threshold.
+   - `partially_healthy`: All categories with ingested data are fresh and healthy, but one or more declared categories have zero observations (`count == 0`).
+   - `degraded`: One or more categories with ingested data have exceeded the staleness threshold or encountered active Dead Letter Queue (DLQ) failures.
+   - `stale`: All supported categories for the provider are stale or contain zero observations.
+   - `blocked`: Ingestion for a category is paused due to consecutive ingestion failures reaching the unrecoverable error threshold.
+   - `not_yet_ingested`: Ingestion pipelines for the provider are not yet active or scheduled.
+
 5. **Query Model Context Protocol (MCP) Streamable HTTP Tools (9 Tools)**:
    ```bash
    # List available tools (requires Bearer JWT)

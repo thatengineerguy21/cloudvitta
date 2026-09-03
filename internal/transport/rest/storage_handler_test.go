@@ -230,6 +230,9 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 	if awsResult.MonthlyCostUSD.String() != "11.5" {
 		t.Errorf("AWS MonthlyCostUSD = %s, want 11.5", awsResult.MonthlyCostUSD.String())
 	}
+	if awsResult.NormalizedHourlyUSD.IsZero() {
+		t.Errorf("AWS NormalizedHourlyUSD should be non-zero")
+	}
 	if awsResult.MatchQuality != "exact" {
 		t.Errorf("AWS MatchQuality = %q, want exact", awsResult.MatchQuality)
 	}

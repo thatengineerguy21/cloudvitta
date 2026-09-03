@@ -27,6 +27,7 @@ const PROVIDER_DISPLAY_NAMES: Record<Provider, string> = {
 /** Maps provider aggregate status to badge styling tokens. */
 const STATUS_BADGE_STYLES: Record<string, string> = {
   healthy: 'bg-status-matchExact/10 text-status-matchExact border-status-matchExact',
+  partially_healthy: 'bg-status-matchClose/10 text-status-matchClose border-status-matchClose',
   degraded: 'bg-status-stale/10 text-status-stale border-status-stale',
   stale: 'bg-status-stale/10 text-status-stale border-status-stale',
   blocked: 'bg-status-anomaly/10 text-status-anomaly border-status-anomaly',

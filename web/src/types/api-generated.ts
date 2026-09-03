@@ -737,6 +737,7 @@ export interface definitions {
     matched_spec?: definitions["domain.NetworkAttributes"];
     missing_attributes?: string[];
     monthly_cost_usd?: number;
+    normalized_hourly_usd?: number;
     price?: definitions["rest.PriceDetail"];
     provider?: string;
     sku_id?: string;
@@ -837,6 +838,7 @@ export interface definitions {
     matched_spec?: definitions["domain.StorageAttributes"];
     missing_attributes?: string[];
     monthly_cost_usd?: number;
+    normalized_hourly_usd?: number;
     price?: definitions["rest.PriceDetail"];
     provider?: string;
     sku_id?: string;

@@ -1626,6 +1626,9 @@
                 "monthly_cost_usd": {
                     "type": "number"
                 },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
                 "price": {
                     "$ref": "#/definitions/rest.PriceDetail"
                 },
@@ -1923,6 +1926,9 @@
                     }
                 },
                 "monthly_cost_usd": {
+                    "type": "number"
+                },
+                "normalized_hourly_usd": {
                     "type": "number"
                 },
                 "price": {

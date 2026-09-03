@@ -55,7 +55,7 @@ sequenceDiagram
     
     %% Scoring and Matching
     Svc->>Match: MatchObservations(requested_specs, observations)
-    Note over Match: Category-specific Strategy Scorer<br/>Assign match_quality (exact / close / loose)<br/>Dynamic join for DB & NoSQL candidates
+    Note over Match: Category-specific Strategy Scorer<br/>Assign match_quality (exact / close / approximate)<br/>Elastic categories (storage, network) match qualitative specs;<br/>volume applies as cost multiplier in pricing arithmetic.<br/>Dynamic join for DB & NoSQL candidates
     Match-->>Svc: Matched Price Result
     
     %% Freshness Evaluation
@@ -179,7 +179,7 @@ sequenceDiagram
             DLQ-->>FreshSvc: DLQ Failure Record (if present)
         end
         
-        FreshSvc->>FreshSvc: Resolve Overall Status (healthy / degraded / stale / blocked)
+        FreshSvc->>FreshSvc: Resolve Overall Status (healthy / partially_healthy / degraded / stale / blocked)
         FreshSvc-->>Handler: ProviderStatus Domain Model
         Handler-->>Client: 200 OK ProviderStatus JSON
     else Unknown Provider Identifier

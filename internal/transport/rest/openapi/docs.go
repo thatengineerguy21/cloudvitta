@@ -1638,6 +1638,9 @@ const docTemplate = `{
                 "monthly_cost_usd": {
                     "type": "number"
                 },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
                 "price": {
                     "$ref": "#/definitions/rest.PriceDetail"
                 },
@@ -1935,6 +1938,9 @@ const docTemplate = `{
                     }
                 },
                 "monthly_cost_usd": {
+                    "type": "number"
+                },
+                "normalized_hourly_usd": {
                     "type": "number"
                 },
                 "price": {

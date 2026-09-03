@@ -502,6 +502,8 @@ definitions:
         type: array
       monthly_cost_usd:
         type: number
+      normalized_hourly_usd:
+        type: number
       price:
         $ref: '#/definitions/rest.PriceDetail'
       provider:
@@ -698,6 +700,8 @@ definitions:
           type: string
         type: array
       monthly_cost_usd:
+        type: number
+      normalized_hourly_usd:
         type: number
       price:
         $ref: '#/definitions/rest.PriceDetail'

@@ -53,7 +53,6 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
 }) => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
-
   const toggleProviderExpanded = (provider: string) => {
     setExpandedProviders((prev) => ({
       ...prev,
@@ -61,9 +60,11 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
     }));
   };
 
+  const safeResults = useMemo(() => results ?? [], [results]);
+
   const setAllExpanded = (expanded: boolean) => {
     const next: Record<string, boolean> = {};
-    results.forEach((r) => {
+    safeResults.forEach((r) => {
       if (r.provider) next[r.provider] = expanded;
     });
     setExpandedProviders(next);
@@ -71,7 +72,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
 
   // ADR 0022 Honesty Sorting: Complete workload results always sort ahead of partial estimates
   const sortedResults = useMemo(() => {
-    return [...results].sort((a, b) => {
+    return [...safeResults].sort((a, b) => {
       const aIsPartial = Boolean(a.partial);
       const bIsPartial = Boolean(b.partial);
 
@@ -83,7 +84,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
       const priceB = getEffectivePrice(b);
       return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
     });
-  }, [results, sortOrder]);
+  }, [safeResults, sortOrder]);
 
   if (isError) {
     const isApiErr = error instanceof ApiError;

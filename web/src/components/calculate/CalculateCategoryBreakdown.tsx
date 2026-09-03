@@ -47,6 +47,8 @@ export const CalculateCategoryBreakdown: React.FC<CalculateCategoryBreakdownProp
   provider,
   warnings,
 }) => {
+  const safeCats = categories ?? {};
+
   const hasProviderAnomaly = warnings?.some(
     (w) =>
       w.code === 'pricing_anomaly_flagged' &&
@@ -61,7 +63,7 @@ export const CalculateCategoryBreakdown: React.FC<CalculateCategoryBreakdownProp
           icon: Box,
         };
         const Icon = catConfig.icon;
-        const result = categories[catKey] || (catKey === 'database_rdbms' ? categories['database'] : undefined);
+        const result = safeCats[catKey] || (catKey === 'database_rdbms' ? safeCats['database'] : undefined);
 
         if (!result) {
           return (

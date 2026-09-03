@@ -12,8 +12,9 @@ import {
 import { cn } from '../lib/utils';
 import { Activity } from 'lucide-react';
 
-const SUMMARY_STATE_COLORS: Record<HealthSummaryState, string> = {
+const SUMMARY_STATE_COLORS: Record<HealthSummaryState | 'partially_healthy', string> = {
   healthy: 'text-status-matchExact border-status-matchExact',
+  partially_healthy: 'text-status-matchClose border-status-matchClose',
   degraded: 'text-status-stale border-status-stale',
   error: 'text-status-anomaly border-status-anomaly',
   loading: 'text-text-secondary border-border-default',

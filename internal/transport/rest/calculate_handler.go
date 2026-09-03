@@ -313,7 +313,7 @@ func (h *CalculateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	var mappedResults []CalculateProviderResult
+	mappedResults := make([]CalculateProviderResult, 0)
 	for _, pr := range svcRes.Results {
 		mappedCats := make(map[string]CalculateCategoryResult)
 		for k, c := range pr.Categories {

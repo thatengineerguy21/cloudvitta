@@ -25,7 +25,7 @@ type CategoryStatus struct {
 // ProviderStatus represents the aggregate operational and data freshness status of a cloud provider.
 type ProviderStatus struct {
 	Provider            string                    `json:"provider"`
-	Status              string                    `json:"status"` // "healthy", "degraded", "stale", "blocked", "not_yet_ingested"
+	Status              string                    `json:"status"` // "healthy", "partially_healthy", "degraded", "stale", "blocked", "not_yet_ingested"
 	LastSuccessfulFetch *time.Time                `json:"last_successful_fetch,omitempty"`
 	Stale               bool                      `json:"stale"`
 	Categories          map[string]CategoryStatus `json:"categories"`

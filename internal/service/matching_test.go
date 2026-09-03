@@ -514,22 +514,21 @@ func TestMatchObservations_CloseTier(t *testing.T) {
 func TestMatchObservations_StorageTier(t *testing.T) {
 	tests := []struct {
 		name        string
-		candSize    float64
-		targetSize  float64
+		candClass   string
+		targetClass string
 		wantQuality string
 	}{
-		{"exact", 100, 100, "exact"},
-		{"close (within 15%)", 110, 100, "close"},             // 10% delta
-		{"approximate (within 60%)", 150, 100, "approximate"}, // 50% delta
-		{"none (over 60%)", 200, 100, ""},                     // 100% delta → nil
+		{"exact (same class)", "standard", "standard", "exact"},
+		{"approximate (one tier apart)", "infrequent_access", "standard", "approximate"}, // 50% delta <= 60%
+		{"none (two tiers apart)", "archive", "standard", ""},                            // 100% delta > 60% → nil
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obsList := []domain.PriceObservation{
-				{SkuID: "s", StorageAttributes: domain.StorageAttributes{SizeGB: tt.candSize}},
+				{SkuID: "s", StorageAttributes: domain.StorageAttributes{SizeGB: 1, StorageClass: tt.candClass}},
 			}
-			target := service.MatchTarget{SizeGB: tt.targetSize, Category: "storage"}
+			target := service.MatchTarget{SizeGB: 100, StorageClass: tt.targetClass, Category: "storage"}
 			result := service.MatchObservations(service.StorageScorer{}, obsList, target, service.StorageThresholds)
 
 			if tt.wantQuality == "" {
@@ -550,23 +549,22 @@ func TestMatchObservations_StorageTier(t *testing.T) {
 
 func TestMatchObservations_NetworkTier(t *testing.T) {
 	tests := []struct {
-		name         string
-		candEgress   float64
-		targetEgress float64
-		wantQuality  string
+		name        string
+		candType    string
+		targetType  string
+		wantQuality string
 	}{
-		{"exact", 500, 500, "exact"},
-		{"close (within 10%)", 520, 500, "close"},             // 4% delta
-		{"approximate (within 50%)", 700, 500, "approximate"}, // 40% delta
-		{"none (over 50%)", 1000, 500, ""},                    // 100% delta → nil
+		{"exact (same type)", "internet_egress", "internet_egress", "exact"},
+		{"approximate (one tier apart)", "inter_region", "internet_egress", "approximate"}, // 50% delta <= 50%
+		{"none (two tiers apart)", "intra_region", "internet_egress", ""},                  // 100% delta > 50% → nil
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obsList := []domain.PriceObservation{
-				{SkuID: "n", NetworkAttributes: domain.NetworkAttributes{EgressGB: tt.candEgress}},
+				{SkuID: "n", NetworkAttributes: domain.NetworkAttributes{EgressGB: 1, TransferType: tt.candType}},
 			}
-			target := service.MatchTarget{EgressGB: tt.targetEgress, Category: "network"}
+			target := service.MatchTarget{EgressGB: 500, TransferType: tt.targetType, Category: "network"}
 			result := service.MatchObservations(service.NetworkScorer{}, obsList, target, service.NetworkThresholds)
 
 			if tt.wantQuality == "" {

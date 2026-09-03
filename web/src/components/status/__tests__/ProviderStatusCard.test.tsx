@@ -163,4 +163,30 @@ describe('ProviderStatusCard', () => {
     expect(screen.getByText('Stale')).toBeInTheDocument();
     expect(screen.getByText('Fresh')).toBeInTheDocument();
   });
+
+  it('renders partially_healthy provider badge with close-match styling', async () => {
+    vi.spyOn(providerApi, 'getStatus').mockResolvedValue(
+      makeStatus('aws', 'partially_healthy', {
+        categories: {
+          compute: {
+            category: 'compute',
+            supported: true,
+            observation_count: 450,
+            stale: false,
+            staleness_threshold_hours: 168,
+          },
+        },
+      })
+    );
+
+    render(<ProviderStatusCard provider="aws" />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('provider-card-aws')).toBeInTheDocument();
+    });
+
+    const badge = screen.getByTestId('status-badge-aws');
+    expect(badge).toHaveTextContent('partially healthy');
+    expect(badge).toHaveClass('text-status-matchClose');
+  });
 });

@@ -174,7 +174,7 @@ func (h *DatabaseNoSQLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var results []DatabaseNoSQLResultEntry
+	results := make([]DatabaseNoSQLResultEntry, 0)
 	for _, item := range compRes.Results {
 		results = append(results, DatabaseNoSQLResultEntry{
 			Provider:          item.Provider,

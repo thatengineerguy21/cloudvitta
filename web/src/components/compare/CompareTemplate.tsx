@@ -94,14 +94,16 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
 }: CompareTemplateProps<TResult>) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  const safeResults = useMemo(() => results ?? [], [results]);
+
   const sortedResults = useMemo(() => {
-    return [...results].sort((a, b) => {
-      const priceA = a.normalized_hourly_usd != null ? Number(a.normalized_hourly_usd) : Infinity;
-      const priceB = b.normalized_hourly_usd != null ? Number(b.normalized_hourly_usd) : Infinity;
+    return [...safeResults].sort((a, b) => {
+      const priceA = a.normalized_hourly_usd ?? a.monthly_cost_usd ?? a.price?.amount ?? Infinity;
+      const priceB = b.normalized_hourly_usd ?? b.monthly_cost_usd ?? b.price?.amount ?? Infinity;
       if (priceA === priceB) return 0;
-      return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
+      return sortOrder === 'asc' ? Number(priceA) - Number(priceB) : Number(priceB) - Number(priceA);
     });
-  }, [results, sortOrder]);
+  }, [safeResults, sortOrder]);
 
   const anomalyProviders = useMemo(() => {
     const set = new Set<string>();

@@ -220,6 +220,9 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 	if awsResult.MonthlyCostUSD.String() != "90" {
 		t.Errorf("AWS MonthlyCostUSD = %s, want 90", awsResult.MonthlyCostUSD.String())
 	}
+	if awsResult.NormalizedHourlyUSD.IsZero() {
+		t.Errorf("AWS NormalizedHourlyUSD should be non-zero")
+	}
 	if awsResult.MatchQuality != "exact" {
 		t.Errorf("AWS MatchQuality = %q, want exact", awsResult.MatchQuality)
 	}
