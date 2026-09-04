@@ -45,6 +45,12 @@ const DefaultKubernetesServiceID = "CCD8-9BF1-090E"
 // DefaultKubernetesBillingCatalogURL is the base URL for the GCP Kubernetes Engine Billing Catalog API.
 const DefaultKubernetesBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultKubernetesServiceID + "/skus"
 
+// DefaultServerlessServiceID is the official GCP Cloud Billing service ID for Cloud Functions / Cloud Run functions.
+const DefaultServerlessServiceID = "29E7-DA93-CA13"
+
+// DefaultServerlessBillingCatalogURL is the base URL for the GCP Cloud Functions Billing Catalog API.
+const DefaultServerlessBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultServerlessServiceID + "/skus"
+
 // Client is an HTTP client for fetching GCP Cloud Billing Catalog API data.
 type Client struct {
 	httpClient *http.Client

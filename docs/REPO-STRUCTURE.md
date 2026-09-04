@@ -7,7 +7,7 @@ Create directories only when their stage implementation requires them.
 .
 ├── cmd/
 │   ├── api/                     # main() entrypoint for REST and MCP service
-│   ├── ingest/                  # main() entrypoint for scheduled ingestion worker
+│   ├── ingest/                  # main() entrypoint and adapter registration factory for scheduled ingestion worker
 │   ├── migrate/                 # database migration runner
 │   └── quarantine-digest/       # CLI utility for flagged price anomaly review
 │

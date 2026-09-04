@@ -26,9 +26,12 @@ sequenceDiagram
         Job->>Main: Start container (/ingest)
     end
 
-    Main->>Factory: BuildJobs()
-    Factory-->>Main: []Job (provider, category, limiter, retry)
+    Main->>Factory: buildProviderFactory(cfg, rawStorage, ctx)
+    Note over Main,Factory: Registers all 7 categories for Big 3 (compute, storage, network, database_rdbms, database_nosql, kubernetes, serverless) + 4 remaining providers
+    Main->>Orch: NewOrchestrator(..., factory)
     Main->>Orch: RunAll(ctx)
+    Orch->>Factory: BuildJobs()
+    Factory-->>Orch: []Job (provider, category, limiter, retry)
     
     par For each (provider, category) job via errgroup.SetLimit
         Orch->>Lock: AcquireIngestionLock (SET NX EX)
@@ -122,6 +125,11 @@ To prevent Cartesian explosion in the database, multi-meter services are ingeste
 3. **Serverless Compute (`serverless`)**:
    - Request fees: `rate_component = "request_fee"` (rate per 1M requests).
    - Duration fees: `rate_component = "duration_fee"` (rate per GB-second) or split `duration_fee_cpu` and `duration_fee_memory` (GCP).
+   - Ingestion Endpoints:
+     - AWS: AWS Price List API for AWS Lambda (`DefaultLambdaPriceListURL`).
+     - Azure: Azure Retail Prices API for Azure Functions (`DefaultFunctionsRetailPricesURL`).
+     - GCP: Cloud Billing Catalog API for Cloud Functions service ID `29E7-DA93-CA13` (`DefaultServerlessBillingCatalogURL`).
+   - Registration Parity: Factory constructor registers all seven declared categories for AWS, Azure, and GCP. Automated parity tests verify that declared categories match factory jobs.
 
 ---
 
