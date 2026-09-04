@@ -11,7 +11,10 @@ import (
 )
 
 type Querier interface {
+	CountComputeCatalogItems(ctx context.Context, arg CountComputeCatalogItemsParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	GetComputeCatalogItem(ctx context.Context, arg GetComputeCatalogItemParams) (ComputeInstanceCatalog, error)
+	GetComputeCatalogSummary(ctx context.Context) ([]GetComputeCatalogSummaryRow, error)
 	GetLatestFXRate(ctx context.Context, arg GetLatestFXRateParams) (FxRate, error)
 	GetLatestPriceForSKU(ctx context.Context, arg GetLatestPriceForSKUParams) (PriceObservation, error)
 	GetLatestPriceForSKUAndCategory(ctx context.Context, arg GetLatestPriceForSKUAndCategoryParams) (PriceObservation, error)
@@ -19,17 +22,20 @@ type Querier interface {
 	GetProviderCategoryStatus(ctx context.Context, provider string) ([]GetProviderCategoryStatusRow, error)
 	GetRefreshTokenByHashForUpdate(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRefreshTokenByID(ctx context.Context, id pgtype.UUID) (RefreshToken, error)
+	GetTotalComputeInstanceCountByProvider(ctx context.Context) ([]GetTotalComputeInstanceCountByProviderRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	// Note: Retained for Stage 1.9 user profile/tier lookup during token refresh rotation.
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	InsertPriceObservation(ctx context.Context, arg InsertPriceObservationParams) (int64, error)
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
+	ListComputeCatalogItems(ctx context.Context, arg ListComputeCatalogItemsParams) ([]ComputeInstanceCatalog, error)
 	ListLatestFXRates(ctx context.Context, baseCurrency string) ([]FxRate, error)
 	ListRefreshTokensByFamilyID(ctx context.Context, familyID pgtype.UUID) ([]RefreshToken, error)
 	RevokeRefreshTokenByHash(ctx context.Context, arg RevokeRefreshTokenByHashParams) error
 	RevokeRefreshTokenFamily(ctx context.Context, arg RevokeRefreshTokenFamilyParams) error
 	RevokeRefreshTokenWithReplacement(ctx context.Context, arg RevokeRefreshTokenWithReplacementParams) error
 	UpdatePriceObservationLastSeenAt(ctx context.Context, arg UpdatePriceObservationLastSeenAtParams) error
+	UpsertComputeCatalogItem(ctx context.Context, arg UpsertComputeCatalogItemParams) (int64, error)
 	UpsertFXRate(ctx context.Context, arg UpsertFXRateParams) (FxRate, error)
 }
 

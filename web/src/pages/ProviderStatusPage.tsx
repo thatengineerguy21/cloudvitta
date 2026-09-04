@@ -3,7 +3,9 @@ import React from 'react';
 import { BentoCard } from '../components/bento/BentoCard';
 import { BentoGrid } from '../components/bento/BentoGrid';
 import { ProviderStatusCard } from '../components/status/ProviderStatusCard';
+import { ComputeCatalogSummaryCard } from '../components/status/ComputeCatalogSummaryCard';
 import { CardErrorBoundary } from '../components/common/CardErrorBoundary';
+
 import {
   ALL_PROVIDERS,
   useProviderHealthSummary,
@@ -59,8 +61,14 @@ export const ProviderStatusPage: React.FC = () => {
         </div>
       </BentoCard>
 
+      {/* Compute Hardware Catalog Inventory Summary */}
+      <CardErrorBoundary>
+        <ComputeCatalogSummaryCard />
+      </CardErrorBoundary>
+
       {/* Provider Status Cards Grid */}
       <BentoGrid columns={12} gap="md">
+
         {ALL_PROVIDERS.map((provider) => (
           <div key={provider} className="col-span-1 md:col-span-6">
             <CardErrorBoundary>

@@ -306,7 +306,19 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		result.InsertedCount++
 	}
 
+	// Step 3b: Synchronize compute catalog inventory if compute category
+	if job.Category == "compute" && len(fetchResult.Observations) > 0 {
+		if syncErr := SyncComputeCatalog(ctx, o.queries, fetchResult.Observations); syncErr != nil {
+			slog.WarnContext(ctx, "failed to sync compute catalog inventory",
+				"provider", job.Provider,
+				"category", job.Category,
+				"error", syncErr,
+			)
+		}
+	}
+
 	// Step 4: Clear DLQ entry on success
+
 	if o.dlq != nil {
 		if clearErr := o.dlq.Clear(ctx, job.Provider, job.Category); clearErr != nil {
 			slog.WarnContext(ctx, "failed to clear DLQ entry on success",

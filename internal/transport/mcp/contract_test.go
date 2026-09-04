@@ -283,7 +283,7 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 		},
 	}
 
-	restRouter := rest.NewRouter(pricingSvc, nil, freshnessSvc, nil, rdb, cfg)
+	restRouter := rest.NewRouter(pricingSvc, nil, freshnessSvc, nil, nil, rdb, cfg)
 	mcpServer := mcp.NewServer(pricingSvc, freshnessSvc)
 
 	ctx := context.Background()

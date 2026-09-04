@@ -1754,7 +1754,86 @@ func handleGetProviderStatus(freshnessSvc *service.FreshnessService) sdk.ToolHan
 	}
 }
 
-// RegisterTools registers all 9 standard CloudVitta comparison and calculation tools on the given MCP server.
+// --- Get Compute Catalog Tool ---
+
+// GetComputeCatalogInput represents input parameters for the get_compute_catalog MCP tool.
+type GetComputeCatalogInput struct {
+	Provider       string   `json:"provider,omitempty" jsonschema:"Cloud provider filter (e.g. aws, azure, gcp)"`
+	Category       string   `json:"category,omitempty" jsonschema:"Instance category filter (e.g. general_purpose, compute_optimized, memory_optimized, gpu_accelerated, storage_optimized)"`
+	InstanceFamily string   `json:"instance_family,omitempty" jsonschema:"Instance family filter (e.g. t3, c5, Standard_D)"`
+	MinVCPU        *float64 `json:"min_vcpu,omitempty" jsonschema:"Minimum number of vCPUs"`
+	MaxVCPU        *float64 `json:"max_vcpu,omitempty" jsonschema:"Maximum number of vCPUs"`
+	MinMemoryGiB   *float64 `json:"min_memory_gib,omitempty" jsonschema:"Minimum RAM in GiB"`
+	MaxMemoryGiB   *float64 `json:"max_memory_gib,omitempty" jsonschema:"Maximum RAM in GiB"`
+	Limit          int32    `json:"limit,omitempty" jsonschema:"Maximum number of instances to return (default: 50, max: 200)"`
+	Offset         int32    `json:"offset,omitempty" jsonschema:"Number of instances to skip for pagination (default: 0)"`
+}
+
+// ComputeCatalogOutput represents the result returned by the get_compute_catalog MCP tool.
+type ComputeCatalogOutput struct {
+	Count     int                         `json:"count"`
+	Total     int64                       `json:"total"`
+	Instances []domain.ComputeCatalogItem `json:"instances"`
+}
+
+func handleGetComputeCatalog(catalogSvc *service.CatalogService) sdk.ToolHandlerFor[GetComputeCatalogInput, any] {
+	return func(ctx context.Context, req *sdk.CallToolRequest, input GetComputeCatalogInput) (*sdk.CallToolResult, any, error) {
+		if catalogSvc == nil {
+			return nil, nil, errors.New("catalog service unavailable")
+		}
+
+		filter := domain.CatalogFilter{
+			Limit:  input.Limit,
+			Offset: input.Offset,
+		}
+		if input.Provider != "" {
+			filter.Provider = &input.Provider
+		}
+		if input.Category != "" {
+			filter.Category = &input.Category
+		}
+		if input.InstanceFamily != "" {
+			filter.InstanceFamily = &input.InstanceFamily
+		}
+		if input.MinVCPU != nil {
+			if *input.MinVCPU < 0 {
+				return nil, nil, fmt.Errorf("min_vcpu must be non-negative: %f", *input.MinVCPU)
+			}
+			filter.MinVCPU = input.MinVCPU
+		}
+		if input.MaxVCPU != nil {
+			if *input.MaxVCPU < 0 {
+				return nil, nil, fmt.Errorf("max_vcpu must be non-negative: %f", *input.MaxVCPU)
+			}
+			filter.MaxVCPU = input.MaxVCPU
+		}
+		if input.MinMemoryGiB != nil {
+			if *input.MinMemoryGiB < 0 {
+				return nil, nil, fmt.Errorf("min_memory_gib must be non-negative: %f", *input.MinMemoryGiB)
+			}
+			filter.MinMemoryGiB = input.MinMemoryGiB
+		}
+		if input.MaxMemoryGiB != nil {
+			if *input.MaxMemoryGiB < 0 {
+				return nil, nil, fmt.Errorf("max_memory_gib must be non-negative: %f", *input.MaxMemoryGiB)
+			}
+			filter.MaxMemoryGiB = input.MaxMemoryGiB
+		}
+
+		instances, total, err := catalogSvc.ListCatalogInstances(ctx, filter)
+		if err != nil {
+			return nil, nil, MapServiceError(err)
+		}
+
+		return nil, ComputeCatalogOutput{
+			Count:     len(instances),
+			Total:     total,
+			Instances: instances,
+		}, nil
+	}
+}
+
+// RegisterTools registers all standard CloudVitta comparison, calculation, and catalog tools on the given MCP server.
 func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, freshnessSvc *service.FreshnessService, cfg *serverConfig) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "compare_compute",
@@ -1800,4 +1879,11 @@ func RegisterTools(server *sdk.Server, pricingSvc *service.PricingService, fresh
 		Name:        "get_provider_status",
 		Description: "Check data freshness, observation counts, staleness, and ingestion health for a cloud provider.",
 	}, instrumentTool("get_provider_status", cfg, handleGetProviderStatus(freshnessSvc)))
+
+	if cfg != nil && cfg.catalogSvc != nil {
+		sdk.AddTool(server, &sdk.Tool{
+			Name:        "get_compute_catalog",
+			Description: "Returns cloud compute virtual machine inventory and hardware specifications filtered by provider, category, and compute requirements.",
+		}, instrumentTool("get_compute_catalog", cfg, handleGetComputeCatalog(cfg.catalogSvc)))
+	}
 }

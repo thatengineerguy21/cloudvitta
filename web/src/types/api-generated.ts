@@ -165,6 +165,62 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/compute/instances": {
+    /** Returns paginated virtual machine specifications filtered by provider, category, family, and vCPU/RAM ranges. */
+    get: {
+      parameters: {
+        query: {
+          /** Cloud provider (aws, azure, gcp, etc.) */
+          provider?: string;
+          /** Instance category (general_purpose, compute_optimized, etc.) */
+          category?: string;
+          /** Instance family (t3, c5, Standard_D, etc.) */
+          instance_family?: string;
+          /** Minimum vCPU count */
+          min_vcpu?: number;
+          /** Maximum vCPU count */
+          max_vcpu?: number;
+          /** Minimum RAM in GiB */
+          min_memory_gib?: number;
+          /** Maximum RAM in GiB */
+          max_memory_gib?: number;
+          /** Limit (default: 50, max: 200) */
+          limit?: number;
+          /** Offset (default: 0) */
+          offset?: number;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["rest.CatalogInstancesResponse"];
+        };
+        /** Bad Request */
+        400: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
+  "/api/v1/catalog/compute/summary": {
+    /** Returns total instances, provider counts, and category breakdowns across all cloud providers. */
+    get: {
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["rest.CatalogSummaryResponse"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
   "/api/v1/prices/compute": {
     /** Returns normalized compute pricing across cloud providers for requested specs. */
     get: {
@@ -477,6 +533,24 @@ export interface definitions {
     ram_gb?: number;
     vcpu?: number;
   };
+  "domain.ComputeCatalogItem": {
+    attributes?: definitions["domain.ComputeAttributes"];
+    category?: string;
+    cpu_architecture?: string;
+    display_name?: string;
+    first_seen_at?: string;
+    gpu_count?: number;
+    gpu_type?: string;
+    id?: number;
+    instance_family?: string;
+    instance_type_id?: string;
+    is_burstable?: boolean;
+    is_current_gen?: boolean;
+    last_seen_at?: string;
+    memory_gib?: number;
+    provider?: string;
+    vcpu?: number;
+  };
   "domain.DatabaseNoSQLAttributes": {
     /** @description "throughput", "storage", "request_operations" */
     component_type?: string;
@@ -591,6 +665,16 @@ export interface definitions {
     meta?: definitions["rest.CalculateMeta"];
     results?: definitions["rest.CalculateProviderResult"][];
     warnings?: definitions["rest.ProviderWarning"][];
+  };
+  "rest.CatalogInstancesResponse": {
+    count?: number;
+    instances?: definitions["domain.ComputeCatalogItem"][];
+    total?: number;
+  };
+  "rest.CatalogSummaryResponse": {
+    category_breakdown?: { [key: string]: { [key: string]: number } };
+    provider_totals?: { [key: string]: number };
+    total_instances?: number;
   };
   "rest.CategoryStatusResponse": {
     /** @example compute */

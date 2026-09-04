@@ -15,8 +15,11 @@ import type {
   LogoutRequest,
   LogoutResponse,
   ProviderStatusResponse,
+  CatalogSummaryResponse,
+  CatalogInstancesResponse,
   CalculateRequestBody,
   CalculateResponse,
+
   ComputeComparisonResponse,
   StorageComparisonResponse,
   NetworkComparisonResponse,
@@ -25,7 +28,9 @@ import type {
   KubernetesComparisonResponse,
   ServerlessComparisonResponse,
   ComputeQueryParams,
+  ComputeCatalogQueryParams,
   StorageQueryParams,
+
   NetworkQueryParams,
   DatabaseQueryParams,
   DatabaseNoSQLQueryParams,
@@ -331,6 +336,18 @@ export const calculateApi = {
       body: JSON.stringify(body),
     }),
 };
+
+export const catalogApi = {
+  getComputeSummary: (options?: RequestOptions) =>
+    apiFetch<CatalogSummaryResponse>('/api/v1/catalog/compute/summary', options),
+
+  getComputeInstances: (query?: ComputeCatalogQueryParams, options?: RequestOptions) =>
+    apiFetch<CatalogInstancesResponse>(
+      buildComparisonUrl('/api/v1/catalog/compute/instances', (query || {}) as Record<string, QueryParamValue>),
+      options
+    ),
+};
+
 
 function cleanQueryParams(params: Record<string, QueryParamValue>): Record<string, string> {
   const result: Record<string, string> = {};

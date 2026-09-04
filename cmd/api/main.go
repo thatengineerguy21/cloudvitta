@@ -131,8 +131,10 @@ func main() {
 		service.WithAuthTracer(otelProviders.Tracer),
 	)
 
+	catalogSvc := service.NewCatalogService(queries, redisClient)
+
 	// --- REST Transport ---
-	restHandler := rest.NewRouter(pricingSvc, authSvc, freshnessSvc, dbPool, redisClient, cfg)
+	restHandler := rest.NewRouter(pricingSvc, authSvc, freshnessSvc, catalogSvc, dbPool, redisClient, cfg)
 
 	// --- MCP Transport (Streamable HTTP, Mandatory JWT Auth & Rate Limited) ---
 	mcpServer := mcp.NewServer(
@@ -140,6 +142,7 @@ func main() {
 		freshnessSvc,
 		mcp.WithTracer(otelProviders.Tracer),
 		mcp.WithMeter(otelProviders.Meter),
+		mcp.WithCatalogService(catalogSvc),
 	)
 	mcpStreamableHandler := mcp.NewStreamableHandler(mcpServer)
 

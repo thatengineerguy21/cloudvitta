@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -104,4 +105,185 @@ func ToInsertPriceObservationParams(obs domain.PriceObservation, rawGCSPath stri
 		LastSeenAt:      TimestamptzFromTime(obs.FetchedAt),
 		AnomalyStatus:   TextFromString(anomalyStatus),
 	}, nil
+}
+
+// ToComputeCatalogItem converts a store.ComputeInstanceCatalog row to a domain.ComputeCatalogItem.
+func ToComputeCatalogItem(row ComputeInstanceCatalog) (domain.ComputeCatalogItem, error) {
+	vcpuDec, err := NumericToDecimal(row.Vcpu)
+	if err != nil {
+		return domain.ComputeCatalogItem{}, fmt.Errorf("convert vcpu for %s: %w", row.InstanceTypeID, err)
+	}
+	memDec, err := NumericToDecimal(row.MemoryGib)
+	if err != nil {
+		return domain.ComputeCatalogItem{}, fmt.Errorf("convert memory_gib for %s: %w", row.InstanceTypeID, err)
+	}
+
+	var attrs domain.ComputeAttributes
+	if len(row.Attributes) > 0 {
+		if err := json.Unmarshal(row.Attributes, &attrs); err != nil {
+			return domain.ComputeCatalogItem{}, fmt.Errorf("unmarshal attributes for %s: %w", row.InstanceTypeID, err)
+		}
+	}
+
+	var gpuType *string
+	if row.GpuType.Valid {
+		gpuType = &row.GpuType.String
+	}
+
+	return domain.ComputeCatalogItem{
+		ID:              row.ID,
+		Provider:        row.Provider,
+		InstanceTypeID:  row.InstanceTypeID,
+		DisplayName:     row.DisplayName,
+		InstanceFamily:  row.InstanceFamily,
+		Category:        row.Category,
+		VCPU:            vcpuDec.InexactFloat64(),
+		MemoryGiB:       memDec.InexactFloat64(),
+		CPUArchitecture: row.CpuArchitecture,
+		GPUCount:        row.GpuCount,
+		GPUType:         gpuType,
+		IsBurstable:     row.IsBurstable,
+		IsCurrentGen:    row.IsCurrentGen,
+		FirstSeenAt:     row.FirstSeenAt.Time,
+		LastSeenAt:      row.LastSeenAt.Time,
+		Attributes:      attrs,
+	}, nil
+}
+
+// ToUpsertComputeCatalogItemParams constructs UpsertComputeCatalogItemParams from domain.ComputeCatalogItem.
+func ToUpsertComputeCatalogItemParams(item domain.ComputeCatalogItem) (UpsertComputeCatalogItemParams, error) {
+	vcpuNum, err := DecimalToNumeric(decimal.NewFromFloat(item.VCPU))
+	if err != nil {
+		return UpsertComputeCatalogItemParams{}, fmt.Errorf("convert vcpu for %s: %w", item.InstanceTypeID, err)
+	}
+	memNum, err := DecimalToNumeric(decimal.NewFromFloat(item.MemoryGiB))
+	if err != nil {
+		return UpsertComputeCatalogItemParams{}, fmt.Errorf("convert memory_gib for %s: %w", item.InstanceTypeID, err)
+	}
+
+	attrBytes, err := json.Marshal(item.Attributes)
+	if err != nil {
+		return UpsertComputeCatalogItemParams{}, fmt.Errorf("marshal attributes for %s: %w", item.InstanceTypeID, err)
+	}
+
+	var gpuType pgtype.Text
+	if item.GPUType != nil {
+		gpuType = TextFromString(*item.GPUType)
+	}
+
+	firstSeen := item.FirstSeenAt
+	if firstSeen.IsZero() {
+		firstSeen = time.Now().UTC()
+	}
+	lastSeen := item.LastSeenAt
+	if lastSeen.IsZero() {
+		lastSeen = time.Now().UTC()
+	}
+
+	return UpsertComputeCatalogItemParams{
+		Provider:        item.Provider,
+		InstanceTypeID:  item.InstanceTypeID,
+		DisplayName:     item.DisplayName,
+		InstanceFamily:  item.InstanceFamily,
+		Category:        item.Category,
+		Vcpu:            vcpuNum,
+		MemoryGib:       memNum,
+		CpuArchitecture: item.CPUArchitecture,
+		GpuCount:        item.GPUCount,
+		GpuType:         gpuType,
+		IsBurstable:     item.IsBurstable,
+		IsCurrentGen:    item.IsCurrentGen,
+		FirstSeenAt:     TimestamptzFromTime(firstSeen),
+		LastSeenAt:      TimestamptzFromTime(lastSeen),
+		Attributes:      attrBytes,
+	}, nil
+}
+
+// ToListComputeCatalogItemsParams constructs ListComputeCatalogItemsParams from domain.CatalogFilter.
+func ToListComputeCatalogItemsParams(filter domain.CatalogFilter) (ListComputeCatalogItemsParams, error) {
+	params := ListComputeCatalogItemsParams{
+		Limit:  filter.Limit,
+		Offset: filter.Offset,
+	}
+	if filter.Provider != nil && *filter.Provider != "" {
+		params.Provider = TextFromString(*filter.Provider)
+	}
+	if filter.Category != nil && *filter.Category != "" {
+		params.Category = TextFromString(*filter.Category)
+	}
+	if filter.InstanceFamily != nil && *filter.InstanceFamily != "" {
+		params.InstanceFamily = TextFromString(*filter.InstanceFamily)
+	}
+	if filter.MinVCPU != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MinVCPU))
+		if err != nil {
+			return params, err
+		}
+		params.MinVcpu = num
+	}
+	if filter.MaxVCPU != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MaxVCPU))
+		if err != nil {
+			return params, err
+		}
+		params.MaxVcpu = num
+	}
+	if filter.MinMemoryGiB != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MinMemoryGiB))
+		if err != nil {
+			return params, err
+		}
+		params.MinMemoryGib = num
+	}
+	if filter.MaxMemoryGiB != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MaxMemoryGiB))
+		if err != nil {
+			return params, err
+		}
+		params.MaxMemoryGib = num
+	}
+	return params, nil
+}
+
+// ToCountComputeCatalogItemsParams constructs CountComputeCatalogItemsParams from domain.CatalogFilter.
+func ToCountComputeCatalogItemsParams(filter domain.CatalogFilter) (CountComputeCatalogItemsParams, error) {
+	params := CountComputeCatalogItemsParams{}
+	if filter.Provider != nil && *filter.Provider != "" {
+		params.Provider = TextFromString(*filter.Provider)
+	}
+	if filter.Category != nil && *filter.Category != "" {
+		params.Category = TextFromString(*filter.Category)
+	}
+	if filter.InstanceFamily != nil && *filter.InstanceFamily != "" {
+		params.InstanceFamily = TextFromString(*filter.InstanceFamily)
+	}
+	if filter.MinVCPU != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MinVCPU))
+		if err != nil {
+			return params, err
+		}
+		params.MinVcpu = num
+	}
+	if filter.MaxVCPU != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MaxVCPU))
+		if err != nil {
+			return params, err
+		}
+		params.MaxVcpu = num
+	}
+	if filter.MinMemoryGiB != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MinMemoryGiB))
+		if err != nil {
+			return params, err
+		}
+		params.MinMemoryGib = num
+	}
+	if filter.MaxMemoryGiB != nil {
+		num, err := DecimalToNumeric(decimal.NewFromFloat(*filter.MaxMemoryGiB))
+		if err != nil {
+			return params, err
+		}
+		params.MaxMemoryGib = num
+	}
+	return params, nil
 }

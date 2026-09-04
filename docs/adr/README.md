@@ -48,3 +48,4 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0038-in-memory-token-lifecycle-and-anonymous-fallback.md](0038-in-memory-token-lifecycle-and-anonymous-fallback.md): In-Memory Token Lifecycle, Single-Flight Mutex Refresh, and Silent Anonymous Fallback
 - [0039-editorial-bento-design-system-and-harsh-geometry.md](0039-editorial-bento-design-system-and-harsh-geometry.md): Editorial Bento Design System, Harsh 0px Geometry, and Strict Visual Honesty Contract
 - [0040-unified-monolith-and-embedded-static-asset-serving.md](0040-unified-monolith-and-embedded-static-asset-serving.md): Unified Monolith and Embedded Static Asset Serving
+- [0041-dedicated-compute-instance-catalog-table.md](0041-dedicated-compute-instance-catalog-table.md): Dedicated Compute Instance Catalog Table and Hardware Specification Normalization

@@ -8,6 +8,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ComputeInstanceCatalog struct {
+	ID              int64              `json:"id"`
+	Provider        string             `json:"provider"`
+	InstanceTypeID  string             `json:"instance_type_id"`
+	DisplayName     string             `json:"display_name"`
+	InstanceFamily  string             `json:"instance_family"`
+	Category        string             `json:"category"`
+	Vcpu            pgtype.Numeric     `json:"vcpu"`
+	MemoryGib       pgtype.Numeric     `json:"memory_gib"`
+	CpuArchitecture string             `json:"cpu_architecture"`
+	GpuCount        int32              `json:"gpu_count"`
+	GpuType         pgtype.Text        `json:"gpu_type"`
+	IsBurstable     bool               `json:"is_burstable"`
+	IsCurrentGen    bool               `json:"is_current_gen"`
+	FirstSeenAt     pgtype.Timestamptz `json:"first_seen_at"`
+	LastSeenAt      pgtype.Timestamptz `json:"last_seen_at"`
+	Attributes      []byte             `json:"attributes"`
+}
+
 type FxRate struct {
 	ID             int64              `json:"id"`
 	BaseCurrency   string             `json:"base_currency"`

@@ -178,4 +178,46 @@ test.describe('Compare Views & Honesty Elements E2E', () => {
     await expect(page).toHaveURL(/\/compare\/storage/);
     await expect(page.getByRole('heading', { level: 1, name: /Storage Pricing Comparison/i })).toBeVisible();
   });
+
+  test('should allow selecting instance preset from catalog autocomplete on compute compare page', async ({ page }) => {
+    await page.route('**/api/v1/catalog/compute/instances*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          count: 1,
+          total: 1,
+          instances: [
+            {
+              id: 1,
+              provider: 'aws',
+              instance_type_id: 'c6i.large',
+              display_name: 'Compute Optimized c6i.large',
+              instance_family: 'c6i',
+              category: 'compute_optimized',
+              vcpu: 2,
+              memory_gib: 4,
+              cpu_architecture: 'x86_64',
+              gpu_count: 0,
+              is_burstable: false,
+              is_current_gen: true,
+              first_seen_at: '2026-01-01T00:00:00Z',
+              last_seen_at: '2026-09-04T00:00:00Z',
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/compare/compute');
+
+    await expect(page.getByTestId('instance-autocomplete')).toBeVisible();
+    await page.getByTestId('instance-autocomplete-trigger').click();
+    await expect(page.getByTestId('instance-autocomplete-dropdown')).toBeVisible();
+    await page.getByTestId('autocomplete-option-c6i.large').click();
+
+    await expect(page.getByTestId('instance-autocomplete-trigger')).toContainText('c6i.large');
+    await expect(page.getByTestId('compute-vcpu-input')).toHaveValue('2');
+    await expect(page.getByTestId('compute-ram-input')).toHaveValue('4');
+  });
 });

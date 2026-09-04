@@ -56,6 +56,25 @@ erDiagram
         TIMESTAMPTZ created_at
     }
 
+    compute_instance_catalog {
+        BIGSERIAL id PK
+        TEXT provider
+        TEXT instance_type_id
+        TEXT display_name
+        TEXT instance_family
+        TEXT category
+        NUMERIC vcpu
+        NUMERIC memory_gib
+        TEXT cpu_architecture
+        INTEGER gpu_count
+        TEXT gpu_type
+        BOOLEAN is_burstable
+        BOOLEAN is_current_gen
+        TIMESTAMPTZ first_seen_at
+        TIMESTAMPTZ last_seen_at
+        JSONB attributes
+    }
+
     users ||--o{ refresh_tokens : "owns"
     refresh_tokens ||--o| refresh_tokens : "replaced_by chain"
 ```
@@ -195,3 +214,24 @@ flowchart LR
     "free_tier_allowance": 400000
   }
   ```
+
+---
+
+## 4. Compute Hardware Instance Catalog (`compute_instance_catalog` - ADR 0041)
+
+The `compute_instance_catalog` table stores slowly changing virtual machine hardware specifications:
+- **`provider`**: Canonical provider identifier (`aws`, `azure`, `gcp`, `oracle`, `ibm`, `alibaba`, `digitalocean`).
+- **`instance_type_id`**: Provider instance type identifier (for example, `m6i.large`, `Standard_D4s_v5`).
+- **`display_name`**: Human-readable name.
+- **`instance_family`**: Normalized instance family identifier (for example, `m6i`, `d4s_v5`).
+- **`category`**: Normalized hardware category (`general_purpose`, `compute_optimized`, `memory_optimized`, `gpu_accelerated`, `storage_optimized`).
+- **`vcpu`**: Number of virtual processor cores.
+- **`memory_gib`**: Total memory capacity in gibibytes (GiB).
+- **`cpu_architecture`**: Instruction set architecture (`arm64`, `x86_64`).
+- **`gpu_count`**: Number of attached graphics processing units.
+- **`gpu_type`**: Optional GPU model name.
+- **`is_burstable`**: True if CPU performance is credit-based.
+- **`is_current_gen`**: True if the provider marks the instance as current generation.
+- **`first_seen_at`**: Timestamp when the system first observed this instance type.
+- **`last_seen_at`**: Timestamp of the latest price observation ingestion.
+- **`attributes`**: Optional JSONB payload with extra hardware dimensions.

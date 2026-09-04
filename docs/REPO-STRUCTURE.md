@@ -12,9 +12,9 @@ Create directories only when their stage implementation requires them.
 │   └── quarantine-digest/       # CLI utility for flagged price anomaly review
 │
 ├── internal/
-│   ├── domain/                  # pure business models (PriceObservation, MatchedSpec, etc.)
+│   ├── domain/                  # pure business models (PriceObservation, ComputeCatalogItem, MatchedSpec, etc.)
 │   │
-│   ├── service/                 # core domain service: Compare, Calculate, matching, FX orchestration
+│   ├── service/                 # core domain service: Compare, Calculate, CatalogService, matching, FX orchestration
 │   │
 │   ├── adapter/
 │   │   └── provider/
@@ -43,8 +43,8 @@ Create directories only when their stage implementation requires them.
 │   ├── quarantine/              # quarantine sink interface and recorder for unmapped entities
 │   │
 │   ├── transport/
-│   │   ├── rest/                # HTTP REST transport handlers, routing, and RFC 7807 error mappings
-│   │   ├── mcp/                 # Model Context Protocol Streamable HTTP tool handlers
+│   │   ├── rest/                # HTTP REST transport handlers (compare, calculate, catalog, auth, provider status), routing, and RFC 7807 error mappings
+│   │   ├── mcp/                 # Model Context Protocol Streamable HTTP tool handlers (compare, calculate, get_compute_catalog)
 │   │   └── spa/                 # embedded SPA static asset delivery, SPA fallback routing, and API guards
 │   │
 │   ├── config/                  # Koanf configuration loader and startup validation
@@ -89,7 +89,7 @@ Create directories only when their stage implementation requires them.
 │   ├── src/                     # React source code, components, design tokens, and utilities
 │   │   ├── api/                 # fetch wrapper, RFC 7807 parsing, 401 mutex, TanStack Query hooks
 │   │   ├── auth/                # in-memory AuthProvider and useAuth context
-│   │   ├── components/          # layout, bento grid, honesty badges, auth modals, compare template, and calculate builder
+│   │   ├── components/          # layout, bento grid, honesty badges, auth modals, compare template, calculate builder, and catalog autocomplete/summary
 │   │   ├── hooks/               # custom hooks (useUrlParams two-way query synchronization)
 │   │   ├── lib/                 # formatting, workload URL serialization, query client configuration, and class merging utils
 │   │   ├── pages/               # compare category views (compute, storage, network, db, k8s, serverless) and composite calculator
