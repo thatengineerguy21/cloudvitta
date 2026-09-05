@@ -45,11 +45,6 @@ func TestFactory_DeclaredCategoriesParity(t *testing.T) {
 			t.Errorf("provider %q declares zero supported categories", p)
 		}
 		for _, cat := range categories {
-			// DigitalOcean only has compute, storage, and network ingestion adapters implemented in v1.
-			// database_rdbms, kubernetes, and serverless ingestion adapters are deferred to subsequent stages.
-			if p == "digitalocean" && (cat == "database_rdbms" || cat == "kubernetes" || cat == "serverless") {
-				continue
-			}
 			key := provider.JobKey{Provider: p, Category: cat}
 			if !registered[key] {
 				t.Errorf("missing factory registration for provider %q, category %q", p, cat)
@@ -81,7 +76,9 @@ func TestFactory_ConditionalRegistrations(t *testing.T) {
 		}
 	}
 
-	// Core providers (AWS, Azure, GCP, Oracle, IBM) should still be registered
+	// Core providers (AWS, Azure, GCP, Oracle, IBM) should still be registered.
+	// IBM registers adapters unconditionally; authentication failure occurs at ingestion
+	// runtime, not at factory registration time (asymmetric to Alibaba/DigitalOcean).
 	coreProviders := []string{"aws", "azure", "gcp", "oracle", "ibm"}
 	for _, p := range coreProviders {
 		for _, cat := range service.SupportedCategoriesForProvider(p) {

@@ -18,7 +18,7 @@ func TestDatabaseRDBMSScorer_ExactMatch(t *testing.T) {
 		Provider:        "aws",
 		ServiceCategory: "database_rdbms",
 		SkuID:           "AWS-RDS-PG-M6G-XLARGE",
-		PriceAmount:     decimal.NewFromFloat(0.26),
+		PriceAmount:     decimal.RequireFromString("0.26"),
 		DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 			Engine:         "postgresql",
 			VCPU:           4,
@@ -130,7 +130,7 @@ func TestMatchDatabaseObservations_QueryTimeJoin(t *testing.T) {
 			ServiceCategory: "database_rdbms",
 			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
 			Region:          "us-east-1",
-			PriceAmount:     decimal.NewFromFloat(0.2600), // $0.26 / hr
+			PriceAmount:     decimal.RequireFromString("0.2600"), // $0.26 / hr
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 				Engine:        "postgresql",
 				VCPU:          4,
@@ -145,7 +145,7 @@ func TestMatchDatabaseObservations_QueryTimeJoin(t *testing.T) {
 			ServiceCategory: "database_rdbms",
 			SkuID:           "AWS-RDS-STORAGE-GP3",
 			Region:          "us-east-1",
-			PriceAmount:     decimal.NewFromFloat(0.115), // $0.115 / GB-mo
+			PriceAmount:     decimal.RequireFromString("0.115"), // $0.115 / GB-mo
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 				Engine:        "any",
 				StorageGB:     1,
@@ -183,10 +183,11 @@ func TestMatchDatabaseObservations_QueryTimeJoin(t *testing.T) {
 	// Instance: $0.26 / hr
 	// Storage: 100 GB * $0.115 / 730 = $0.0157534246575342 / hr
 	// Total: ~$0.275753... / hr
-	expectedMinHourly := decimal.NewFromFloat(0.27)
-	expectedMaxHourly := decimal.NewFromFloat(0.28)
-	if res.Observation.PriceAmount.LessThan(expectedMinHourly) || res.Observation.PriceAmount.GreaterThan(expectedMaxHourly) {
-		t.Errorf("expected combined hourly cost between %s and %s, got %s", expectedMinHourly, expectedMaxHourly, res.Observation.PriceAmount)
+	expectedInstance := decimal.RequireFromString("0.26")
+	expectedStorage := decimal.RequireFromString("0.115").Mul(decimal.RequireFromString("100")).Div(HoursInMonth)
+	expectedHourly := expectedInstance.Add(expectedStorage)
+	if !res.Observation.PriceAmount.Equal(expectedHourly) {
+		t.Errorf("expected combined hourly cost %s, got %s", expectedHourly, res.Observation.PriceAmount)
 	}
 	if res.Observation.DatabaseRDBMSAttributes.StorageGB != 100 {
 		t.Errorf("expected joined storage 100 GB, got %f", res.Observation.DatabaseRDBMSAttributes.StorageGB)
@@ -204,7 +205,7 @@ func TestMatchDatabaseObservations_ThresholdsTiers(t *testing.T) {
 		Provider:        "aws",
 		ServiceCategory: "database_rdbms",
 		SkuID:           "AWS-RDS-PG-M6G-XLARGE",
-		PriceAmount:     decimal.NewFromFloat(0.26),
+		PriceAmount:     decimal.RequireFromString("0.26"),
 		DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 			Engine:        "postgresql",
 			VCPU:          4,
@@ -287,7 +288,7 @@ func TestDatabaseRDBMSScorer_IOPSDistanceScoring(t *testing.T) {
 		Provider:        "aws",
 		ServiceCategory: "database_rdbms",
 		SkuID:           "AWS-RDS-PG-M6G-XLARGE-IOPS1000",
-		PriceAmount:     decimal.NewFromFloat(0.26),
+		PriceAmount:     decimal.RequireFromString("0.26"),
 		DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 			Engine:         "postgresql",
 			VCPU:           4,
@@ -365,7 +366,7 @@ func TestMatchDatabaseObservations_CombinedIOPSPriced(t *testing.T) {
 			ServiceCategory: "database_rdbms",
 			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
 			Region:          "us-east-1",
-			PriceAmount:     decimal.NewFromFloat(0.2600), // Instance: $0.26 / hr
+			PriceAmount:     decimal.RequireFromString("0.2600"), // Instance: $0.26 / hr
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 				Engine:        "postgresql",
 				VCPU:          4,
@@ -380,7 +381,7 @@ func TestMatchDatabaseObservations_CombinedIOPSPriced(t *testing.T) {
 			ServiceCategory: "database_rdbms",
 			SkuID:           "AWS-RDS-STORAGE-GP3",
 			Region:          "us-east-1",
-			PriceAmount:     decimal.NewFromFloat(0.115), // Storage: $0.115 / GB-mo -> 100 GB = $0.0157534 / hr
+			PriceAmount:     decimal.RequireFromString("0.115"), // Storage: $0.115 / GB-mo -> 100 GB = $0.0157534 / hr
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 				Engine:        "any",
 				StorageGB:     1,
@@ -395,7 +396,7 @@ func TestMatchDatabaseObservations_CombinedIOPSPriced(t *testing.T) {
 			ServiceCategory: "database_rdbms",
 			SkuID:           "AWS-RDS-IOPS-GP3",
 			Region:          "us-east-1",
-			PriceAmount:     decimal.NewFromFloat(0.010), // IOPS: $0.010 / IOPS-mo -> 3000 IOPS = $30/mo = $0.04109589 / hr
+			PriceAmount:     decimal.RequireFromString("0.010"), // IOPS: $0.010 / IOPS-mo -> 3000 IOPS = $30/mo = $0.04109589 / hr
 			Unit:            "IOPS-Mo",
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 				Engine:        "any",
@@ -428,11 +429,13 @@ func TestMatchDatabaseObservations_CombinedIOPSPriced(t *testing.T) {
 	// Storage: 100 * 0.115 / 730 = ~$0.0157534
 	// IOPS: 3000 * 0.010 / 730 = ~$0.0410959
 	// Total: ~$0.3168493 / hr
-	expectedMinHourly := decimal.NewFromFloat(0.31)
-	expectedMaxHourly := decimal.NewFromFloat(0.32)
-	if res.Observation.PriceAmount.LessThan(expectedMinHourly) || res.Observation.PriceAmount.GreaterThan(expectedMaxHourly) {
-		t.Fatalf("expected combined price between %s and %s (including IOPS rate), got %s",
-			expectedMinHourly, expectedMaxHourly, res.Observation.PriceAmount)
+	expectedInstance := decimal.RequireFromString("0.26")
+	expectedStorage := decimal.RequireFromString("0.115").Mul(decimal.RequireFromString("100")).Div(HoursInMonth)
+	expectedIOPS := decimal.RequireFromString("0.010").Mul(decimal.RequireFromString("3000")).Div(HoursInMonth)
+	expectedHourly := expectedInstance.Add(expectedStorage).Add(expectedIOPS)
+	if !res.Observation.PriceAmount.Equal(expectedHourly) {
+		t.Fatalf("expected combined price %s (including IOPS rate), got %s",
+			expectedHourly, res.Observation.PriceAmount)
 	}
 }
 
@@ -448,7 +451,7 @@ func TestMatchDatabaseObservations_EngineMismatchExcluded(t *testing.T) {
 			ServiceCategory: "database_rdbms",
 			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
 			Region:          "us-east-1",
-			PriceAmount:     decimal.NewFromFloat(0.26),
+			PriceAmount:     decimal.RequireFromString("0.26"),
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
 				Engine:        "postgresql",
 				VCPU:          4,

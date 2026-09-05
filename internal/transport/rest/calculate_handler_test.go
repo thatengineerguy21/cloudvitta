@@ -409,3 +409,315 @@ func TestCalculateHandler_ParameterBoundsValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateHandler_AllSevenCategories_Success(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	regionGroup := "us-east"
+
+	// 1. Compute
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "compute",
+			SkuID:           "SKU-AWS-C5-XLARGE",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.170"),
+			Unit:            "hour",
+			Attributes: domain.ComputeAttributes{
+				VCPU:   4,
+				RAMGB:  8,
+				Family: "compute_optimized",
+			},
+			FetchedAt: now,
+		},
+	}, cache.DefaultTTL)
+
+	// 2. Storage
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:          "aws",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-AWS-S3-STANDARD",
+			Region:            "us-east-1",
+			RegionGroup:       regionGroup,
+			PriceAmount:       decimal.RequireFromString("0.023"),
+			Unit:              "GB-Mo",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
+			FetchedAt:         now,
+		},
+	}, cache.DefaultTTL)
+
+	// 3. Network
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:          "aws",
+			ServiceCategory:   "network",
+			SkuID:             "SKU-AWS-NET-EGRESS",
+			Region:            "us-east-1",
+			RegionGroup:       regionGroup,
+			PriceAmount:       decimal.RequireFromString("0.090"),
+			Unit:              "GB",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 50, TransferType: "internet_egress"},
+			FetchedAt:         now,
+		},
+	}, cache.DefaultTTL)
+
+	// 4. Database RDBMS (Instance + Storage)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_rdbms", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.260"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "AWS-RDS-STORAGE-GP3",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.115"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "any",
+				StorageGB:     1,
+				StorageFamily: "gp3",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+	}, cache.DefaultTTL)
+
+	// 5. Database NoSQL (Throughput + Storage)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_nosql", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-READ",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.00013"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				ReadUnits:     1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-WRITE",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.00065"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				WriteUnits:    1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-AWS-DDB-STORAGE",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.25"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				StorageGB:     1,
+				StorageClass:  "standard",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+	}, cache.DefaultTTL)
+
+	// 6. Kubernetes
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "kubernetes", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "kubernetes",
+			SkuID:           "SKU-AWS-EKS-STANDARD",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.100"),
+			PriceCurrency:   "USD",
+			Unit:            "hour",
+			KubernetesAttributes: domain.KubernetesAttributes{
+				Tier: domain.KubernetesTierStandard,
+			},
+			FetchedAt: now,
+		},
+	}, cache.DefaultTTL)
+
+	// 7. Serverless
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "serverless", "us-east-1"), []domain.PriceObservation{
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-LAMBDA-REQ-X86",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.20"),
+			PriceCurrency:   "USD",
+			Unit:            "per_million_requests",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  "x86_64",
+				Tier:          "consumption",
+				ComponentType: "request_fee",
+				Unit:          "per_million_requests",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "aws",
+			ServiceCategory: "serverless",
+			SkuID:           "SKU-AWS-LAMBDA-DUR-X86",
+			Region:          "us-east-1",
+			RegionGroup:     regionGroup,
+			PriceAmount:     decimal.RequireFromString("0.0000166667"),
+			PriceCurrency:   "USD",
+			Unit:            "per_gb_second",
+			ServerlessRateAttributes: domain.ServerlessRateAttributes{
+				Architecture:  "x86_64",
+				Tier:          "consumption",
+				ComponentType: "duration_fee",
+				Unit:          "per_gb_second",
+			},
+			FetchedAt: now,
+		},
+	}, cache.DefaultTTL)
+
+	pricingSvc := service.NewPricingService(nil, rdb)
+	handler := rest.NewCalculateHandler(pricingSvc)
+
+	body := []byte(`{
+		"region": "us-east",
+		"compute": {
+			"vcpu": 4,
+			"ram_gb": 8,
+			"family": "compute_optimized"
+		},
+		"storage": {
+			"size_gb": 100,
+			"storage_class": "standard"
+		},
+		"network": {
+			"egress_gb": 50,
+			"transfer_type": "internet_egress"
+		},
+		"database_rdbms": {
+			"engine": "postgresql",
+			"vcpu": 4,
+			"ram_gb": 16,
+			"storage_gb": 100
+		},
+		"database_nosql": {
+			"data_model": "document",
+			"pricing_mode": "provisioned",
+			"read_units": 100,
+			"write_units": 20,
+			"storage_gb": 50
+		},
+		"kubernetes": {
+			"tier": "standard"
+		},
+		"serverless": {
+			"architecture": "x86_64",
+			"tier": "consumption",
+			"requests_per_month": 10000000,
+			"memory_mb": 512,
+			"execution_duration_ms": 200
+		}
+	}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", bytes.NewBuffer(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 OK. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp rest.CalculateResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response JSON: %v", err)
+	}
+
+	var awsResult *rest.CalculateProviderResult
+	for i := range resp.Results {
+		if resp.Results[i].Provider == "aws" {
+			awsResult = &resp.Results[i]
+			break
+		}
+	}
+
+	if awsResult == nil {
+		t.Fatalf("expected AWS result in composite calculate response")
+	}
+
+	if awsResult.Partial {
+		t.Errorf("expected AWS calculation to be complete (not partial)")
+	}
+	if awsResult.TotalNormalizedHourlyUSD == nil {
+		t.Errorf("expected AWS TotalNormalizedHourlyUSD to be non-nil for complete match")
+	}
+
+	allSevenCategories := []string{
+		"compute",
+		"storage",
+		"network",
+		"database_rdbms",
+		"database_nosql",
+		"kubernetes",
+		"serverless",
+	}
+
+	for _, cat := range allSevenCategories {
+		item, exists := awsResult.Categories[cat]
+		if !exists {
+			t.Errorf("expected category %q in AWS composite calculation, got missing", cat)
+			continue
+		}
+		if item.NormalizedHourlyUSD.LessThanOrEqual(decimal.Zero) {
+			t.Errorf("expected category %q to have positive NormalizedHourlyUSD, got %v", cat, item.NormalizedHourlyUSD)
+		}
+	}
+}

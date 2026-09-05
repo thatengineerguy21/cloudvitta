@@ -376,12 +376,12 @@ func TestMatchObservations_TieBreakOnSkuID(t *testing.T) {
 		{
 			SkuID:       "sku-z",
 			Attributes:  domain.ComputeAttributes{VCPU: 4, RAMGB: 16},
-			PriceAmount: decimal.NewFromFloat(0.50), // cheaper, but tie-break is NOT on price
+			PriceAmount: decimal.RequireFromString("0.50"), // cheaper, but tie-break is NOT on price
 		},
 		{
 			SkuID:       "sku-a",
 			Attributes:  domain.ComputeAttributes{VCPU: 4, RAMGB: 16},
-			PriceAmount: decimal.NewFromFloat(1.00), // more expensive
+			PriceAmount: decimal.RequireFromString("1.00"), // more expensive
 		},
 	}
 
@@ -738,6 +738,53 @@ func TestNetworkScorer_4NewProviders(t *testing.T) {
 			Provider:          "digitalocean",
 			SkuID:             "SKU-DO-NETWORK-BANDWIDTH",
 			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1000, TransferType: "internet_egress"},
+		},
+	}
+
+	for _, obs := range obsList {
+		t.Run(obs.Provider, func(t *testing.T) {
+			dist, missing, eligible := scorer.Score(obs, target)
+			if !eligible {
+				t.Fatalf("expected %s observation to be eligible", obs.Provider)
+			}
+			if dist != 0 {
+				t.Errorf("expected %s distance 0, got %f", obs.Provider, dist)
+			}
+			if len(missing) != 0 {
+				t.Errorf("expected no missing attributes for %s, got %v", obs.Provider, missing)
+			}
+		})
+	}
+}
+
+func TestComputeScorer_4NewProviders(t *testing.T) {
+	scorer := service.ComputeScorer{}
+	target := service.MatchTarget{
+		VCPU:     4,
+		RAMGB:    16,
+		Category: "compute",
+	}
+
+	obsList := []domain.PriceObservation{
+		{
+			Provider:   "oracle",
+			SkuID:      "SKU-OCI-COMPUTE-4-16",
+			Attributes: domain.ComputeAttributes{VCPU: 4, RAMGB: 16, Family: "general"},
+		},
+		{
+			Provider:   "ibm",
+			SkuID:      "SKU-IBM-COMPUTE-4-16",
+			Attributes: domain.ComputeAttributes{VCPU: 4, RAMGB: 16, Family: "general"},
+		},
+		{
+			Provider:   "alibaba",
+			SkuID:      "SKU-ALI-COMPUTE-4-16",
+			Attributes: domain.ComputeAttributes{VCPU: 4, RAMGB: 16, Family: "general"},
+		},
+		{
+			Provider:   "digitalocean",
+			SkuID:      "SKU-DO-COMPUTE-4-16",
+			Attributes: domain.ComputeAttributes{VCPU: 4, RAMGB: 16, Family: "general"},
 		},
 	}
 

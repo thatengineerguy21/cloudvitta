@@ -160,14 +160,14 @@ func TestSupportedCategories(t *testing.T) {
 	if !digitalocean.IsCategorySupported("network") {
 		t.Errorf("expected network to be supported")
 	}
-	if !digitalocean.IsCategorySupported("database_rdbms") {
-		t.Errorf("expected database_rdbms to be supported")
+	if digitalocean.IsCategorySupported("database_rdbms") {
+		t.Errorf("expected database_rdbms to NOT be supported by DigitalOcean")
 	}
-	if !digitalocean.IsCategorySupported("kubernetes") {
-		t.Errorf("expected kubernetes to be supported")
+	if digitalocean.IsCategorySupported("kubernetes") {
+		t.Errorf("expected kubernetes to NOT be supported by DigitalOcean")
 	}
-	if !digitalocean.IsCategorySupported("serverless") {
-		t.Errorf("expected serverless to be supported")
+	if digitalocean.IsCategorySupported("serverless") {
+		t.Errorf("expected serverless to NOT be supported by DigitalOcean")
 	}
 	if digitalocean.IsCategorySupported("database_nosql") {
 		t.Errorf("expected database_nosql to NOT be supported by DigitalOcean (Open Question #7)")
@@ -177,8 +177,8 @@ func TestSupportedCategories(t *testing.T) {
 	}
 
 	cats := digitalocean.SupportedCategories()
-	if len(cats) != 6 {
-		t.Errorf("SupportedCategories() length = %d, want 6", len(cats))
+	if len(cats) != 3 {
+		t.Errorf("SupportedCategories() length = %d, want 3", len(cats))
 	}
 }
 

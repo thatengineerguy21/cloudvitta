@@ -45,7 +45,7 @@ func TestPricingService_GetPrices_CacheHit(t *testing.T) {
 			DisplayName:     "t3.micro",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.0104),
+			PriceAmount:     decimal.RequireFromString("0.0104"),
 			PriceCurrency:   "USD",
 		},
 	}
@@ -67,6 +67,69 @@ func TestPricingService_GetPrices_CacheHit(t *testing.T) {
 	}
 	if got[0].SkuID != "SKU-TEST-1" {
 		t.Errorf("SkuID = %q, want SKU-TEST-1", got[0].SkuID)
+	}
+}
+
+func TestPricingService_GetPrices_AllCategories_CacheHit(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	svc := service.NewPricingService(nil, rdb)
+
+	categories := []string{
+		"compute",
+		"storage",
+		"network",
+		"database_rdbms",
+		"database_nosql",
+		"kubernetes",
+		"serverless",
+	}
+
+	for _, cat := range categories {
+		t.Run(cat, func(t *testing.T) {
+			skuID := "SKU-" + strings.ToUpper(cat) + "-1"
+			key := cache.BuildKey(cache.SchemaVersion, "aws", cat, "us-east-1")
+
+			cachedObs := []domain.PriceObservation{
+				{
+					Provider:        "aws",
+					ServiceCategory: cat,
+					SkuID:           skuID,
+					DisplayName:     cat + " resource",
+					Region:          "us-east-1",
+					RegionGroup:     "us-east",
+					PriceAmount:     decimal.RequireFromString("0.05"),
+					PriceCurrency:   "USD",
+				},
+			}
+
+			if err := cache.Warm(ctx, rdb, key, cachedObs, cache.DefaultTTL); err != nil {
+				t.Fatalf("cache.Warm failed for %s: %v", cat, err)
+			}
+
+			got, err := svc.GetPrices(ctx, "aws", cat, "us-east-1")
+			if err != nil {
+				t.Fatalf("GetPrices unexpected error for %s: %v", cat, err)
+			}
+
+			if len(got) != 1 {
+				t.Fatalf("got %d observations for %s, want 1", len(got), cat)
+			}
+			if got[0].SkuID != skuID {
+				t.Errorf("SkuID = %q, want %q", got[0].SkuID, skuID)
+			}
+			if got[0].ServiceCategory != cat {
+				t.Errorf("ServiceCategory = %q, want %q", got[0].ServiceCategory, cat)
+			}
+		})
 	}
 }
 

@@ -23,6 +23,7 @@ type mockQuerier struct {
 	revokeRefreshTokenFamilyFunc          func(ctx context.Context, arg store.RevokeRefreshTokenFamilyParams) error
 	listRefreshTokensByFamilyIDFunc       func(ctx context.Context, familyID pgtype.UUID) ([]store.RefreshToken, error)
 	getProviderCategoryStatusFunc         func(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error)
+	getPriceObservationsFunc              func(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error)
 }
 
 func (m *mockQuerier) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
@@ -102,7 +103,10 @@ func (m *mockQuerier) ListRefreshTokensByFamilyID(ctx context.Context, familyID 
 }
 
 func (m *mockQuerier) GetPriceObservations(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error) {
-	return nil, errors.New("GetPriceObservations not implemented")
+	if m.getPriceObservationsFunc != nil {
+		return m.getPriceObservationsFunc(ctx, arg)
+	}
+	return nil, nil
 }
 
 func (m *mockQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.GetLatestPriceForSKUParams) (store.PriceObservation, error) {

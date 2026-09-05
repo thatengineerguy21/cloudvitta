@@ -188,9 +188,78 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 		},
 	}
 
+	oracleObs := []domain.PriceObservation{
+		{
+			Provider:          "oracle",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-OCI-OBJ-STD",
+			DisplayName:       "Object Storage Standard",
+			Region:            "us-ashburn-1",
+			RegionGroup:       "us-east",
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.0255"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+			FetchedAt:         time.Now().UTC(),
+		},
+	}
+	ibmObs := []domain.PriceObservation{
+		{
+			Provider:          "ibm",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-IBM-COS-STD",
+			DisplayName:       "Cloud Object Storage Standard",
+			Region:            "us-east",
+			RegionGroup:       "us-east",
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.022"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+			FetchedAt:         time.Now().UTC(),
+		},
+	}
+	aliObs := []domain.PriceObservation{
+		{
+			Provider:          "alibaba",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-ALI-OSS-STD",
+			DisplayName:       "Object Storage Standard",
+			Region:            "us-east-1",
+			RegionGroup:       "us-east",
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.019"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+			FetchedAt:         time.Now().UTC(),
+		},
+	}
+	doObs := []domain.PriceObservation{
+		{
+			Provider:          "digitalocean",
+			ServiceCategory:   "storage",
+			SkuID:             "SKU-DO-SPACES-STD",
+			DisplayName:       "Spaces Standard Storage",
+			Region:            "nyc3",
+			RegionGroup:       "us-east",
+			Unit:              "GB-Mo",
+			PriceAmount:       decimal.RequireFromString("0.020"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			StorageAttributes: domain.StorageAttributes{SizeGB: 500, StorageClass: "standard"},
+			FetchedAt:         time.Now().UTC(),
+		},
+	}
+
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), awsObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", "eastus"), azureObs, cache.DefaultTTL)
 	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", "us-east4"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "oracle", "storage", "us-ashburn-1"), oracleObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "ibm", "storage", "us-east"), ibmObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "alibaba", "storage", "us-east-1"), aliObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "digitalocean", "storage", "nyc3"), doObs, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewStorageHandler(pricingSvc)
@@ -212,29 +281,48 @@ func TestStorageHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 	if resp.Meta.APIVersion != "v1" {
 		t.Errorf("APIVersion = %q, want v1", resp.Meta.APIVersion)
 	}
-	if len(resp.Results) != 3 {
-		t.Fatalf("got %d results, want 3 (AWS, Azure, GCP)", len(resp.Results))
+	expectedProviders := []string{"aws", "azure", "gcp", "oracle", "ibm", "alibaba", "digitalocean"}
+	if len(resp.Results) != len(expectedProviders) {
+		t.Fatalf("got %d results, want %d (%v)", len(resp.Results), len(expectedProviders), expectedProviders)
 	}
 
-	// Verify AWS 500 GB cost = 500 * 0.023 = 11.5
-	var awsResult *rest.StorageResultEntry
-	for i := range resp.Results {
-		if resp.Results[i].Provider == "aws" {
-			awsResult = &resp.Results[i]
-			break
+	resultsByProvider := make(map[string]rest.StorageResultEntry)
+	for _, res := range resp.Results {
+		resultsByProvider[res.Provider] = res
+	}
+
+	for _, p := range expectedProviders {
+		res, ok := resultsByProvider[p]
+		if !ok {
+			t.Errorf("missing result for provider %q", p)
+			continue
+		}
+		if res.MatchQuality != "exact" {
+			t.Errorf("provider %q MatchQuality = %q, want exact", p, res.MatchQuality)
+		}
+		if res.Price.Currency != "USD" {
+			t.Errorf("provider %q currency = %q, want USD", p, res.Price.Currency)
+		}
+		if res.MonthlyCostUSD.LessThanOrEqual(decimal.Zero) {
+			t.Errorf("provider %q MonthlyCostUSD = %s, want > 0", p, res.MonthlyCostUSD)
+		}
+		if res.NormalizedHourlyUSD.LessThanOrEqual(decimal.Zero) {
+			t.Errorf("provider %q NormalizedHourlyUSD = %s, want > 0", p, res.NormalizedHourlyUSD)
 		}
 	}
-	if awsResult == nil {
-		t.Fatalf("missing aws result")
+
+	// Verify specific calculated monthly costs:
+	// AWS: 500 * 0.023 = 11.5
+	if awsRes := resultsByProvider["aws"]; awsRes.MonthlyCostUSD.String() != "11.5" {
+		t.Errorf("AWS MonthlyCostUSD = %s, want 11.5", awsRes.MonthlyCostUSD.String())
 	}
-	if awsResult.MonthlyCostUSD.String() != "11.5" {
-		t.Errorf("AWS MonthlyCostUSD = %s, want 11.5", awsResult.MonthlyCostUSD.String())
+	// Azure: 500 * 0.0184 = 9.2
+	if azRes := resultsByProvider["azure"]; azRes.MonthlyCostUSD.String() != "9.2" {
+		t.Errorf("Azure MonthlyCostUSD = %s, want 9.2", azRes.MonthlyCostUSD.String())
 	}
-	if awsResult.NormalizedHourlyUSD.IsZero() {
-		t.Errorf("AWS NormalizedHourlyUSD should be non-zero")
-	}
-	if awsResult.MatchQuality != "exact" {
-		t.Errorf("AWS MatchQuality = %q, want exact", awsResult.MatchQuality)
+	// GCP: 500 * 0.020 = 10
+	if gcpRes := resultsByProvider["gcp"]; gcpRes.MonthlyCostUSD.String() != "10" {
+		t.Errorf("GCP MonthlyCostUSD = %s, want 10", gcpRes.MonthlyCostUSD.String())
 	}
 }
 

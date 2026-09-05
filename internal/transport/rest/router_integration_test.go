@@ -247,4 +247,272 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 			t.Errorf("expected X-RateLimit-Limit header, got empty")
 		}
 	})
+
+	t.Run("GET /api/v1/prices/storage returns 200 with rate limiting", func(t *testing.T) {
+		obs := []domain.PriceObservation{
+			{
+				Provider:          "aws",
+				ServiceCategory:   "storage",
+				SkuID:             "SKU-AWS-S3-STD",
+				Region:            "us-east-1",
+				RegionGroup:       "us-east",
+				PriceAmount:       decimal.RequireFromString("0.023"),
+				PriceCurrency:     "USD",
+				StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard"},
+				FetchedAt:         time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", "us-east-1"), obs, time.Hour)
+
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/storage?size_gb=100&region=us-east", nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Origin", "https://cloudvitta.dev")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+		if limit := resp.Header.Get("X-RateLimit-Limit"); limit == "" {
+			t.Errorf("expected X-RateLimit-Limit header, got empty")
+		}
+	})
+
+	t.Run("GET /api/v1/prices/network returns 200 with rate limiting", func(t *testing.T) {
+		obs := []domain.PriceObservation{
+			{
+				Provider:          "aws",
+				ServiceCategory:   "network",
+				SkuID:             "SKU-AWS-NET-EGRESS",
+				Region:            "us-east-1",
+				RegionGroup:       "us-east",
+				PriceAmount:       decimal.RequireFromString("0.090"),
+				PriceCurrency:     "USD",
+				NetworkAttributes: domain.NetworkAttributes{EgressGB: 100, TransferType: "internet_egress"},
+				FetchedAt:         time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), obs, time.Hour)
+
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/network?egress_gb=100&region=us-east", nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Origin", "https://cloudvitta.dev")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+		if limit := resp.Header.Get("X-RateLimit-Limit"); limit == "" {
+			t.Errorf("expected X-RateLimit-Limit header, got empty")
+		}
+	})
+
+	t.Run("GET /api/v1/prices/database returns 200 with rate limiting", func(t *testing.T) {
+		obs := []domain.PriceObservation{
+			{
+				Provider:        "aws",
+				ServiceCategory: "database_rdbms",
+				SkuID:           "AWS-RDS-PG-M6G-XLARGE",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.260"),
+				PriceCurrency:   "USD",
+				Unit:            "Hrs",
+				DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+					Engine:         "postgresql",
+					VCPU:           4,
+					RAMGB:          16,
+					DeploymentTier: "standard",
+					ComponentType:  "instance",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+			{
+				Provider:        "aws",
+				ServiceCategory: "database_rdbms",
+				SkuID:           "AWS-RDS-STORAGE-GP3",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.115"),
+				PriceCurrency:   "USD",
+				Unit:            "GB-Mo",
+				DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+					Engine:        "any",
+					StorageGB:     1,
+					StorageFamily: "gp3",
+					ComponentType: "storage",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_rdbms", "us-east-1"), obs, time.Hour)
+
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/database?engine=postgresql&vcpu=4&ram_gb=16&storage_gb=100&region=us-east", nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Origin", "https://cloudvitta.dev")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+		if limit := resp.Header.Get("X-RateLimit-Limit"); limit == "" {
+			t.Errorf("expected X-RateLimit-Limit header, got empty")
+		}
+	})
+
+	t.Run("GET /api/v1/prices/database-nosql returns 200 with rate limiting", func(t *testing.T) {
+		obs := []domain.PriceObservation{
+			{
+				Provider:        "aws",
+				ServiceCategory: "database_nosql",
+				SkuID:           "SKU-AWS-DDB-READ",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.00013"),
+				PriceCurrency:   "USD",
+				Unit:            "Hrs",
+				DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+					DataModel:     "document",
+					PricingMode:   "provisioned",
+					ReadUnits:     1,
+					ComponentType: "throughput",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+			{
+				Provider:        "aws",
+				ServiceCategory: "database_nosql",
+				SkuID:           "SKU-AWS-DDB-WRITE",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.00065"),
+				PriceCurrency:   "USD",
+				Unit:            "Hrs",
+				DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+					DataModel:     "document",
+					PricingMode:   "provisioned",
+					WriteUnits:    1,
+					ComponentType: "throughput",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+			{
+				Provider:        "aws",
+				ServiceCategory: "database_nosql",
+				SkuID:           "SKU-AWS-DDB-STORAGE",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.25"),
+				PriceCurrency:   "USD",
+				Unit:            "GB-Mo",
+				DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+					DataModel:     "document",
+					PricingMode:   "provisioned",
+					StorageGB:     1,
+					StorageClass:  "standard",
+					ComponentType: "storage",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.SchemaVersion, "aws", "database_nosql", "us-east-1"), obs, time.Hour)
+
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/database-nosql?read_units=100&write_units=20&storage_gb=50&pricing_mode=provisioned&region=us-east", nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Origin", "https://cloudvitta.dev")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+		if limit := resp.Header.Get("X-RateLimit-Limit"); limit == "" {
+			t.Errorf("expected X-RateLimit-Limit header, got empty")
+		}
+	})
+
+	t.Run("GET /api/v1/prices/serverless returns 200 with rate limiting", func(t *testing.T) {
+		obs := []domain.PriceObservation{
+			{
+				Provider:        "aws",
+				ServiceCategory: "serverless",
+				SkuID:           "SKU-AWS-LAMBDA-REQ-X86",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.20"),
+				PriceCurrency:   "USD",
+				Unit:            "per_million_requests",
+				ServerlessRateAttributes: domain.ServerlessRateAttributes{
+					Architecture:  "x86_64",
+					Tier:          "consumption",
+					ComponentType: "request_fee",
+					Unit:          "per_million_requests",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+			{
+				Provider:        "aws",
+				ServiceCategory: "serverless",
+				SkuID:           "SKU-AWS-LAMBDA-DUR-X86",
+				Region:          "us-east-1",
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString("0.0000166667"),
+				PriceCurrency:   "USD",
+				Unit:            "per_gb_second",
+				ServerlessRateAttributes: domain.ServerlessRateAttributes{
+					Architecture:  "x86_64",
+					Tier:          "consumption",
+					ComponentType: "duration_fee",
+					Unit:          "per_gb_second",
+				},
+				FetchedAt: time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.SchemaVersion, "aws", "serverless", "us-east-1"), obs, time.Hour)
+
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/serverless?requests_per_month=1000000&duration_ms=200&memory_mb=128&region=us-east", nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Origin", "https://cloudvitta.dev")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+		if limit := resp.Header.Get("X-RateLimit-Limit"); limit == "" {
+			t.Errorf("expected X-RateLimit-Limit header, got empty")
+		}
+	})
 }
