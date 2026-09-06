@@ -31,13 +31,15 @@ func WithCategory(category string) AdapterOption {
 
 // Adapter handles fetching, persisting raw response to GCS, and normalizing AWS pricing.
 type Adapter struct {
-	client          *Client
-	storage         storage.RawStorage
-	category        string
-	tracer          trace.Tracer
-	meter           metric.Meter
-	fetchCounter    metric.Int64Counter
-	unmappedCounter metric.Int64Counter
+	client            *Client
+	storage           storage.RawStorage
+	category          string
+	tracer            trace.Tracer
+	meter             metric.Meter
+	fetchCounter      metric.Int64Counter
+	unmappedCounter   metric.Int64Counter
+	fetchDurationHist metric.Float64Histogram
+	bytesCounter      metric.Int64Counter
 }
 
 // NewAdapter constructs a new AWS provider adapter.
@@ -45,15 +47,27 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 	meter := otel.Meter("cloudvitta.adapter.aws")
 	fetchCounter, _ := meter.Int64Counter("aws.fetch.count", metric.WithDescription("Number of AWS fetch operations"))
 	unmappedCounter, _ := meter.Int64Counter("aws.normalize.unmapped_count", metric.WithDescription("Number of unmapped AWS taxonomy items"))
+	fetchDurationHist, _ := meter.Float64Histogram(
+		"adapter.fetch.duration_seconds",
+		metric.WithDescription("Duration of provider fetch operation in seconds"),
+		metric.WithUnit("s"),
+	)
+	bytesCounter, _ := meter.Int64Counter(
+		"adapter.fetch.bytes_total",
+		metric.WithDescription("Total number of raw response bytes streamed to storage"),
+		metric.WithUnit("By"),
+	)
 
 	a := &Adapter{
-		client:          client,
-		storage:         st,
-		category:        "compute",
-		tracer:          otel.Tracer("cloudvitta.adapter.aws"),
-		meter:           meter,
-		fetchCounter:    fetchCounter,
-		unmappedCounter: unmappedCounter,
+		client:            client,
+		storage:           st,
+		category:          "compute",
+		tracer:            otel.Tracer("cloudvitta.adapter.aws"),
+		meter:             meter,
+		fetchCounter:      fetchCounter,
+		unmappedCounter:   unmappedCounter,
+		fetchDurationHist: fetchDurationHist,
+		bytesCounter:      bytesCounter,
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -63,12 +77,32 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 
 // Fetch retrieves the AWS price list, concurrently streams raw JSON to storage and normalizes it.
 // Returns a domain.FetchResult containing the observations and raw GCS path, and any error.
-func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.FetchResult, error) {
+func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.FetchResult, err error) {
 	ctx, span := a.tracer.Start(ctx, "aws.fetch")
 	defer span.End()
 
+	startTime := time.Now()
+	category := a.category
+	if category == "" {
+		category = "compute"
+	}
+	defer func() {
+		dur := time.Since(startTime).Seconds()
+		status := "ok"
+		if err != nil {
+			status = "error"
+		}
+		if a.fetchDurationHist != nil {
+			a.fetchDurationHist.Record(ctx, dur, metric.WithAttributes(
+				attribute.String("provider", "aws"),
+				attribute.String("category", category),
+				attribute.String("status", status),
+			))
+		}
+	}()
+
 	if limiter != nil {
-		if err := limiter.Wait(ctx); err != nil {
+		if err = limiter.Wait(ctx); err != nil {
 			return domain.FetchResult{}, fmt.Errorf("aws adapter: rate limit wait: %w", err)
 		}
 	}
@@ -76,10 +110,6 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	fetchedAt := time.Now().UTC()
 	fetchID := uuid.New().String()
 	dateStr := fetchedAt.Format("2006-01-02")
-	category := a.category
-	if category == "" {
-		category = "compute"
-	}
 	gcsPath := fmt.Sprintf("raw/aws/%s/%s/%s.json", category, dateStr, fetchID)
 
 	body, err := a.client.FetchPriceList(ctx)
@@ -91,8 +121,9 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	}
 	defer func() { _ = body.Close() }()
 
+	cr := provider.NewCountingReader(body)
 	pr, pw := io.Pipe()
-	tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
+	tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
 
 	qSink := quarantine.NewStorageSink(a.storage, "aws", category, fetchID, fetchedAt)
 	var normResult domain.NormalizationResult
@@ -120,11 +151,18 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		return nil
 	})
 
-	if err := g.Wait(); err != nil {
+	if err = g.Wait(); err != nil {
 		if a.fetchCounter != nil {
 			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
 		}
 		return domain.FetchResult{}, err
+	}
+
+	if a.bytesCounter != nil {
+		a.bytesCounter.Add(ctx, cr.BytesRead(), metric.WithAttributes(
+			attribute.String("provider", "aws"),
+			attribute.String("category", category),
+		))
 	}
 
 	// Flush quarantined unmapped items to storage

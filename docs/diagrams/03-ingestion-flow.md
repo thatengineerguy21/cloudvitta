@@ -53,14 +53,14 @@ sequenceDiagram
                 end
             end
 
-            Adapter->>GCS: Store Raw Response (before normalizing)
+            Adapter->>GCS: Store Raw Response via WriteStream (span: gcs.write, metric: storage_operation_duration_seconds)
             GCS-->>Adapter: Return Storage Ref
             
             critical Streaming JSON Normalization & Multi-Component Split
                 Note over Adapter: Streaming parser requires 'products' before 'terms'
                 alt Schema ordering violation ('terms' before 'products')
                     Adapter-->>Orch: ErrPermanentFailure (schema shape mismatch)
-                    Orch->>DLQ: Record as 'blocked' (no retry burn)
+                    Orch->>DLQ: Record as 'blocked' (span: dlq.record, metric: dlq_operations_total)
                 else Valid ordering
                     Adapter->>Adapter: Stream tokens, skip unused blocks via depth tracking
                     
@@ -70,15 +70,16 @@ sequenceDiagram
                     end
                     
                     Note over Adapter: Multi-Component Observation Splits:<br/>1. RDBMS -> instance + storage rows (ADR 0030)<br/>2. NoSQL -> throughput + storage rows (ADR 0033)<br/>3. Serverless -> request_fee + duration_fee (CPU/Mem)<br/>4. Multi-Provider Parity (AWS, Azure, GCP, Oracle, IBM, Alibaba, DigitalOcean)
+                    Note over Adapter: Records adapter.fetch.duration_seconds and adapter.fetch.bytes_total
                     Adapter-->>Orch: FetchResult (observations + unmappedCount + GCS path)
                 end
             end
             
             alt Unmapped Ratio Exceeds Threshold (> 5%)
-                Orch->>DLQ: Record as 'blocked' (breaking API change detected)
+                Orch->>DLQ: Record as 'blocked' (span: dlq.record, metric: dlq_operations_total)
             else Normal Unmapped Ratio (<= 5%)
                 loop For each observation
-                    Orch->>DB: GetLatestPriceForSKU (anomaly check)
+                    Orch->>DB: GetLatestPriceForSKU (span: pgx.Query via otelpgx)
                     alt Price ratio >= 10x
                         Orch->>DB: Upsert with anomaly_status = 'pending_review'
                     else Price unchanged
@@ -88,13 +89,13 @@ sequenceDiagram
                     end
                 end
                 
-                Orch->>DLQ: Clear entry on success
-                Orch->>Redis: Event-driven cache warm (by native region)
+                Orch->>DLQ: Clear entry on success (span: dlq.clear, metric: dlq_operations_total)
+                Orch->>Redis: Event-driven cache warm (spans: redisotel)
                 Orch->>Lock: Release lock (Lua script, token-safe)
             end
             
             alt Fetch failure (after retries exhausted or permanent failure)
-                Orch->>DLQ: Record failure (provider, category, error, count)
+                Orch->>DLQ: Record failure (span: dlq.record, metric: dlq_operations_total)
             end
         end
     end

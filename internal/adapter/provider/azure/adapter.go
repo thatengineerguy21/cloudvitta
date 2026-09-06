@@ -33,13 +33,15 @@ func WithCategory(category string) AdapterOption {
 
 // Adapter handles fetching, persisting raw response to GCS, and normalizing Azure pricing.
 type Adapter struct {
-	client          *Client
-	storage         storage.RawStorage
-	category        string
-	tracer          trace.Tracer
-	meter           metric.Meter
-	fetchCounter    metric.Int64Counter
-	unmappedCounter metric.Int64Counter
+	client            *Client
+	storage           storage.RawStorage
+	category          string
+	tracer            trace.Tracer
+	meter             metric.Meter
+	fetchCounter      metric.Int64Counter
+	unmappedCounter   metric.Int64Counter
+	fetchDurationHist metric.Float64Histogram
+	bytesCounter      metric.Int64Counter
 }
 
 // NewAdapter constructs a new Azure provider adapter.
@@ -47,15 +49,27 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 	meter := otel.Meter("cloudvitta.adapter.azure")
 	fetchCounter, _ := meter.Int64Counter("azure.fetch.count", metric.WithDescription("Number of Azure fetch operations"))
 	unmappedCounter, _ := meter.Int64Counter("azure.normalize.unmapped_count", metric.WithDescription("Number of unmapped Azure taxonomy items"))
+	fetchDurationHist, _ := meter.Float64Histogram(
+		"adapter.fetch.duration_seconds",
+		metric.WithDescription("Duration of provider fetch operation in seconds"),
+		metric.WithUnit("s"),
+	)
+	bytesCounter, _ := meter.Int64Counter(
+		"adapter.fetch.bytes_total",
+		metric.WithDescription("Total number of raw response bytes streamed to storage"),
+		metric.WithUnit("By"),
+	)
 
 	a := &Adapter{
-		client:          client,
-		storage:         st,
-		category:        "compute",
-		tracer:          otel.Tracer("cloudvitta.adapter.azure"),
-		meter:           meter,
-		fetchCounter:    fetchCounter,
-		unmappedCounter: unmappedCounter,
+		client:            client,
+		storage:           st,
+		category:          "compute",
+		tracer:            otel.Tracer("cloudvitta.adapter.azure"),
+		meter:             meter,
+		fetchCounter:      fetchCounter,
+		unmappedCounter:   unmappedCounter,
+		fetchDurationHist: fetchDurationHist,
+		bytesCounter:      bytesCounter,
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -65,22 +79,39 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 
 // Fetch retrieves the Azure price list, concurrently streams raw JSON to storage and normalizes it.
 // Returns a domain.FetchResult containing the observations and raw GCS path, and any error.
-func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.FetchResult, error) {
+func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.FetchResult, err error) {
 	ctx, span := a.tracer.Start(ctx, "azure.fetch")
 	defer span.End()
+
+	startTime := time.Now()
+	category := a.category
+	if category == "" {
+		category = "compute"
+	}
+	defer func() {
+		dur := time.Since(startTime).Seconds()
+		status := "ok"
+		if err != nil {
+			status = "error"
+		}
+		if a.fetchDurationHist != nil {
+			a.fetchDurationHist.Record(ctx, dur, metric.WithAttributes(
+				attribute.String("provider", "azure"),
+				attribute.String("category", category),
+				attribute.String("status", status),
+			))
+		}
+	}()
 
 	slog.InfoContext(ctx, "starting azure fetch")
 
 	fetchedAt := time.Now().UTC()
 	fetchID := uuid.New().String()
 	dateStr := fetchedAt.Format("2006-01-02")
-	category := a.category
-	if category == "" {
-		category = "compute"
-	}
 
 	var allObservations []domain.PriceObservation
 	var totalIgnoredCount int
+	var totalBytes int64
 	var firstGCSPath string
 
 	qSink := quarantine.NewStorageSink(a.storage, "azure", category, fetchID, fetchedAt)
@@ -89,7 +120,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 
 	for {
 		if limiter != nil {
-			if err := limiter.Wait(ctx); err != nil {
+			if err = limiter.Wait(ctx); err != nil {
 				span.RecordError(err)
 				span.SetStatus(codes.Error, err.Error())
 				return domain.FetchResult{}, fmt.Errorf("azure adapter: rate limit wait page %d: %w", pageIdx, err)
@@ -101,7 +132,8 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 			firstGCSPath = gcsPath
 		}
 
-		body, err := a.client.FetchPriceList(ctx, nextLink)
+		var body io.ReadCloser
+		body, err = a.client.FetchPriceList(ctx, nextLink)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
@@ -109,8 +141,9 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 			return domain.FetchResult{}, fmt.Errorf("azure adapter: fetch price list page %d: %w", pageIdx, err)
 		}
 
+		cr := provider.NewCountingReader(body)
 		pr, pw := io.Pipe()
-		tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
+		tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
 
 		var pageResult domain.NormalizationResult
 		var pageNextLink string
@@ -138,7 +171,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 			return nil
 		})
 
-		if err := g.Wait(); err != nil {
+		if err = g.Wait(); err != nil {
 			_ = body.Close()
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
@@ -148,6 +181,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		}
 		_ = body.Close()
 
+		totalBytes += cr.BytesRead()
 		allObservations = append(allObservations, pageResult.Observations...)
 		totalIgnoredCount += pageResult.IgnoredCount
 
@@ -156,6 +190,13 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		}
 		nextLink = pageNextLink
 		pageIdx++
+	}
+
+	if a.bytesCounter != nil {
+		a.bytesCounter.Add(ctx, totalBytes, metric.WithAttributes(
+			attribute.String("provider", "azure"),
+			attribute.String("category", category),
+		))
 	}
 
 	// Flush quarantined unmapped items to storage

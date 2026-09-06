@@ -37,7 +37,7 @@ sequenceDiagram
     Handler->>Svc: GetPrices(ctx, filter)
     
     %% Cache lookup
-    Svc->>Cache: GET v1:{provider}:{category}:{region}
+    Svc->>Cache: GET v1:{provider}:{category}:{region} (span: redis.cmd.GET via redisotel)
     
     alt Cache Hit
         Cache-->>Svc: Cached Observation Slice (JSON)
@@ -46,9 +46,9 @@ sequenceDiagram
         Svc->>SF: DoChan(cache_key, queryFn)
         
         critical Singleflight DB Query Collapse
-            SF->>DB: GetNormalizedPricesByProviderCategoryRegion(provider, category, region)
+            SF->>DB: GetNormalizedPricesByProviderCategoryRegion (span: pgx.Query via otelpgx)
             DB-->>SF: []price_observations rows
-            SF->>Cache: SETEX v1:{provider}:{category}:{region} (TTL 5-15 min)
+            SF->>Cache: SETEX v1:{provider}:{category}:{region} (TTL 5-15 min, span: redis.cmd.SETEX)
             SF-->>Svc: Normalized Observations
         end
     end

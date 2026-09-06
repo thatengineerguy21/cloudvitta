@@ -31,14 +31,14 @@ Create directories only when their stage implementation requires them.
 │   ├── fx/                      # foreign exchange service interface and implementations
 │   │   └── frankfurter/         # Frankfurter (ECB) API client
 │   │
-│   ├── store/                   # SQLC generated database code and connection pool constructor
+│   ├── store/                   # SQLC generated database code, connection pool constructor with otelpgx tracing, and pool metrics
 │   │   └── queries/             # SQL query definition files (*.sql)
 │   │
-│   ├── storage/                 # GCS raw payload storage interface and mocks
+│   ├── storage/                 # GCS and in-memory raw payload storage with OpenTelemetry tracing and latency metrics
 │   │
-│   ├── cache/                   # Redis client wrapper, singleflight, and schema-versioned cache keys
+│   ├── cache/                   # Redis client wrapper with redisotel tracing and metrics, singleflight, and schema-versioned cache keys
 │   │
-│   ├── dlq/                     # lightweight Redis dead-letter queue client
+│   ├── dlq/                     # lightweight Redis dead-letter queue client with OpenTelemetry tracing, logging, and metrics
 │   │
 │   ├── quarantine/              # quarantine sink interface and recorder for unmapped entities
 │   │
@@ -120,3 +120,5 @@ Create directories only when their stage implementation requires them.
 - **`internal/store`**: Contains SQLC-generated queries and the database pool constructor (`pool.go`). Code in `internal/service` interacts with `store.Querier` and never imports `pgx` driver types directly.
 - **`internal/service`**: Transport-agnostic domain engine. It is the only package where matching algorithms, pricing math, and totaling occur.
 - **Transport Packages**: `internal/transport/rest` and `internal/transport/mcp` handle protocol encoding, parameter extraction, and input validation before delegating to `service`. `internal/transport/spa` delivers embedded frontend SPA assets, manages HTML5 history fallback routing, and enforces strict API route guards.
+- **Infrastructure Observability**: Infrastructure packages (`internal/store`, `internal/cache`, `internal/dlq`, and `internal/storage`) maintain native OpenTelemetry tracing and metrics instrumentation. Database queries use `otelpgx` spans and export pool gauges. Redis commands use `redisotel` spans and latency metrics. The DLQ client traces `dlq.record`, `dlq.clear`, and `dlq.get` with operation counters. Raw storage traces operations and records operation latency histograms.
+

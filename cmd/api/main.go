@@ -78,6 +78,10 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	if _, err := observability.RegisterPoolStatsCollector(dbPool, otelProviders.Meter); err != nil {
+		slog.ErrorContext(ctx, "failed to register database pool stats collector", "error", err)
+	}
+
 	// --- Redis Cache ---
 	var redisClient redis.Cmdable
 	if cfg.Redis.URL != "" {

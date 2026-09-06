@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thatengineerguy21/CloudVitta/internal/observability"
 )
 
@@ -96,4 +97,45 @@ func TestCacheMetrics(t *testing.T) {
 	// Record hits and misses without panic
 	cacheMetrics.RecordHit(ctx)
 	cacheMetrics.RecordMiss(ctx)
+}
+
+type mockPoolStatSource struct{}
+
+func (m *mockPoolStatSource) Stat() *pgxpool.Stat {
+	return nil
+}
+
+func TestRegisterPoolStatsCollector(t *testing.T) {
+	ctx := context.Background()
+	providers, err := observability.InitOTel(ctx, observability.Config{ServiceName: "test-pool-stats"})
+	if err != nil {
+		t.Fatalf("InitOTel failed: %v", err)
+	}
+	defer func() { _ = providers.Shutdown(ctx) }()
+
+	// Test nil guards
+	reg, err := observability.RegisterPoolStatsCollector(nil, providers.Meter)
+	if err != nil || reg != nil {
+		t.Errorf("expected nil, nil for nil pool, got reg=%v, err=%v", reg, err)
+	}
+
+	reg, err = observability.RegisterPoolStatsCollectorSource(nil, providers.Meter)
+	if err != nil || reg != nil {
+		t.Errorf("expected nil, nil for nil source, got reg=%v, err=%v", reg, err)
+	}
+
+	reg, err = observability.RegisterPoolStatsCollectorSource(&mockPoolStatSource{}, nil)
+	if err != nil || reg != nil {
+		t.Errorf("expected nil, nil for nil meter, got reg=%v, err=%v", reg, err)
+	}
+
+	// Test successful registration with mock source
+	reg, err = observability.RegisterPoolStatsCollectorSource(&mockPoolStatSource{}, providers.Meter)
+	if err != nil {
+		t.Fatalf("RegisterPoolStatsCollectorSource failed: %v", err)
+	}
+	if reg == nil {
+		t.Fatal("expected non-nil registration")
+	}
+	_ = reg.Unregister()
 }
