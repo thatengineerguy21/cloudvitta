@@ -235,7 +235,24 @@ Configure API keys to enable scheduled ingestion runs across supported cloud pro
 
 ---
 
-### 6. Repository Variables (Optional Overrides)
+### 6. Transactional Email Secrets (Resend)
+
+Configure credentials for user account email verification delivery:
+
+1. **`RESEND_API_KEY` (or `CLOUDVITTA_EMAIL_RESEND_API_KEY`)**:
+   - *Console*: [Resend Console](https://resend.com/api-keys) > **API Keys** > **Create API Key**.
+   - *Value*: The generated API key string (e.g. `re_...`).
+   - *Fallback*: If empty, the server automatically uses an in-memory `NoopSender` that logs verification links without failing.
+
+2. **`EMAIL_FROM` (or `CLOUDVITTA_EMAIL_FROM`)**:
+   - *Value*: Sender email address matching a verified domain in Resend (e.g. `CloudVitta <noreply@cloudvitta.thatengineerguy.in>`).
+
+3. **`VERIFY_EMAIL_BASE_URL` (or `CLOUDVITTA_EMAIL_VERIFY_EMAIL_BASE_URL`)**:
+   - *Value*: Target frontend URL for token verification links (e.g. `https://cloudvitta.thatengineerguy.in/verify-email`).
+
+---
+
+### 7. Repository Variables (Optional Overrides)
 
 Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Variables** tab -> click **New repository variable**:
 
@@ -245,7 +262,7 @@ Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Va
 * **`SERVICE_NAME`**: Cloud Run API service name (default: `cloudvitta-api`).
 * **`INGEST_JOB_NAME`**: Cloud Run Ingestion Job name (default: `cloudvitta-ingest`).
 * **`GCS_BUCKET_NAME`**: GCS raw fixtures and payload bucket name (default: `cloudvitta-raw-fixtures`).
-* **`CORS_ALLOWED_ORIGINS`**: Comma-separated allowed frontend origins (default: `https://cloudvitta.dev`).
+* **`CORS_ALLOWED_ORIGINS`**: Comma-separated allowed frontend origins (default: `https://cloudvitta.thatengineerguy.in,https://cloudvitta.dev`).
 
 ---
 
@@ -259,7 +276,7 @@ Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Va
 
 ### What happens during CD?
 1. **Build & Push**: The Go application is packaged into a minimal distroless container image containing both `/api` and `/ingest` statically compiled binaries, and pushed to Google Artifact Registry.
-2. **Database Migrations**: `tern` connects to your Neon production database and applies any new forward migrations (`0001_initial_schema.sql`, `0002_create_users_and_refresh_tokens.sql`, `0003_create_fx_rates.sql`). Since we enforce forward-only migrations (ADR 0028), this executes safely on every deploy.
+2. **Database Migrations**: `tern` connects to your Neon production database and applies any new forward migrations (`0001_initial_schema.sql` through `0005_add_email_verification.sql`). Since we enforce forward-only migrations (ADR 0028), this executes safely on every deploy.
 3. **Deploy API Service**: Cloud Run updates the `cloudvitta-api` service with the new image revision. Traffic shifts automatically once the instance passes readiness probes.
 4. **Deploy Ingest Job**: The pipeline executes `gcloud run jobs deploy` to configure the `cloudvitta-ingest` Cloud Run Job with `--command /ingest`, resource limits (2 CPU, 2Gi RAM, 20m timeout), and matching production environment secrets.
 5. **Execute Post-Deploy Warmup**: The pipeline triggers immediate job execution (`gcloud run jobs execute --wait`) to validate provider ingestion against the new schema and refresh the Redis cache.

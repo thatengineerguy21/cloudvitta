@@ -105,9 +105,12 @@ jobs:
             CLOUDVITTA_ALIBABA_ACCESS_KEY_ID=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_ID || secrets.ALIBABA_ACCESS_KEY_ID || '' }}
             CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET=${{ secrets.CLOUDVITTA_ALIBABA_ACCESS_KEY_SECRET || secrets.ALIBABA_ACCESS_KEY_SECRET || '' }}
             CLOUDVITTA_DIGITALOCEAN_TOKEN=${{ secrets.CLOUDVITTA_DIGITALOCEAN_TOKEN || secrets.DIGITALOCEAN_TOKEN || '' }}
-            CLOUDVITTA_CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS || secrets.CORS_ALLOWED_ORIGINS || 'https://thatengineerguy.in,https://*.thatengineerguy.in,https://cloudvitta.dev,http://localhost:3000' }}
+            CLOUDVITTA_CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS || secrets.CORS_ALLOWED_ORIGINS || 'https://thatengineerguy.in,https://*.thatengineerguy.in,https://cloudvitta.thatengineerguy.in,https://cloudvitta.dev,http://localhost:3000' }}
             OTEL_EXPORTER_OTLP_ENDPOINT=${{ secrets.GRAFANA_OTLP_ENDPOINT || vars.GRAFANA_OTLP_ENDPOINT || secrets.OTEL_EXPORTER_OTLP_ENDPOINT || vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
             OTEL_EXPORTER_OTLP_HEADERS=${{ secrets.GRAFANA_OTLP_HEADERS || secrets.OTEL_EXPORTER_OTLP_HEADERS }}
+            RESEND_API_KEY=${{ secrets.RESEND_API_KEY || secrets.CLOUDVITTA_EMAIL_RESEND_API_KEY || '' }}
+            EMAIL_FROM=${{ vars.EMAIL_FROM || secrets.EMAIL_FROM || 'CloudVitta <noreply@cloudvitta.thatengineerguy.in>' }}
+            VERIFY_EMAIL_BASE_URL=${{ vars.VERIFY_EMAIL_BASE_URL || secrets.VERIFY_EMAIL_BASE_URL || 'https://cloudvitta.thatengineerguy.in/verify-email' }}
 
       - name: Deploy Cloud Run Ingest Job
         run: |
