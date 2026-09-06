@@ -46,7 +46,7 @@ const getProviderIconBg = (provider?: string) => {
   if (p === 'azure') return 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800/40';
   if (p === 'gcp') return 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800/40';
   if (p === 'oracle') return 'bg-orange-50 dark:bg-orange-950/40 text-brand-600 dark:text-brand-400 border-brand-200 dark:border-brand-800/40';
-  return 'bg-stone-50 dark:bg-surface-raised text-text-primary border-border-default';
+  return 'bg-surface-raised text-text-primary border-border-default';
 };
 
 export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
@@ -144,7 +144,7 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
         </div>
 
         {/* 2x2 Spec Matrix Pills */}
-        <div className="grid grid-cols-2 gap-2 mt-3 bg-stone-50/80 dark:bg-surface-raised p-3 rounded-xl border border-border-default/60">
+        <div className="grid grid-cols-2 gap-2 mt-3 bg-surface-raised p-3 rounded-xl border border-border-default/60">
           <div>
             <span className="text-[10px] font-bold uppercase text-text-secondary block">vCPU</span>
             <span className="font-bold text-text-primary text-sm font-mono">

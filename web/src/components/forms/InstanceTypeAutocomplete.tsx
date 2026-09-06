@@ -60,10 +60,10 @@ export const InstanceTypeAutocomplete: React.FC<InstanceTypeAutocompleteProps> =
       <div className="relative">
         <div
           className={cn(
-            'w-full flex items-center justify-between border rounded-xl bg-stone-50/80 dark:bg-surface-raised px-3 py-2 text-xs font-mono cursor-pointer transition-all',
+            'w-full flex items-center justify-between border rounded-xl bg-surface-raised px-3 py-2 text-xs font-mono cursor-pointer transition-all',
             isOpen
               ? 'border-brand-500 ring-2 ring-brand-500/10'
-              : 'border-border-default/80 hover:border-text-secondary/60 hover:bg-stone-100/70 dark:hover:bg-surface-card'
+              : 'border-border-default/80 hover:border-text-secondary/60 hover:bg-surface-card'
           )}
           onClick={() => setIsOpen(!isOpen)}
           data-testid="instance-autocomplete-trigger"

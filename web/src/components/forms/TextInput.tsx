@@ -18,7 +18,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            'bg-stone-50/80 dark:bg-surface-raised border border-border-default/80 text-text-primary px-3 py-2 text-sm rounded-xl',
+            'bg-surface-raised border border-border-default/80 text-text-primary px-3 py-2 text-sm rounded-xl',
             'focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all placeholder:text-text-secondary/50',
             error && 'border-status-anomaly text-status-anomaly focus:ring-status-anomaly/10',
             className

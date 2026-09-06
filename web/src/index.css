@@ -12,10 +12,10 @@
 
 @layer base {
   :root {
-    --color-surface-page: #FAFAF8;
+    --color-surface-page: #F4F2E6;
     --color-surface-card: #FFFFFF;
-    --color-surface-raised: #F5F4F0;
-    --color-border-default: #E7E5E4;
+    --color-surface-raised: #F6F4EC;
+    --color-border-default: #E2DDD3;
     --color-border-accent: #E06D53;
     --color-text-primary: #1C1917;
     --color-text-secondary: #57534E;

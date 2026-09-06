@@ -138,7 +138,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
       {/* 1. Page Title & Subheader Area */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-stone-200/70 dark:bg-surface-raised border border-border-default/80 text-[11px] font-semibold text-text-secondary uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-surface-raised border border-border-default/80 text-[11px] font-semibold text-text-secondary uppercase tracking-wider mb-2">
             <span>TOPOLOGY V4.2</span>
             <span className="text-text-secondary/50">•</span>
             <span>Live Multi-Cloud Pricing Engine</span>
@@ -154,7 +154,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
         </div>
 
         {/* Hourly vs Monthly Toggle */}
-        <div className="flex items-center self-start md:self-auto bg-stone-200/80 dark:bg-surface-raised p-1 rounded-xl border border-border-default/80">
+        <div className="flex items-center self-start md:self-auto bg-surface-raised p-1 rounded-xl border border-border-default/80">
           <button
             type="button"
             onClick={() => setTimeframe('hourly')}

@@ -27,7 +27,7 @@ export const SelectInput = React.forwardRef<HTMLSelectElement, SelectInputProps>
             ref={ref}
             id={selectId}
             className={cn(
-              'w-full appearance-none bg-stone-50/80 dark:bg-surface-raised border border-border-default/80 text-text-primary px-3 py-2 pr-8 text-sm rounded-xl cursor-pointer',
+              'w-full appearance-none bg-surface-raised border border-border-default/80 text-text-primary px-3 py-2 pr-8 text-sm rounded-xl cursor-pointer',
               'focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all',
               error && 'border-status-anomaly text-status-anomaly focus:ring-status-anomaly/10',
               className
