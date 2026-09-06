@@ -79,6 +79,10 @@ func run() error {
 	}
 	defer dbPool.Close()
 
+	if _, err := observability.RegisterPoolStatsCollector(dbPool, otelProviders.Meter); err != nil {
+		slog.ErrorContext(ctx, "failed to register database pool stats collector", "error", err)
+	}
+
 	// --- Storage ---
 	var rawStorage storage.RawStorage
 	gcsClient, err := gcsstorage.NewClient(ctx)
@@ -112,6 +116,88 @@ func run() error {
 	}
 
 	// --- Provider Factory ---
+	factory := buildProviderFactory(cfg, rawStorage, ctx)
+
+	// --- DLQ ---
+	var dlqSvc *dlq.DLQ
+	if redisClient != nil {
+		dlqSvc = dlq.New(redisClient)
+	}
+
+	queries := store.New(dbPool)
+
+	// --- FX Rates Synchronization ---
+	frankfurterClient := frankfurter.NewClient()
+	fxSvc := fx.NewService(queries, frankfurterClient)
+	slog.InfoContext(ctx, "syncing daily fx rates...")
+	if err := fxSvc.RefreshRates(ctx); err != nil {
+		slog.WarnContext(ctx, "fx rate synchronization failed during ingestion run, operating with fallback rates", "error", err)
+	} else {
+		slog.InfoContext(ctx, "daily fx rates synchronized successfully")
+	}
+
+	// --- Orchestrator ---
+	orchConfig := service.DefaultOrchestratorConfig()
+	orchConfig.Tracer = otelProviders.Tracer
+	orchConfig.Meter = otelProviders.Meter
+
+	orchestrator := service.NewOrchestrator(
+		queries,
+		redisClient,
+		dlqSvc,
+		factory,
+		orchConfig,
+	)
+
+	// --- Execution ---
+	slog.InfoContext(ctx, "starting orchestrated ingestion run...")
+	results := orchestrator.RunAll(ctx)
+
+	// Report results
+	var hasErrors bool
+	for _, r := range results {
+		if r.Skipped {
+			slog.InfoContext(ctx, "ingestion job skipped (lock held)",
+				"provider", r.Provider,
+				"category", r.Category,
+			)
+			continue
+		}
+		if r.Err != nil {
+			slog.ErrorContext(ctx, "ingestion job failed",
+				"provider", r.Provider,
+				"category", r.Category,
+				"error", r.Err,
+			)
+			// If an unauthenticated IBM job failed due to missing API key, log warning without failing overall run
+			if r.Provider == "ibm" && cfg.IBM.APIKey == "" {
+				slog.WarnContext(ctx, "ibm ingestion failed without api key, proceeding without failing overall run",
+					"category", r.Category,
+					"error", r.Err,
+				)
+				continue
+			}
+			hasErrors = true
+			continue
+		}
+		slog.InfoContext(ctx, "ingestion job completed",
+			"provider", r.Provider,
+			"category", r.Category,
+			"inserted", r.InsertedCount,
+			"anomalies", r.AnomalyCount,
+		)
+	}
+
+	if hasErrors {
+		return fmt.Errorf("one or more ingestion jobs failed")
+	}
+
+	slog.InfoContext(ctx, "all ingestion jobs completed successfully")
+	return nil
+}
+
+// buildProviderFactory constructs and registers all provider adapters with rate limiting and retry configurations.
+func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx context.Context) *provider.Factory {
 	factory := provider.NewFactory()
 
 	// Register AWS compute adapter with rate limiting and retry config
@@ -180,6 +266,17 @@ func run() error {
 		Retry:          provider.DefaultRetryConfig(),
 	}, awsKubernetesAdapter)
 
+	// Register AWS Serverless adapter with rate limiting and retry config
+	awsLambdaClient := aws.NewClient(aws.WithURL(aws.DefaultLambdaPriceListURL))
+	awsLambdaAdapter := aws.NewAdapter(awsLambdaClient, rawStorage, aws.WithCategory("serverless"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "aws",
+		Category:       "serverless",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, awsLambdaAdapter)
+
 	// Register Azure compute adapter with rate limiting and retry config
 	azureClient := azure.NewClient()
 	azureAdapter := azure.NewAdapter(azureClient, rawStorage, azure.WithCategory("compute"))
@@ -245,6 +342,17 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, azureKubernetesAdapter)
+
+	// Register Azure Serverless adapter with rate limiting and retry config
+	azureServerlessClient := azure.NewClient(azure.WithURL(azure.DefaultFunctionsRetailPricesURL))
+	azureServerlessAdapter := azure.NewAdapter(azureServerlessClient, rawStorage, azure.WithCategory("serverless"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "azure",
+		Category:       "serverless",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, azureServerlessAdapter)
 
 	// Register GCP compute adapter with rate limiting and retry config
 	var gcpOpts []gcp.Option
@@ -340,6 +448,22 @@ func run() error {
 		RateLimitBurst: 5,
 		Retry:          provider.DefaultRetryConfig(),
 	}, gcpKubernetesAdapter)
+
+	// Register GCP Serverless adapter with rate limiting and retry config
+	var gcpServerlessOpts []gcp.Option
+	if cfg.GCP.APIKey != "" {
+		gcpServerlessOpts = append(gcpServerlessOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
+	}
+	gcpServerlessOpts = append(gcpServerlessOpts, gcp.WithURL(gcp.DefaultServerlessBillingCatalogURL))
+	gcpServerlessClient := gcp.NewClient(gcpServerlessOpts...)
+	gcpServerlessAdapter := gcp.NewAdapter(gcpServerlessClient, rawStorage, gcp.WithCategory("serverless"))
+	factory.Register(provider.ProviderConfig{
+		Provider:       "gcp",
+		Category:       "serverless",
+		RateLimitRPS:   10,
+		RateLimitBurst: 5,
+		Retry:          provider.DefaultRetryConfig(),
+	}, gcpServerlessAdapter)
 
 	// Register Oracle compute adapter with rate limiting and retry config
 	oracleClient := oracle.NewClient()
@@ -497,80 +621,5 @@ func run() error {
 		slog.InfoContext(ctx, "skipping DigitalOcean ingestion: token not configured (CLOUDVITTA_DIGITALOCEAN_TOKEN)")
 	}
 
-	// --- DLQ ---
-	var dlqSvc *dlq.DLQ
-	if redisClient != nil {
-		dlqSvc = dlq.New(redisClient)
-	}
-
-	queries := store.New(dbPool)
-
-	// --- FX Rates Synchronization ---
-	frankfurterClient := frankfurter.NewClient()
-	fxSvc := fx.NewService(queries, frankfurterClient)
-	slog.InfoContext(ctx, "syncing daily fx rates...")
-	if err := fxSvc.RefreshRates(ctx); err != nil {
-		slog.WarnContext(ctx, "fx rate synchronization failed during ingestion run, operating with fallback rates", "error", err)
-	} else {
-		slog.InfoContext(ctx, "daily fx rates synchronized successfully")
-	}
-
-	// --- Orchestrator ---
-	orchConfig := service.DefaultOrchestratorConfig()
-	orchConfig.Tracer = otelProviders.Tracer
-	orchConfig.Meter = otelProviders.Meter
-
-	orchestrator := service.NewOrchestrator(
-		queries,
-		redisClient,
-		dlqSvc,
-		factory,
-		orchConfig,
-	)
-
-	// --- Execution ---
-	slog.InfoContext(ctx, "starting orchestrated ingestion run...")
-	results := orchestrator.RunAll(ctx)
-
-	// Report results
-	var hasErrors bool
-	for _, r := range results {
-		if r.Skipped {
-			slog.InfoContext(ctx, "ingestion job skipped (lock held)",
-				"provider", r.Provider,
-				"category", r.Category,
-			)
-			continue
-		}
-		if r.Err != nil {
-			slog.ErrorContext(ctx, "ingestion job failed",
-				"provider", r.Provider,
-				"category", r.Category,
-				"error", r.Err,
-			)
-			// If an unauthenticated IBM job failed due to missing API key, log warning without failing overall run
-			if r.Provider == "ibm" && cfg.IBM.APIKey == "" {
-				slog.WarnContext(ctx, "ibm ingestion failed without api key, proceeding without failing overall run",
-					"category", r.Category,
-					"error", r.Err,
-				)
-				continue
-			}
-			hasErrors = true
-			continue
-		}
-		slog.InfoContext(ctx, "ingestion job completed",
-			"provider", r.Provider,
-			"category", r.Category,
-			"inserted", r.InsertedCount,
-			"anomalies", r.AnomalyCount,
-		)
-	}
-
-	if hasErrors {
-		return fmt.Errorf("one or more ingestion jobs failed")
-	}
-
-	slog.InfoContext(ctx, "all ingestion jobs completed successfully")
-	return nil
+	return factory
 }

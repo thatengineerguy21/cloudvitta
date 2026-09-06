@@ -8,6 +8,41 @@ definitions:
       vcpu:
         type: number
     type: object
+  domain.ComputeCatalogItem:
+    properties:
+      attributes:
+        $ref: '#/definitions/domain.ComputeAttributes'
+      category:
+        type: string
+      cpu_architecture:
+        type: string
+      display_name:
+        type: string
+      first_seen_at:
+        type: string
+      gpu_count:
+        type: integer
+      gpu_type:
+        type: string
+      id:
+        type: integer
+      instance_family:
+        type: string
+      instance_type_id:
+        type: string
+      is_burstable:
+        type: boolean
+      is_current_gen:
+        type: boolean
+      last_seen_at:
+        type: string
+      memory_gib:
+        type: number
+      provider:
+        type: string
+      vcpu:
+        type: number
+    type: object
   domain.DatabaseNoSQLAttributes:
     properties:
       component_type:
@@ -204,6 +239,32 @@ definitions:
         items:
           $ref: '#/definitions/rest.ProviderWarning'
         type: array
+    type: object
+  rest.CatalogInstancesResponse:
+    properties:
+      count:
+        type: integer
+      instances:
+        items:
+          $ref: '#/definitions/domain.ComputeCatalogItem'
+        type: array
+      total:
+        type: integer
+    type: object
+  rest.CatalogSummaryResponse:
+    properties:
+      category_breakdown:
+        additionalProperties:
+          additionalProperties:
+            type: integer
+          type: object
+        type: object
+      provider_totals:
+        additionalProperties:
+          type: integer
+        type: object
+      total_instances:
+        type: integer
     type: object
   rest.CategoryStatusResponse:
     properties:
@@ -502,6 +563,8 @@ definitions:
         type: array
       monthly_cost_usd:
         type: number
+      normalized_hourly_usd:
+        type: number
       price:
         $ref: '#/definitions/rest.PriceDetail'
       provider:
@@ -579,6 +642,16 @@ definitions:
       refresh_token:
         type: string
       token_type:
+        type: string
+    type: object
+  rest.ResendVerificationRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  rest.ResendVerificationResponse:
+    properties:
+      message:
         type: string
     type: object
   rest.ServerlessComparisonMeta:
@@ -699,6 +772,8 @@ definitions:
         type: array
       monthly_cost_usd:
         type: number
+      normalized_hourly_usd:
+        type: number
       price:
         $ref: '#/definitions/rest.PriceDetail'
       provider:
@@ -707,6 +782,16 @@ definitions:
         type: string
       stale:
         type: boolean
+    type: object
+  rest.VerifyEmailRequest:
+    properties:
+      token:
+        type: string
+    type: object
+  rest.VerifyEmailResponse:
+    properties:
+      message:
+        type: string
     type: object
 info:
   contact: {}
@@ -831,6 +916,46 @@ paths:
       summary: Rotate refresh token
       tags:
       - Auth
+  /api/v1/auth/resend-verification:
+    post:
+      consumes:
+      - application/json
+      description: Requests a fresh email verification link without revealing account
+        existence
+      parameters:
+      - description: Recipient email
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.ResendVerificationRequest'
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "202":
+          description: Verification email request accepted
+          schema:
+            $ref: '#/definitions/rest.ResendVerificationResponse'
+        "400":
+          description: Malformed request or missing email
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "429":
+          description: Too many verification requests
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Resend verification email
+      tags:
+      - Auth
   /api/v1/auth/signup:
     post:
       consumes:
@@ -870,6 +995,57 @@ paths:
       summary: Register a new user
       tags:
       - Auth
+  /api/v1/auth/verify-email:
+    post:
+      consumes:
+      - application/json
+      description: Consumes a single-use verification token to activate a user account
+      parameters:
+      - description: Verification token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.VerifyEmailRequest'
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "200":
+          description: Email verified successfully
+          schema:
+            $ref: '#/definitions/rest.VerifyEmailResponse'
+        "400":
+          description: Malformed request or missing token
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "404":
+          description: Verification token not found
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "409":
+          description: Verification token already consumed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "410":
+          description: Verification token expired
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Verify email address
+      tags:
+      - Auth
   /api/v1/calculate:
     post:
       consumes:
@@ -905,6 +1081,83 @@ paths:
       summary: Get composite pricing calculation
       tags:
       - calculator
+  /api/v1/catalog/compute/instances:
+    get:
+      description: Returns paginated virtual machine specifications filtered by provider,
+        category, family, and vCPU/RAM ranges.
+      parameters:
+      - description: Cloud provider (aws, azure, gcp, etc.)
+        in: query
+        name: provider
+        type: string
+      - description: Instance category (general_purpose, compute_optimized, etc.)
+        in: query
+        name: category
+        type: string
+      - description: Instance family (t3, c5, Standard_D, etc.)
+        in: query
+        name: instance_family
+        type: string
+      - description: Minimum vCPU count
+        in: query
+        name: min_vcpu
+        type: number
+      - description: Maximum vCPU count
+        in: query
+        name: max_vcpu
+        type: number
+      - description: Minimum RAM in GiB
+        in: query
+        name: min_memory_gib
+        type: number
+      - description: Maximum RAM in GiB
+        in: query
+        name: max_memory_gib
+        type: number
+      - description: 'Limit (default: 50, max: 200)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rest.CatalogInstancesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Search and filter compute instance catalog
+      tags:
+      - catalog
+  /api/v1/catalog/compute/summary:
+    get:
+      description: Returns total instances, provider counts, and category breakdowns
+        across all cloud providers.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rest.CatalogSummaryResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Get compute instance catalog summary
+      tags:
+      - catalog
   /api/v1/prices/compute:
     get:
       description: Returns normalized compute pricing across cloud providers for requested

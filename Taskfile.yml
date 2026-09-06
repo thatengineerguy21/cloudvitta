@@ -68,7 +68,8 @@ tasks:
       - internal/transport/rest/openapi/swagger.yaml
       - internal/transport/rest/openapi/docs.go
     cmds:
-      - go run github.com/swaggo/swag/cmd/swag@v1.8.1 init -g internal/transport/rest/router.go -o internal/transport/rest/openapi
+      - go run github.com/swaggo/swag/cmd/swag@v1.8.1 init -g router.go --dir internal/transport/rest,internal/domain -o internal/transport/rest/openapi
+
 
   sqlc:
     desc: Regenerate type-safe SQL store queries via SQLC
@@ -79,7 +80,7 @@ tasks:
     generates:
       - internal/store/*.go
     cmds:
-      - go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0 generate
+      - go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
 
   db:migrate:
     desc: Run database schema migrations forward

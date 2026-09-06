@@ -19,11 +19,50 @@ export type RefreshResponse = definitions['rest.RefreshResponse'];
 export type LogoutRequest = definitions['rest.LogoutRequest'];
 export type LogoutResponse = definitions['rest.LogoutResponse'];
 
+export type VerifyEmailRequest = definitions['rest.VerifyEmailRequest'];
+export type VerifyEmailResponse = definitions['rest.VerifyEmailResponse'];
+
+export type ResendVerificationRequest = definitions['rest.ResendVerificationRequest'];
+export type ResendVerificationResponse = definitions['rest.ResendVerificationResponse'];
+
 // Provider Status Endpoints
 export type ProviderStatusResponse = definitions['rest.ProviderStatusResponse'];
 export type CategoryStatusResponse = definitions['rest.CategoryStatusResponse'];
 export type DLQStatusResponse = definitions['rest.DLQStatusResponse'];
 export type ProviderStatusWarningResponse = definitions['rest.ProviderStatusWarningResponse'];
+
+// Catalog Endpoints
+export interface ComputeCatalogItem {
+  id: number;
+  provider: string;
+  instance_type_id: string;
+  display_name: string;
+  instance_family: string;
+  category: string;
+  vcpu: number;
+  memory_gib: number;
+  cpu_architecture: string;
+  gpu_count: number;
+  gpu_type?: string;
+  is_burstable: boolean;
+  is_current_gen: boolean;
+  first_seen_at: string;
+  last_seen_at: string;
+  attributes?: ComputeAttributes;
+}
+
+export interface CatalogSummaryResponse {
+  total_instances: number;
+  provider_totals: Record<string, number>;
+  category_breakdown: Record<string, Record<string, number>>;
+}
+
+export interface CatalogInstancesResponse {
+  count: number;
+  total: number;
+  instances: ComputeCatalogItem[];
+}
+
 
 // Calculation & Comparison Endpoints
 export type CalculateRequestBody = definitions['rest.CalculateRequestBody'];
@@ -70,6 +109,19 @@ export interface ComputeQueryParams extends BaseQueryParams {
   family?: string;
   strict_family?: boolean | string;
 }
+
+export interface ComputeCatalogQueryParams extends BaseQueryParams {
+  provider?: string;
+  category?: string;
+  instance_family?: string;
+  min_vcpu?: number | string;
+  max_vcpu?: number | string;
+  min_memory_gib?: number | string;
+  max_memory_gib?: number | string;
+  limit?: number | string;
+  offset?: number | string;
+}
+
 
 export interface StorageQueryParams extends BaseQueryParams {
   size_gb?: number | string;

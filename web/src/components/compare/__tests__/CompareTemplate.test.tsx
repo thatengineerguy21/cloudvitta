@@ -68,7 +68,7 @@ describe('CompareTemplate Component', () => {
     expect(screen.getByText('Exact Match')).toBeInTheDocument();
     expect(screen.getByText('Close Match')).toBeInTheDocument();
     expect(screen.getByText('Approximate')).toBeInTheDocument();
-    expect(screen.getByText(/1 unverified/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 unspecified/i)).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument(); // GCP (no fetched_at)
   });
 

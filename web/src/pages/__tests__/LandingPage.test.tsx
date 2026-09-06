@@ -36,7 +36,7 @@ describe('LandingPage', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Normalized Cloud Infrastructure Pricing',
+        name: 'Transparent Cloud Infrastructure Pricing',
       })
     ).toBeInTheDocument();
     expect(screen.getByText(/Compare and calculate cloud infrastructure/)).toBeInTheDocument();

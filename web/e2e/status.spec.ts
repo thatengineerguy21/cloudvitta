@@ -35,7 +35,7 @@ test.describe('Provider Status & Telemetry E2E', () => {
     }
 
     // Verify observation counts and freshness labels
-    await expect(page.getByText(/1200 obs/i).first()).toBeVisible();
+    await expect(page.getByText(/1200 price records/i).first()).toBeVisible();
     await expect(page.getByText(/Fresh/i).first()).toBeVisible();
   });
 
@@ -81,5 +81,40 @@ test.describe('Provider Status & Telemetry E2E', () => {
     // Verify isolated error boundary display on failed provider card
     await expect(page.getByTestId('provider-error-alibaba')).toBeVisible();
     await expect(page.getByRole('button', { name: /Retry/i })).toBeVisible();
+  });
+
+  test('should render compute catalog summary inventory card', async ({ page }) => {
+    await page.route('**/api/v1/providers/*/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          provider: 'aws',
+          status: 'healthy',
+          categories: {},
+          dlq: { status: 'healthy', consecutive_failures: 0 },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/catalog/compute/summary', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          total_instances: 3200,
+          provider_totals: { aws: 1400, azure: 1100, gcp: 700 },
+          category_breakdown: {
+            aws: { general_purpose: 500, compute_optimized: 400 },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/status');
+
+    await expect(page.getByTestId('compute-catalog-summary-card')).toBeVisible();
+    await expect(page.getByTestId('catalog-total-instances')).toContainText('3,200');
+    await expect(page.getByTestId('catalog-provider-total-aws')).toContainText('1,400');
   });
 });

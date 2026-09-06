@@ -9,6 +9,10 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func setupTest(t *testing.T) (*dlq.DLQ, *miniredis.Miniredis, func()) {
@@ -172,5 +176,123 @@ func TestGet_ReturnsEntryNotFoundForMissing(t *testing.T) {
 	_, err := d.Get(ctx, "aws", "metrics")
 	if !errors.Is(err, dlq.ErrEntryNotFound) {
 		t.Errorf("expected ErrEntryNotFound, got %v", err)
+	}
+}
+
+func TestDLQ_Tracing(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() {
+		_ = client.Close()
+		mr.Close()
+	}()
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	defer func() { _ = tp.Shutdown(context.Background()) }()
+
+	tracer := tp.Tracer("test-dlq")
+	d := dlq.New(client, dlq.WithTracer(tracer))
+
+	ctx := context.Background()
+
+	// 1. Test Record creates dlq.record span with dlq.status
+	err := d.Record(ctx, "aws", "compute", errors.New("timeout"))
+	if err != nil {
+		t.Fatalf("Record failed: %v", err)
+	}
+
+	spans := exporter.GetSpans()
+	spanNames := make(map[string]bool)
+	for _, s := range spans {
+		spanNames[s.Name] = true
+	}
+
+	if !spanNames["dlq.record"] {
+		t.Errorf("expected dlq.record span, got spans: %v", spans)
+	}
+	if spanNames["dlq.get"] {
+		t.Errorf("did not expect nested dlq.get span during Record")
+	}
+
+	// 2. Test Get creates dlq.get span
+	_, err = d.Get(ctx, "aws", "compute")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+
+	spans = exporter.GetSpans()
+	spanNames = make(map[string]bool)
+	for _, s := range spans {
+		spanNames[s.Name] = true
+	}
+	if !spanNames["dlq.get"] {
+		t.Errorf("expected dlq.get span")
+	}
+
+	// 3. Test Clear creates dlq.clear span
+	err = d.Clear(ctx, "aws", "compute")
+	if err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+
+	spans = exporter.GetSpans()
+	foundClear := false
+	for _, s := range spans {
+		if s.Name == "dlq.clear" {
+			foundClear = true
+			break
+		}
+	}
+	if !foundClear {
+		t.Errorf("expected dlq.clear span")
+	}
+}
+
+func TestDLQ_Metrics(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() {
+		_ = client.Close()
+		mr.Close()
+	}()
+
+	reader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	defer func() { _ = mp.Shutdown(context.Background()) }()
+
+	meter := mp.Meter("test-dlq")
+	d := dlq.New(client, dlq.WithMeter(meter))
+
+	ctx := context.Background()
+
+	// Perform Record, Get, Clear operations
+	if err := d.Record(ctx, "aws", "compute", errors.New("timeout")); err != nil {
+		t.Fatalf("Record failed: %v", err)
+	}
+	if _, err := d.Get(ctx, "aws", "compute"); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if err := d.Clear(ctx, "aws", "compute"); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatalf("Collect failed: %v", err)
+	}
+
+	foundOpsMetric := false
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name == "dlq_operations_total" {
+				foundOpsMetric = true
+				break
+			}
+		}
+	}
+
+	if !foundOpsMetric {
+		t.Errorf("expected dlq_operations_total metric to be recorded")
 	}
 }

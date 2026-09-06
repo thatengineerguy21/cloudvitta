@@ -74,10 +74,11 @@ func (s ComputeScorer) Score(candidate domain.PriceObservation, target MatchTarg
 // --- Storage scorer ---
 
 // StorageScorer implements CategoryScorer for storage resources.
-// Distance formula:
+// Storage observations represent unit rates ($/GB-month) with SizeGB = 1.
+// Volume (size_gb) is a cost multiplier in pricing calculation rather than a
+// distance term. The distance formula evaluates storage_class compatibility:
 //
-//	distance = w_size * |C.size_gb - T.size_gb| / T.size_gb
-//	         + w_class * |ordinal(C.storage_class) - ordinal(T.storage_class)| / max_ordinal
+//	distance = w_class * |ordinal(C.storage_class) - ordinal(T.storage_class)| / max_ordinal
 //
 // storage_class is an optional dimension: if the target omits it, the class term is excluded
 // entirely (not defaulted to "standard"), and the candidate's class is recorded in
@@ -87,12 +88,7 @@ type StorageScorer struct{}
 
 // Score computes weighted distance between a storage candidate and the target spec.
 func (s StorageScorer) Score(candidate domain.PriceObservation, target MatchTarget) (float64, []string, bool) {
-	// Required dimension: size_gb.
-	if target.SizeGB <= 0 {
-		// No size requested — all candidates are exact matches.
-		return 0, []string{}, true
-	}
-
+	// Eligibility guard: candidate must have a valid unit-rate size.
 	if candidate.StorageAttributes.SizeGB <= 0 {
 		// Candidate lacks the required dimension.
 		return 0, nil, false
@@ -101,8 +97,10 @@ func (s StorageScorer) Score(candidate domain.PriceObservation, target MatchTarg
 	var distance float64
 	var missingAttrs []string
 
-	// Size term (required, weight=1.0).
-	distance += math.Abs(candidate.StorageAttributes.SizeGB-target.SizeGB) / target.SizeGB
+	// Volume dimension (size_gb) is NOT a matchable spec for storage.
+	// Storage observations represent unit rates ($/GB-month) with SizeGB=1.
+	// The requested volume is applied as a cost multiplier in pricing_calc.go,
+	// not as a distance term. Matching evaluates storage_class compatibility only.
 
 	// Storage class term (optional, weight=1.0).
 	if target.StorageClass != "" {
@@ -127,22 +125,18 @@ func (s StorageScorer) Score(candidate domain.PriceObservation, target MatchTarg
 // --- Network scorer ---
 
 // NetworkScorer implements CategoryScorer for network / data transfer resources.
-// Distance formula:
+// Network observations represent unit rates ($/GB) with EgressGB = 1.
+// Volume (egress_gb) is a cost multiplier in pricing calculation rather than a
+// distance term. The distance formula evaluates transfer_type compatibility:
 //
-//	distance = w_egress * |C.egress_gb - T.egress_gb| / T.egress_gb
-//	         + w_transfer * |ordinal(C.transfer_type) - ordinal(T.transfer_type)| / max_ordinal
+//	distance = w_transfer * |ordinal(C.transfer_type) - ordinal(T.transfer_type)| / max_ordinal
 //
 // transfer_type is an optional dimension: same logic as storage_class above.
 type NetworkScorer struct{}
 
 // Score computes weighted distance between a network candidate and the target spec.
 func (s NetworkScorer) Score(candidate domain.PriceObservation, target MatchTarget) (float64, []string, bool) {
-	// Required dimension: egress_gb.
-	if target.EgressGB <= 0 {
-		// No egress requested — all candidates are exact matches.
-		return 0, []string{}, true
-	}
-
+	// Eligibility guard: candidate must have a valid unit-rate egress value.
 	if candidate.NetworkAttributes.EgressGB <= 0 {
 		return 0, nil, false
 	}
@@ -150,8 +144,10 @@ func (s NetworkScorer) Score(candidate domain.PriceObservation, target MatchTarg
 	var distance float64
 	var missingAttrs []string
 
-	// Egress term (required, weight=1.0).
-	distance += math.Abs(candidate.NetworkAttributes.EgressGB-target.EgressGB) / target.EgressGB
+	// Volume dimension (egress_gb) is NOT a matchable spec for network.
+	// Network observations represent unit rates ($/GB) with EgressGB=1.
+	// The requested volume is applied as a cost multiplier in pricing_calc.go,
+	// not as a distance term. Matching evaluates transfer_type compatibility only.
 
 	// Transfer type term (optional, weight=1.0).
 	if target.TransferType != "" {

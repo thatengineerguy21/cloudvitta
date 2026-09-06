@@ -158,6 +158,8 @@ func (s *FreshnessService) GetProviderStatus(ctx context.Context, provider strin
 	var anyCategoryStale bool
 	var allCategoriesStaleOrEmpty = true
 	var allCategoriesHealthy = true
+	var hasPopulatedCategories bool
+	var allPopulatedCategoriesHealthy = true
 
 	for _, cat := range supportedCategories {
 		threshold := s.Threshold(p, cat)
@@ -222,6 +224,12 @@ func (s *FreshnessService) GetProviderStatus(ctx context.Context, provider strin
 		if isStale || count == 0 || dlqStatus != nil {
 			allCategoriesHealthy = false
 		}
+		if count > 0 {
+			hasPopulatedCategories = true
+			if isStale || dlqStatus != nil {
+				allPopulatedCategoriesHealthy = false
+			}
+		}
 	}
 
 	var status string
@@ -231,6 +239,11 @@ func (s *FreshnessService) GetProviderStatus(ctx context.Context, provider strin
 		status = "healthy"
 	} else if allCategoriesStaleOrEmpty {
 		status = "stale"
+	} else if hasPopulatedCategories && allPopulatedCategoriesHealthy {
+		// All categories that have ever been ingested are fresh and healthy,
+		// but some declared categories have never been populated (count == 0).
+		// This is distinct from "degraded" where ingested data has gone stale.
+		status = "partially_healthy"
 	} else {
 		status = "degraded"
 	}

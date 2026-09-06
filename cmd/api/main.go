@@ -16,6 +16,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
+	"github.com/thatengineerguy21/CloudVitta/internal/email"
 	"github.com/thatengineerguy21/CloudVitta/internal/fx"
 	"github.com/thatengineerguy21/CloudVitta/internal/fx/frankfurter"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
@@ -78,6 +79,10 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	if _, err := observability.RegisterPoolStatsCollector(dbPool, otelProviders.Meter); err != nil {
+		slog.ErrorContext(ctx, "failed to register database pool stats collector", "error", err)
+	}
+
 	// --- Redis Cache ---
 	var redisClient redis.Cmdable
 	if cfg.Redis.URL != "" {
@@ -124,15 +129,26 @@ func main() {
 		service.WithFreshnessService(freshnessSvc),
 		service.WithFXService(fxSvc),
 	)
+	var emailSender email.Sender
+	if cfg.Email.ResendAPIKey != "" {
+		emailSender = email.NewResendSender(cfg.Email.ResendAPIKey, cfg.Email.From)
+	} else {
+		emailSender = &email.NoopSender{}
+	}
+
 	authSvc := service.NewAuthService(
 		queries,
 		[]byte(cfg.Auth.JWTSecret),
 		service.WithTransactor(transactor),
 		service.WithAuthTracer(otelProviders.Tracer),
+		service.WithEmailSender(emailSender),
+		service.WithVerifyBaseURL(cfg.Email.VerifyEmailBaseURL),
 	)
 
+	catalogSvc := service.NewCatalogService(queries, redisClient)
+
 	// --- REST Transport ---
-	restHandler := rest.NewRouter(pricingSvc, authSvc, freshnessSvc, dbPool, redisClient, cfg)
+	restHandler := rest.NewRouter(pricingSvc, authSvc, freshnessSvc, catalogSvc, dbPool, redisClient, cfg)
 
 	// --- MCP Transport (Streamable HTTP, Mandatory JWT Auth & Rate Limited) ---
 	mcpServer := mcp.NewServer(
@@ -140,6 +156,7 @@ func main() {
 		freshnessSvc,
 		mcp.WithTracer(otelProviders.Tracer),
 		mcp.WithMeter(otelProviders.Meter),
+		mcp.WithCatalogService(catalogSvc),
 	)
 	mcpStreamableHandler := mcp.NewStreamableHandler(mcpServer)
 

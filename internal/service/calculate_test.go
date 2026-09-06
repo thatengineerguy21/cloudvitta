@@ -950,3 +950,79 @@ func TestPricingService_MatchAndCalculate_4NewProviders_StorageAndNetwork(t *tes
 		})
 	}
 }
+
+func TestPricingService_MatchAndCalculate_4NewProviders_Compute(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+
+	// Seed cache for Oracle, IBM, Alibaba, DigitalOcean compute
+	providers := []struct {
+		provider    string
+		region      string
+		computeSku  string
+		vcpu        float64
+		ramgb       float64
+		family      string
+		computeRate string
+	}{
+		{"oracle", "us-ashburn-1", "SKU-OCI-COMPUTE-4-16", 4, 16, "general", "0.2000"},
+		{"ibm", "us-east", "SKU-IBM-COMPUTE-4-16", 4, 16, "general", "0.2100"},
+		{"alibaba", "us-east-1", "SKU-ALI-COMPUTE-4-16", 4, 16, "general", "0.1900"},
+		{"digitalocean", "nyc3", "SKU-DO-COMPUTE-4-16", 4, 16, "general", "0.2200"},
+	}
+
+	for _, p := range providers {
+		computeObs := []domain.PriceObservation{
+			{
+				Provider:        p.provider,
+				ServiceCategory: "compute",
+				SkuID:           p.computeSku,
+				Region:          p.region,
+				RegionGroup:     "us-east",
+				PriceAmount:     decimal.RequireFromString(p.computeRate),
+				PriceCurrency:   "USD",
+				PricingModel:    "OnDemand",
+				Unit:            "Hrs",
+				Attributes:      domain.ComputeAttributes{VCPU: p.vcpu, RAMGB: p.ramgb, Family: p.family},
+				FetchedAt:       time.Now().UTC(),
+			},
+		}
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, p.provider, "compute", p.region), computeObs, cache.DefaultTTL)
+	}
+
+	svc := service.NewPricingService(nil, rdb)
+
+	for _, p := range providers {
+		t.Run(p.provider+"_compute", func(t *testing.T) {
+			target := service.MatchTarget{
+				Category: "compute",
+				VCPU:     4,
+				RAMGB:    16,
+				Family:   "general",
+			}
+			res, err := svc.MatchAndCalculate(ctx, p.provider, "compute", "us-east", target)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if res == nil {
+				t.Fatal("expected result, got nil")
+			}
+			// Cost is rate * 730
+			expectedCost := decimal.RequireFromString(p.computeRate).Mul(decimal.NewFromInt(730))
+			if !res.MonthlyCost.Equal(expectedCost) {
+				t.Errorf("MonthlyCost = %s, want %s", res.MonthlyCost.String(), expectedCost.String())
+			}
+			if res.MatchResult.MatchQuality != "exact" {
+				t.Errorf("MatchQuality = %s, want exact", res.MatchResult.MatchQuality)
+			}
+		})
+	}
+}

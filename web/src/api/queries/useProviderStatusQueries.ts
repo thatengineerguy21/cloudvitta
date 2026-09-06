@@ -106,6 +106,7 @@ export function useProviderHealthSummary(): ProviderHealthSummary {
 
     switch (providerStatus) {
       case 'healthy':
+      case 'partially_healthy':
         healthyCount++;
         break;
       case 'degraded':
@@ -138,7 +139,7 @@ export function useProviderHealthSummary(): ProviderHealthSummary {
     summaryLabel = `${total}/${total} Providers Active`;
   } else {
     summaryState = 'degraded';
-    const activeCount = healthyCount;
+    const activeCount = healthyCount + degradedCount;
     summaryLabel = `${activeCount}/${total} Active`;
   }
 

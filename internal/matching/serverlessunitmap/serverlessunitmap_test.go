@@ -52,6 +52,7 @@ func TestMapAzureUnit(t *testing.T) {
 		{"1 GB-s", domain.ComponentTypeDurationFee, domain.UnitPerGBSecond, nil},
 		{"GB-Second", domain.ComponentTypeDurationFee, domain.UnitPerGBSecond, nil},
 		{"unknown_unit", domain.ComponentTypeRequestFee, "", ErrUnmappedUnit},
+		{"unknown_unit", domain.ComponentTypeDurationFee, "", ErrUnmappedUnit},
 	}
 
 	for _, tt := range tests {
@@ -84,6 +85,8 @@ func TestMapGCPUnit(t *testing.T) {
 		{"vCPU.s", domain.ComponentTypeDurationFeeCPU, domain.UnitPerVCPUSecond, nil},
 		{"s", domain.ComponentTypeDurationFeeCPU, domain.UnitPerGHzSecond, nil},
 		{"unknown_unit", domain.ComponentTypeRequestFee, "", ErrUnmappedUnit},
+		{"unknown_unit", domain.ComponentTypeDurationFeeMemory, "", ErrUnmappedUnit},
+		{"unknown_unit", domain.ComponentTypeDurationFeeCPU, "", ErrUnmappedUnit},
 	}
 
 	for _, tt := range tests {
@@ -119,6 +122,30 @@ func TestNormalizeUnit(t *testing.T) {
 	_, err = NormalizeUnit("unmapped_provider", "Calls", domain.ComponentTypeRequestFee)
 	if err == nil {
 		t.Errorf("NormalizeUnit(unmapped_provider) expected error, got nil")
+	}
+}
+
+func TestFailLoudUnmappedUnits(t *testing.T) {
+	providers := []string{"aws", "azure", "gcp"}
+	compTypes := []string{
+		domain.ComponentTypeRequestFee,
+		domain.ComponentTypeDurationFee,
+		domain.ComponentTypeDurationFeeMemory,
+		domain.ComponentTypeDurationFeeCPU,
+	}
+
+	for _, p := range providers {
+		for _, comp := range compTypes {
+			t.Run(p+"_"+comp, func(t *testing.T) {
+				_, err := NormalizeUnit(p, "completely_invalid_unit_xyz_12345", comp)
+				if err == nil {
+					t.Fatalf("NormalizeUnit(%q, %q, %q) expected fail-loud error, got nil", p, "completely_invalid_unit_xyz_12345", comp)
+				}
+				if !errors.Is(err, ErrUnmappedUnit) {
+					t.Errorf("expected error wrapping ErrUnmappedUnit, got: %v", err)
+				}
+			})
+		}
 	}
 }
 

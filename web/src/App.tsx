@@ -19,6 +19,8 @@ import { CalculatePage } from './pages/CalculatePage';
 import { LandingPage } from './pages/LandingPage';
 import { ProviderStatusPage } from './pages/ProviderStatusPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { CheckEmailPage } from './pages/CheckEmailPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
 
 export const AppRoutes: React.FC = () => {
   const { pathname } = useLocation();
@@ -42,6 +44,10 @@ export const AppRoutes: React.FC = () => {
       return <CalculatePage />;
     case '/status':
       return <ProviderStatusPage />;
+    case '/check-email':
+      return <CheckEmailPage />;
+    case '/verify-email':
+      return <VerifyEmailPage />;
     case '/':
       return <LandingPage />;
     default:

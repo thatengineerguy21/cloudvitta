@@ -3,7 +3,9 @@ import React from 'react';
 import { BentoCard } from '../components/bento/BentoCard';
 import { BentoGrid } from '../components/bento/BentoGrid';
 import { ProviderStatusCard } from '../components/status/ProviderStatusCard';
+import { ComputeCatalogSummaryCard } from '../components/status/ComputeCatalogSummaryCard';
 import { CardErrorBoundary } from '../components/common/CardErrorBoundary';
+
 import {
   ALL_PROVIDERS,
   useProviderHealthSummary,
@@ -12,8 +14,9 @@ import {
 import { cn } from '../lib/utils';
 import { Activity } from 'lucide-react';
 
-const SUMMARY_STATE_COLORS: Record<HealthSummaryState, string> = {
+const SUMMARY_STATE_COLORS: Record<HealthSummaryState | 'partially_healthy', string> = {
   healthy: 'text-status-matchExact border-status-matchExact',
+  partially_healthy: 'text-status-matchClose border-status-matchClose',
   degraded: 'text-status-stale border-status-stale',
   error: 'text-status-anomaly border-status-anomaly',
   loading: 'text-text-secondary border-border-default',
@@ -34,21 +37,20 @@ export const ProviderStatusPage: React.FC = () => {
       {/* Page Header */}
       <BentoCard colSpan={12}>
         <span className="text-xs uppercase tracking-widest text-border-accent font-bold">
-          Provider Health Telemetry
+          System Status
         </span>
         <h1 className="font-display text-3xl font-medium text-text-primary mt-2">
-          Provider Operational Status &amp; Data Freshness
+          Cloud Provider Operational Status &amp; Data Freshness
         </h1>
         <p className="text-sm text-text-secondary mt-2 max-w-2xl">
-          Live health telemetry across all 7 supported cloud providers. Each card queries
-          independently — a single provider failure does not block others.
+          Live synchronization status and pricing data freshness across all 7 supported cloud providers.
         </p>
 
         {/* Summary telemetry pill */}
         <div className="mt-4">
           <span
             className={cn(
-              'inline-flex items-center space-x-2 px-3 py-1 border text-xs font-bold uppercase tracking-wider',
+              'inline-flex items-center space-x-2 px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-wider',
               stateColor
             )}
           >
@@ -58,8 +60,14 @@ export const ProviderStatusPage: React.FC = () => {
         </div>
       </BentoCard>
 
+      {/* Compute Hardware Catalog Inventory Summary */}
+      <CardErrorBoundary>
+        <ComputeCatalogSummaryCard />
+      </CardErrorBoundary>
+
       {/* Provider Status Cards Grid */}
       <BentoGrid columns={12} gap="md">
+
         {ALL_PROVIDERS.map((provider) => (
           <div key={provider} className="col-span-1 md:col-span-6">
             <CardErrorBoundary>

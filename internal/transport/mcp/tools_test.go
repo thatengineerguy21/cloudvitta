@@ -13,6 +13,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
+	"github.com/thatengineerguy21/CloudVitta/internal/store"
 	"github.com/thatengineerguy21/CloudVitta/internal/transport/mcp"
 )
 
@@ -330,8 +331,19 @@ func TestMCP_ToolsList(t *testing.T) {
 	defer mr.Close()
 	defer func() { _ = rdb.Close() }()
 
+	// Include CatalogService to match production wiring (10 tools total).
+	mockQ := &mockCatalogQuerierForMCP{
+		countCatalogItemsFunc: func(ctx context.Context, arg store.CountComputeCatalogItemsParams) (int64, error) {
+			return 0, nil
+		},
+		listCatalogItemsFunc: func(ctx context.Context, arg store.ListComputeCatalogItemsParams) ([]store.ComputeInstanceCatalog, error) {
+			return nil, nil
+		},
+	}
+	catalogSvc := service.NewCatalogService(mockQ, rdb)
+
 	ctx := context.Background()
-	server := mcp.NewServer(pricingSvc, freshnessSvc)
+	server := mcp.NewServer(pricingSvc, freshnessSvc, mcp.WithCatalogService(catalogSvc))
 	clientSession, cleanup := connectTestClient(ctx, t, server)
 	defer cleanup()
 
@@ -350,6 +362,7 @@ func TestMCP_ToolsList(t *testing.T) {
 		"compare_serverless":     false,
 		"calculate_workload":     false,
 		"get_provider_status":    false,
+		"get_compute_catalog":    false,
 	}
 
 	for _, tool := range toolsList.Tools {
@@ -363,8 +376,8 @@ func TestMCP_ToolsList(t *testing.T) {
 			t.Errorf("expected tool %q in tools list, but not found", name)
 		}
 	}
-	if len(toolsList.Tools) != 9 {
-		t.Errorf("expected exactly 9 tools in tools list, got %d", len(toolsList.Tools))
+	if len(toolsList.Tools) != 10 {
+		t.Errorf("expected exactly 10 tools in tools list, got %d", len(toolsList.Tools))
 	}
 }
 

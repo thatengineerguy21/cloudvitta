@@ -29,7 +29,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
   return (
     <div
       className={cn(
-        'border border-border-default bg-surface-card transition-colors',
+        'border border-border-default/80 bg-surface-card rounded-2xl shadow-sm transition-all overflow-hidden',
         enabled && 'border-border-accent/60',
         className
       )}
@@ -37,7 +37,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
       {/* Accordion Header */}
       <div className="flex items-center justify-between p-3.5 bg-surface-raised/40 select-none border-b border-border-default/50">
         <div className="flex items-center space-x-3 min-w-0">
-          {/* Custom Rectilinear Checkbox */}
+          {/* Custom Checkbox */}
           <label className="flex items-center space-x-2.5 cursor-pointer">
             <button
               type="button"
@@ -49,7 +49,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
                 onToggleEnabled(!enabled);
               }}
               className={cn(
-                'w-4 h-4 border flex items-center justify-center transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none',
+                'w-4 h-4 border rounded flex items-center justify-center transition-colors focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:outline-none',
                 enabled
                   ? 'bg-border-accent border-border-accent text-surface-canvas'
                   : 'bg-surface-card border-border-default hover:border-text-secondary'
@@ -74,7 +74,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
           <span
             onClick={onToggleOpen}
             className={cn(
-              'text-[11px] px-2 py-0.5 border font-mono truncate max-w-[150px] sm:max-w-none cursor-pointer',
+              'text-[11px] px-2.5 py-0.5 border rounded-full font-mono truncate max-w-[150px] sm:max-w-none cursor-pointer',
               enabled
                 ? 'border-border-accent/40 text-text-primary bg-surface-card'
                 : 'border-border-default text-text-secondary/70 bg-surface-raised'
@@ -87,7 +87,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
             onClick={onToggleOpen}
             aria-expanded={isOpen}
             aria-label={isOpen ? `Collapse ${title}` : `Expand ${title}`}
-            className="p-1 hover:bg-surface-raised text-text-secondary hover:text-text-primary transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+            className="p-1 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text-primary transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           >
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -98,7 +98,7 @@ export const WorkloadCategoryCard: React.FC<WorkloadCategoryCardProps> = ({
       {isOpen && (
         <div className="p-4 bg-surface-card space-y-3.5">
           {!enabled && (
-            <div className="p-2 border border-dashed border-border-default bg-surface-raised text-xs text-text-secondary flex items-center justify-between">
+            <div className="p-2.5 rounded-xl border border-dashed border-border-default bg-surface-raised text-xs text-text-secondary flex items-center justify-between">
               <span>This category is currently disabled in your workload.</span>
               <button
                 type="button"

@@ -149,7 +149,7 @@ func TestDatabaseNoSQLHandler_Success(t *testing.T) {
 			SkuID:           "SKU-AWS-DDB-READ-PROV",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.00013),
+			PriceAmount:     decimal.RequireFromString("0.00013"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
@@ -166,7 +166,7 @@ func TestDatabaseNoSQLHandler_Success(t *testing.T) {
 			SkuID:           "SKU-AWS-DDB-WRITE-PROV",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.00065),
+			PriceAmount:     decimal.RequireFromString("0.00065"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
@@ -183,7 +183,7 @@ func TestDatabaseNoSQLHandler_Success(t *testing.T) {
 			SkuID:           "SKU-AWS-DDB-STORAGE",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.25),
+			PriceAmount:     decimal.RequireFromString("0.25"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
@@ -209,7 +209,7 @@ func TestDatabaseNoSQLHandler_Success(t *testing.T) {
 			SkuID:           "SKU-AZURE-COSMOS-100RU",
 			Region:          "eastus",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.008),
+			PriceAmount:     decimal.RequireFromString("0.008"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
@@ -227,7 +227,7 @@ func TestDatabaseNoSQLHandler_Success(t *testing.T) {
 			SkuID:           "SKU-AZURE-COSMOS-STORAGE",
 			Region:          "eastus",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.25),
+			PriceAmount:     decimal.RequireFromString("0.25"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
@@ -243,6 +243,66 @@ func TestDatabaseNoSQLHandler_Success(t *testing.T) {
 	azureKey := cache.BuildKey(cache.SchemaVersion, "azure", "database_nosql", "eastus")
 	if err := cache.Warm(context.Background(), rdb, azureKey, azureObs, time.Hour); err != nil {
 		t.Fatalf("failed to warm azure cache: %v", err)
+	}
+
+	// Seed cache with GCP Firestore observations
+	gcpObs := []domain.PriceObservation{
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-GCP-FIRESTORE-READ",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.03"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				ReadUnits:     1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-GCP-FIRESTORE-WRITE",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.09"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				WriteUnits:    1,
+				ComponentType: "throughput",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_nosql",
+			SkuID:           "SKU-GCP-FIRESTORE-STORAGE",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.18"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
+				DataModel:     "document",
+				PricingMode:   "provisioned",
+				StorageGB:     1,
+				StorageClass:  "standard",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+	}
+	gcpKey := cache.BuildKey(cache.SchemaVersion, "gcp", "database_nosql", "us-east4")
+	if err := cache.Warm(context.Background(), rdb, gcpKey, gcpObs, time.Hour); err != nil {
+		t.Fatalf("failed to warm gcp cache: %v", err)
 	}
 
 	pricingSvc := service.NewPricingService(nil, rdb)
@@ -266,8 +326,8 @@ func TestDatabaseNoSQLHandler_Success(t *testing.T) {
 		t.Errorf("expected APIVersion v1, got %s", resp.Meta.APIVersion)
 	}
 
-	if len(resp.Results) < 2 {
-		t.Fatalf("expected at least 2 results (AWS, Azure), got %d", len(resp.Results))
+	if len(resp.Results) != 3 {
+		t.Fatalf("expected 3 results (AWS, Azure, GCP), got %d", len(resp.Results))
 	}
 
 	for _, res := range resp.Results {
@@ -301,7 +361,7 @@ func TestDatabaseNoSQLHandler_CurrencyWarning(t *testing.T) {
 			SkuID:           "SKU-AWS-DDB-READ-PROV",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.00013),
+			PriceAmount:     decimal.RequireFromString("0.00013"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{
@@ -318,7 +378,7 @@ func TestDatabaseNoSQLHandler_CurrencyWarning(t *testing.T) {
 			SkuID:           "SKU-AWS-DDB-STORAGE",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.25),
+			PriceAmount:     decimal.RequireFromString("0.25"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			DatabaseNoSQLAttributes: domain.DatabaseNoSQLAttributes{

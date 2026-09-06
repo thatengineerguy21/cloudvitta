@@ -10,7 +10,7 @@ describe('AnomalyFlag Component', () => {
     expect(flag).toHaveClass('border-status-anomaly', 'text-status-anomaly', 'bg-status-anomaly/10');
     expect(flag).toHaveAttribute(
       'title',
-      'Price observation flagged for review: significant anomaly detected (>10x variation).'
+      'Price observation under review: An unusual rate change was detected from this provider.'
     );
   });
 

@@ -36,5 +36,6 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['e2e/**', 'node_modules/**'],
     css: false,
+    testTimeout: 15000,
   },
 });

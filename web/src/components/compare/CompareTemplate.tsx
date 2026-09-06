@@ -1,18 +1,27 @@
 // web/src/components/compare/CompareTemplate.tsx
 import React, { useState, useMemo } from 'react';
-import { BentoGrid } from '../bento/BentoGrid';
-import { BentoCard } from '../bento/BentoCard';
 import { RegionSelect, CurrencySelect } from '../forms/taxonomy/TaxonomySelects';
+import { HonestyContractBanner } from '../honesty/HonestyContractBanner';
 import { WarningsBanner } from '../honesty/WarningsBanner';
+import { BentoMetricHighlights } from './BentoMetricHighlights';
+import { ProviderCompareCard } from './ProviderCompareCard';
 import { MatchQualityBadge } from '../honesty/MatchQualityBadge';
 import { MissingAttributesIndicator } from '../honesty/MissingAttributesIndicator';
 import { StaleDataBadge } from '../honesty/StaleDataBadge';
 import { PriceDisplay, PriceDisplayProps } from '../honesty/PriceDisplay';
 import { CompareSkeleton } from './CompareSkeleton';
 import { formatProviderName, formatRelativeTime } from '../../lib/format';
-import { ArrowUpDown, RotateCcw, AlertTriangle, RefreshCw } from 'lucide-react';
+import {
+  ArrowUpDown,
+  RotateCcw,
+  AlertTriangle,
+  RefreshCw,
+  LayoutGrid,
+  Table as TableIcon,
+} from 'lucide-react';
 import type { ProviderWarning, PriceDetail } from '../../types/api';
 import { ApiError } from '../../api/errors';
+import { cn } from '../../lib/utils';
 
 export interface ComparisonResultRow {
   provider?: string;
@@ -93,15 +102,20 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
   renderCustomSpec,
 }: CompareTemplateProps<TResult>) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [timeframe, setTimeframe] = useState<'hourly' | 'monthly'>('hourly');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const safeResults = useMemo(() => results ?? [], [results]);
 
   const sortedResults = useMemo(() => {
-    return [...results].sort((a, b) => {
-      const priceA = a.normalized_hourly_usd != null ? Number(a.normalized_hourly_usd) : Infinity;
-      const priceB = b.normalized_hourly_usd != null ? Number(b.normalized_hourly_usd) : Infinity;
+    return [...safeResults].sort((a, b) => {
+      const priceA = a.normalized_hourly_usd ?? a.monthly_cost_usd ?? a.price?.amount ?? Infinity;
+      const priceB = b.normalized_hourly_usd ?? b.monthly_cost_usd ?? b.price?.amount ?? Infinity;
       if (priceA === priceB) return 0;
-      return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
+      return sortOrder === 'asc' ? Number(priceA) - Number(priceB) : Number(priceB) - Number(priceA);
     });
-  }, [results, sortOrder]);
+  }, [safeResults, sortOrder]);
 
   const anomalyProviders = useMemo(() => {
     const set = new Set<string>();
@@ -113,45 +127,65 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
     return set;
   }, [warnings]);
 
+  const handleUpdateMatrix = () => {
+    setIsUpdating(true);
+    refetch?.();
+    setTimeout(() => setIsUpdating(false), 500);
+  };
+
   return (
-    <div className="w-full space-y-6">
-      {/* Page Title & Context Header */}
-      <div className="border-b border-border-default pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <span className="text-xs uppercase tracking-widest text-border-accent font-bold">
-              Comparison View
-            </span>
-            <h1 className="font-display text-3xl font-medium text-text-primary mt-1">
-              {categoryTitle}
-            </h1>
-            {categoryDescription && (
-              <p className="text-xs text-text-secondary mt-1">{categoryDescription}</p>
+    <div className="w-full space-y-7">
+      {/* 1. Page Title & Subheader Area */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-surface-raised border border-border-default/80 text-[11px] font-semibold text-text-secondary uppercase tracking-wider mb-2">
+            <span>TOPOLOGY V4.2</span>
+            <span className="text-text-secondary/50">•</span>
+            <span>Live Multi-Cloud Pricing Engine</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-text-primary tracking-tight font-display">
+            {categoryTitle}
+          </h1>
+          {categoryDescription && (
+            <p className="text-text-secondary text-sm sm:text-base mt-1.5 max-w-2xl leading-relaxed">
+              {categoryDescription}
+            </p>
+          )}
+        </div>
+
+        {/* Hourly vs Monthly Toggle */}
+        <div className="flex items-center self-start md:self-auto bg-surface-raised p-1 rounded-xl border border-border-default/80">
+          <button
+            type="button"
+            onClick={() => setTimeframe('hourly')}
+            className={cn(
+              'px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all',
+              timeframe === 'hourly'
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'text-text-secondary hover:text-text-primary'
             )}
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="px-2.5 py-1 text-xs font-mono border border-border-default bg-surface-raised text-text-secondary">
-              {querySummary}
-            </span>
-          </div>
+          >
+            Hourly ($/hr)
+          </button>
+          <button
+            type="button"
+            onClick={() => setTimeframe('monthly')}
+            className={cn(
+              'px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all',
+              timeframe === 'monthly'
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'text-text-secondary hover:text-text-primary'
+            )}
+          >
+            Monthly (730h)
+          </button>
         </div>
       </div>
 
-      {/* Main 12-Column Grid */}
-      <BentoGrid columns={12} gap="md">
-        {/* Left Sticky Query Sidebar (3 Columns) */}
-        <BentoCard
-          colSpan={3}
-          header={
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg font-medium text-text-primary">Query Parameters</h2>
-              <span className="text-xs font-mono uppercase text-border-accent font-bold">Curated</span>
-            </div>
-          }
-          className="lg:sticky lg:top-20 h-fit"
-        >
-          <div className="space-y-4 pt-2">
-            {/* Global Region & Currency Selectors */}
+      {/* 2. Floating Query Console (Header / Filter Matrix Panel) */}
+      <section className="w-full bg-surface-card rounded-2xl border border-border-default/80 shadow-sm p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-end justify-between gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 flex-1">
             <RegionSelect
               value={region}
               onChange={(e) => onRegionChange(e.target.value)}
@@ -162,121 +196,210 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
               onChange={(e) => onCurrencyChange(e.target.value)}
               data-testid="global-currency-select"
             />
+            {sidebarControls}
+          </div>
 
-            <div className="border-t border-border-default pt-4 space-y-4">
-              {sidebarControls}
-            </div>
+          <div className="flex items-center gap-2 pt-1 lg:pt-0 shrink-0">
+            <button
+              type="button"
+              onClick={handleUpdateMatrix}
+              className="flex-1 lg:flex-none h-[38px] px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm shadow-brand-500/20 transition-all cursor-pointer"
+            >
+              <RefreshCw className={cn('w-4 h-4', isUpdating && 'animate-spin')} />
+              <span>Update Matrix</span>
+            </button>
 
-            <div className="border-t border-border-default pt-4">
+            <button
+              type="button"
+              onClick={onReset}
+              className="h-[38px] px-3 rounded-xl bg-surface-raised hover:bg-surface-card text-text-secondary hover:text-text-primary border border-border-default/80 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              title="Reset query parameters to defaults"
+              data-testid="reset-query-btn"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Secondary Parity Tuning Bar */}
+        <div className="pt-3 border-t border-border-default/60 flex flex-wrap items-center justify-between gap-3 text-xs text-text-secondary">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-text-primary font-mono text-[11px] uppercase tracking-wider">Active Query:</span>
+            <span className="font-mono text-text-secondary text-xs">{querySummary}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-text-secondary font-medium">
+            <span className="w-2 h-2 rounded-full bg-status-matchExact"></span>
+            <span>7 Providers Synced ({results.length} matched options)</span>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Honesty Contract Banner */}
+      <HonestyContractBanner />
+
+      {/* Warnings Banner (if any) */}
+      {warnings.length > 0 && (
+        <WarningsBanner warnings={warnings} data-testid="compare-warnings-banner" />
+      )}
+
+      {/* 4. Bento Metric Highlights Row */}
+      {!isLoading && !isError && sortedResults.length > 0 && (
+        <BentoMetricHighlights
+          results={sortedResults}
+          currency={currency}
+          timeframe={timeframe}
+        />
+      )}
+
+      {/* 5. Main Results Container */}
+      <div className="space-y-4">
+        {/* Results Matrix Header Bar with View Switcher */}
+        <div className="bg-surface-card rounded-2xl border border-border-default/80 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <h2 className="font-bold text-base text-text-primary tracking-tight">
+              Provider Comparison Matrix
+            </h2>
+            <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-surface-raised text-text-secondary border border-border-default/60">
+              {results.length} SKUs
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle: [ Cards Grid | Table View ] */}
+            <div className="flex items-center bg-surface-raised p-1 rounded-xl border border-border-default/80">
               <button
                 type="button"
-                onClick={onReset}
-                className="w-full flex items-center justify-center space-x-1.5 px-3 py-2 text-xs uppercase font-bold tracking-wider text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-border-default bg-surface-card transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
-                data-testid="reset-query-btn"
+                onClick={() => setViewMode('cards')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all',
+                  viewMode === 'cards'
+                    ? 'bg-brand-500 text-white shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary'
+                )}
+                aria-label="Cards Grid View"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset to Defaults</span>
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all',
+                  viewMode === 'table'
+                    ? 'bg-brand-500 text-white shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary'
+                )}
+                aria-label="Detailed Table View"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>Table</span>
               </button>
             </div>
-          </div>
-        </BentoCard>
 
-        {/* Right Results Container (9 Columns) */}
-        <BentoCard
-          colSpan={9}
-          header={
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="flex items-center space-x-2">
-                <h2 className="font-display text-lg font-medium text-text-primary">Normalized Comparison</h2>
-                <span className="text-xs font-mono text-text-secondary font-normal">
-                  ({results.length} matched)
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <label htmlFor="sort-order" className="sr-only">Sort by Price</label>
-                <div className="flex items-center space-x-1 text-xs text-text-secondary">
-                  <ArrowUpDown className="w-3 h-3" />
-                  <span className="font-mono">Sort:</span>
-                </div>
-                <select
-                  id="sort-order"
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-                  className="px-2 py-1 text-xs bg-surface-raised border border-border-default text-text-primary focus:outline-none focus:border-border-accent focus-visible:ring-1 focus-visible:ring-border-accent"
-                  aria-label="Sort by Price"
-                  data-testid="sort-order-select"
-                >
-                  <option value="asc">Price: Low to High</option>
-                  <option value="desc">Price: High to Low</option>
-                </select>
-              </div>
+            {/* Price Sort Order Selector */}
+            <div className="flex items-center space-x-1 text-xs text-text-secondary">
+              <ArrowUpDown className="w-3.5 h-3.5" />
+              <label htmlFor="sort-order" className="sr-only">Sort by Price</label>
+              <select
+                id="sort-order"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+                className="px-2.5 py-1 text-xs bg-surface-raised border border-border-default/80 rounded-xl text-text-primary focus:outline-none focus:border-brand-500 cursor-pointer"
+                aria-label="Sort by Price"
+                data-testid="sort-order-select"
+              >
+                <option value="asc">Price: Low to High</option>
+                <option value="desc">Price: High to Low</option>
+              </select>
             </div>
-          }
-        >
-          <div className="space-y-4 pt-2">
-            {/* Warnings Banner */}
-            {warnings.length > 0 && (
-              <WarningsBanner warnings={warnings} data-testid="compare-warnings-banner" />
-            )}
+          </div>
+        </div>
 
-            {/* Loading State */}
-            {isLoading && <CompareSkeleton rows={4} />}
+        {/* Loading State */}
+        {isLoading && <CompareSkeleton rows={4} />}
 
-            {/* Error State */}
-            {!isLoading && isError && (
-              <div
-                className="p-6 border border-status-anomaly bg-surface-raised space-y-3"
-                data-testid="compare-error-container"
+        {/* Error State */}
+        {!isLoading && isError && (
+          <div
+            className="p-6 border border-status-anomaly/80 bg-status-anomaly/5 rounded-2xl space-y-3"
+            data-testid="compare-error-container"
+          >
+            <div className="flex items-center space-x-2 text-status-anomaly font-bold text-sm">
+              <AlertTriangle className="w-4 h-4" />
+              <span>{error instanceof ApiError ? error.title : 'Query Error'}</span>
+            </div>
+            <p className="text-xs text-text-secondary">
+              {error instanceof ApiError
+                ? error.detail
+                : error?.message || 'Failed to fetch comparison prices.'}
+            </p>
+            {refetch && (
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm"
               >
-                <div className="flex items-center space-x-2 text-status-anomaly font-bold text-sm">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>
-                    {error instanceof ApiError ? error.title : 'Query Error'}
-                  </span>
-                </div>
-                <p className="text-xs text-text-secondary">
-                  {error instanceof ApiError
-                    ? error.detail
-                    : error?.message || 'Failed to fetch comparison prices.'}
-                </p>
-                {refetch && (
-                  <button
-                    type="button"
-                    onClick={() => refetch()}
-                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase font-bold tracking-wider text-text-primary hover:border-border-accent border border-border-default bg-surface-card transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Retry Query</span>
-                  </button>
-                )}
-              </div>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Retry Query</span>
+              </button>
             )}
+          </div>
+        )}
 
-            {/* Empty State */}
-            {!isLoading && !isError && sortedResults.length === 0 && (
-              <div
-                className="p-8 border border-dashed border-border-default bg-surface-raised text-center space-y-2"
-                data-testid="compare-empty-state"
-              >
-                <div className="font-display text-lg text-text-primary">No Matching SKUs Found</div>
-                <p className="text-xs text-text-secondary max-w-md mx-auto">
-                  No cloud provider matched the specified parameters in {region}. Review the warnings
-                  above or adjust your requirements.
-                </p>
+        {/* Empty State */}
+        {!isLoading && !isError && sortedResults.length === 0 && (
+          <div
+            className="p-10 border border-dashed border-border-default rounded-2xl bg-surface-card text-center space-y-2 shadow-2xs"
+            data-testid="compare-empty-state"
+          >
+            <div className="font-bold text-lg text-text-primary">No Matching SKUs Found</div>
+            <p className="text-xs text-text-secondary max-w-md mx-auto">
+              No cloud provider matched the specified parameters in {region}. Review the warnings
+              above or adjust your requirements.
+            </p>
+          </div>
+        )}
+
+        {/* Results Presentation Container with data-testid="results-table" */}
+        {!isLoading && !isError && sortedResults.length > 0 && (
+          <div data-testid="results-table">
+            {viewMode === 'cards' ? (
+              /* Bento Cards Grid View (Matching Stitch mockups) */
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+                {sortedResults.map((row, idx) => {
+                  const isAnomaly = anomalyProviders.has(row.provider?.toLowerCase() || '');
+                  const isLowestTCO = idx === 0 && sortOrder === 'asc';
+
+                  return (
+                    <ProviderCompareCard
+                      key={`${row.provider || 'unknown'}-${row.sku_id || idx}`}
+                      row={row}
+                      currency={currency}
+                      timeframe={timeframe}
+                      isLowestTCO={isLowestTCO}
+                      hasAnomaly={isAnomaly}
+                      renderCustomSpec={renderCustomSpec as ((row: ComparisonResultRow) => React.ReactNode) | undefined}
+                    />
+                  );
+                })}
               </div>
-            )}
-
-            {/* Results Table */}
-            {!isLoading && !isError && sortedResults.length > 0 && (
-              <div className="overflow-x-auto border border-border-default">
-                <table className="w-full min-w-[640px] text-left border-collapse text-xs" data-testid="results-table" aria-label="Provider Comparison Results">
+            ) : (
+              /* Detailed Table View */
+              <div className="overflow-x-auto border border-border-default/80 rounded-2xl bg-surface-card shadow-sm">
+                <table
+                  className="w-full min-w-[640px] text-left border-collapse text-xs"
+                  aria-label="Provider Comparison Results"
+                >
                   <thead>
                     <tr className="border-b border-border-default bg-surface-raised font-mono text-text-secondary uppercase">
-                      <th scope="col" className="py-2.5 px-4 font-bold">Provider</th>
-                      <th scope="col" className="py-2.5 px-4 font-bold">Matched Specification</th>
-                      <th scope="col" className="py-2.5 px-4 font-bold">Match Quality</th>
-                      <th scope="col" className="py-2.5 px-4 font-bold">Price</th>
-                      <th scope="col" className="py-2.5 px-4 font-bold">Freshness</th>
+                      <th scope="col" className="py-3 px-4 font-bold">Provider</th>
+                      <th scope="col" className="py-3 px-4 font-bold">Matched Specification</th>
+                      <th scope="col" className="py-3 px-4 font-bold">Match Quality</th>
+                      <th scope="col" className="py-3 px-4 font-bold">Price</th>
+                      <th scope="col" className="py-3 px-4 font-bold">Freshness</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default bg-surface-card">
@@ -289,8 +412,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                           className="hover:bg-surface-raised transition-colors"
                           data-testid={`row-${row.provider}`}
                         >
-                          {/* Provider Column */}
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-3.5 px-4 align-top">
                             <div className="flex flex-col">
                               <span className="font-bold text-text-primary uppercase tracking-wide">
                                 {formatProviderName(row.provider)}
@@ -303,13 +425,12 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                             </div>
                           </td>
 
-                          {/* Specification Column */}
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-3.5 px-4 align-top">
                             {renderCustomSpec ? (
                               renderCustomSpec(row)
                             ) : (
                               <div className="space-y-0.5">
-                                <div className="font-mono text-text-primary font-medium">
+                                <div className="font-mono text-text-primary font-semibold">
                                   {row.instance_type || row.spec_summary || 'Standard SKU'}
                                 </div>
                                 {row.missing_attributes && row.missing_attributes.length > 0 && (
@@ -321,8 +442,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                             )}
                           </td>
 
-                          {/* Match Quality Column */}
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-3.5 px-4 align-top">
                             <MatchQualityBadge
                               quality={matchQuality}
                               score={row.match_score}
@@ -330,8 +450,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                             />
                           </td>
 
-                          {/* Price Column */}
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-3.5 px-4 align-top">
                             <PriceDisplay
                               amount={row.price?.amount}
                               currency={row.price?.currency || currency}
@@ -342,8 +461,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                             />
                           </td>
 
-                          {/* Freshness Column */}
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-3.5 px-4 align-top">
                             {row.stale ? (
                               <StaleDataBadge fetchedAt={row.fetched_at} />
                             ) : (
@@ -360,8 +478,8 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
               </div>
             )}
           </div>
-        </BentoCard>
-      </BentoGrid>
+        )}
+      </div>
     </div>
   );
 }

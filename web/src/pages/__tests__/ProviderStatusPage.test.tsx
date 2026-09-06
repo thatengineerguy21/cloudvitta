@@ -57,7 +57,7 @@ describe('ProviderStatusPage', () => {
     });
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Provider Operational Status'
+      'Cloud Provider Operational Status & Data Freshness'
     );
   });
 

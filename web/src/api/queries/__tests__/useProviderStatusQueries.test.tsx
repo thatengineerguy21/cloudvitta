@@ -116,7 +116,29 @@ describe('useProviderStatusQueries', () => {
       expect(result.current.summaryState).toBe('degraded');
       expect(result.current.degradedCount).toBe(2);
       expect(result.current.healthyCount).toBe(5);
-      expect(result.current.summaryLabel).toBe('5/7 Active');
+      expect(result.current.summaryLabel).toBe('7/7 Active');
+    });
+
+    it('counts partially_healthy providers as healthy', async () => {
+      vi.spyOn(providerApi, 'getStatus').mockImplementation((provider) => {
+        if (provider === 'aws' || provider === 'azure' || provider === 'gcp') {
+          return Promise.resolve(mockStatus(provider, 'partially_healthy'));
+        }
+        return Promise.resolve(mockStatus(provider, 'not_yet_ingested'));
+      });
+
+      const { result } = renderHook(() => useProviderHealthSummary(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.summaryState).toBe('degraded');
+      expect(result.current.healthyCount).toBe(3);
+      expect(result.current.notIngestedCount).toBe(4);
+      expect(result.current.summaryLabel).toBe('3/7 Active');
     });
 
     it('calculates error when all queries fail', async () => {

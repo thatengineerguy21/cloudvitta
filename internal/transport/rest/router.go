@@ -24,7 +24,7 @@ func SwaggerHandler() http.Handler {
 }
 
 // NewRouter constructs a net/http.ServeMux with all REST API routes, health probes, metrics, and middlewares wired.
-func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, freshnessSvc *service.FreshnessService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
+func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService, freshnessSvc *service.FreshnessService, catalogSvc *service.CatalogService, dbPool *pgxpool.Pool, redisClient redis.Cmdable, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Probes & Metrics (unlimited)
@@ -80,6 +80,8 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	loginHandler := NewLoginHandler(authSvc)
 	refreshHandler := NewRefreshHandler(authSvc)
 	logoutHandler := NewLogoutHandler(authSvc)
+	verifyEmailHandler := NewVerifyEmailHandler(authSvc)
+	resendVerificationHandler := NewResendVerificationHandler(authSvc)
 
 	mux.Handle("GET /api/v1/prices/compute", limiter.Handler(computeHandler))
 	mux.Handle("GET /api/v1/prices/storage", limiter.Handler(storageHandler))
@@ -95,6 +97,16 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	mux.Handle("POST /api/v1/auth/login", limiter.WithProfile("login", loginLimit)(loginHandler))
 	mux.Handle("POST /api/v1/auth/refresh", limiter.Handler(refreshHandler))
 	mux.Handle("POST /api/v1/auth/logout", limiter.Handler(logoutHandler))
+	mux.Handle("POST /api/v1/auth/verify-email", limiter.WithProfile("verification", 10)(verifyEmailHandler))
+	mux.Handle("POST /api/v1/auth/resend-verification", limiter.WithProfile("verification", 5)(resendVerificationHandler))
+
+	// Catalog Handlers
+	if catalogSvc != nil {
+		catalogSummaryHandler := NewCatalogSummaryHandler(catalogSvc)
+		catalogInstancesHandler := NewCatalogInstancesHandler(catalogSvc)
+		mux.Handle("GET /api/v1/catalog/compute/summary", limiter.WithProfile("catalog", 60)(catalogSummaryHandler))
+		mux.Handle("GET /api/v1/catalog/compute/instances", limiter.WithProfile("catalog", 60)(catalogInstancesHandler))
+	}
 
 	// Global chain: CORS -> AuthContext -> Recovery -> ServeMux
 	handler := authMw(mux)

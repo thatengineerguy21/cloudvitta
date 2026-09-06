@@ -90,7 +90,7 @@ func TestNoSQLScorer_ModelCompatibility(t *testing.T) {
 		},
 	}
 	distWide, _, eligible := scorer.Score(candWide, target)
-	if !eligible || distWide < 0.39 || distWide > 0.41 {
+	if !eligible || distWide != 0.40 {
 		t.Errorf("expected wide_column penalty 0.40, got %f", distWide)
 	}
 }
@@ -120,7 +120,7 @@ func TestNoSQLScorer_ModeAndHAPenalties(t *testing.T) {
 		},
 	}
 	distMode, _, _ := scorer.Score(candMode, target)
-	if distMode < 0.29 || distMode > 0.31 {
+	if distMode != 0.30 {
 		t.Errorf("expected mode penalty 0.30, got %f", distMode)
 	}
 
@@ -137,7 +137,7 @@ func TestNoSQLScorer_ModeAndHAPenalties(t *testing.T) {
 		},
 	}
 	distHA, _, _ := scorer.Score(candHA, target)
-	if distHA < 0.49 || distHA > 0.51 {
+	if distHA != 0.50 {
 		t.Errorf("expected HA penalty 0.50, got %f", distHA)
 	}
 }
@@ -150,7 +150,7 @@ func TestMatchNoSQLObservations_AWS(t *testing.T) {
 			Provider:        "aws",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-DDB-READ-PROV",
-			PriceAmount:     decimal.NewFromFloat(0.00013),
+			PriceAmount:     decimal.RequireFromString("0.00013"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			Region:          "us-east-1",
@@ -167,7 +167,7 @@ func TestMatchNoSQLObservations_AWS(t *testing.T) {
 			Provider:        "aws",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-DDB-WRITE-PROV",
-			PriceAmount:     decimal.NewFromFloat(0.00065),
+			PriceAmount:     decimal.RequireFromString("0.00065"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			Region:          "us-east-1",
@@ -184,7 +184,7 @@ func TestMatchNoSQLObservations_AWS(t *testing.T) {
 			Provider:        "aws",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-DDB-STORAGE",
-			PriceAmount:     decimal.NewFromFloat(0.25),
+			PriceAmount:     decimal.RequireFromString("0.25"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			Region:          "us-east-1",
@@ -231,9 +231,9 @@ func TestMatchNoSQLObservations_AWS(t *testing.T) {
 	// 50 WCU * 0.00065 = 0.0325
 	// 100 GB * 0.25 / 730 = 0.0342465753...
 	// Total Hourly = 0.013 + 0.0325 + 0.0342465753 = ~0.0797465753
-	expectedHourly := decimal.NewFromFloat(100 * 0.00013).
-		Add(decimal.NewFromFloat(50 * 0.00065)).
-		Add(decimal.NewFromFloat(100 * 0.25).Div(service.HoursInMonth))
+	expectedHourly := decimal.RequireFromString("0.013").
+		Add(decimal.RequireFromString("0.0325")).
+		Add(decimal.RequireFromString("25").Div(service.HoursInMonth))
 
 	if !res.Observation.PriceAmount.Equal(expectedHourly) {
 		t.Errorf("expected hourly price %s, got %s", expectedHourly, res.Observation.PriceAmount)
@@ -248,7 +248,7 @@ func TestMatchNoSQLObservations_Azure(t *testing.T) {
 			Provider:        "azure",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-AZURE-100RU",
-			PriceAmount:     decimal.NewFromFloat(0.008),
+			PriceAmount:     decimal.RequireFromString("0.008"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			Region:          "eastus",
@@ -266,7 +266,7 @@ func TestMatchNoSQLObservations_Azure(t *testing.T) {
 			Provider:        "azure",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-AZURE-STORAGE",
-			PriceAmount:     decimal.NewFromFloat(0.25),
+			PriceAmount:     decimal.RequireFromString("0.25"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			Region:          "eastus",
@@ -307,8 +307,8 @@ func TestMatchNoSQLObservations_Azure(t *testing.T) {
 
 	// 500 RU / 100 * 0.008 = 0.04
 	// 200 GB * 0.25 / 730 = 0.06849315...
-	expectedHourly := decimal.NewFromFloat(5 * 0.008).
-		Add(decimal.NewFromFloat(200 * 0.25).Div(service.HoursInMonth))
+	expectedHourly := decimal.RequireFromString("0.04").
+		Add(decimal.RequireFromString("50").Div(service.HoursInMonth))
 
 	if !res.Observation.PriceAmount.Equal(expectedHourly) {
 		t.Errorf("expected hourly price %s, got %s", expectedHourly, res.Observation.PriceAmount)
@@ -323,7 +323,7 @@ func TestMatchNoSQLObservations_GCP(t *testing.T) {
 			Provider:        "gcp",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-GCP-READS",
-			PriceAmount:     decimal.NewFromFloat(0.03), // $0.03 per 100k
+			PriceAmount:     decimal.RequireFromString("0.03"), // $0.03 per 100k
 			PriceCurrency:   "USD",
 			Unit:            "100k-ops",
 			Region:          "us-east4",
@@ -340,7 +340,7 @@ func TestMatchNoSQLObservations_GCP(t *testing.T) {
 			Provider:        "gcp",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-GCP-WRITES",
-			PriceAmount:     decimal.NewFromFloat(0.09), // $0.09 per 100k
+			PriceAmount:     decimal.RequireFromString("0.09"), // $0.09 per 100k
 			PriceCurrency:   "USD",
 			Unit:            "100k-ops",
 			Region:          "us-east4",
@@ -357,7 +357,7 @@ func TestMatchNoSQLObservations_GCP(t *testing.T) {
 			Provider:        "gcp",
 			ServiceCategory: "database_nosql",
 			SkuID:           "SKU-GCP-STORAGE",
-			PriceAmount:     decimal.NewFromFloat(0.18),
+			PriceAmount:     decimal.RequireFromString("0.18"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			Region:          "us-east4",
@@ -396,9 +396,9 @@ func TestMatchNoSQLObservations_GCP(t *testing.T) {
 		t.Errorf("expected exact match quality, got %s", res.MatchQuality)
 	}
 
-	expectedHourly := decimal.NewFromFloat(1.8 * 0.03).
-		Add(decimal.NewFromFloat(0.36 * 0.09)).
-		Add(decimal.NewFromFloat(50 * 0.18).Div(service.HoursInMonth))
+	expectedHourly := decimal.RequireFromString("0.054").
+		Add(decimal.RequireFromString("0.0324")).
+		Add(decimal.RequireFromString("9").Div(service.HoursInMonth))
 
 	if !res.Observation.PriceAmount.Equal(expectedHourly) {
 		t.Errorf("expected hourly price %s, got %s", expectedHourly, res.Observation.PriceAmount)

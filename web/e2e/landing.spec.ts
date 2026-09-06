@@ -28,7 +28,7 @@ test.describe('Landing Page E2E', () => {
     await expect(page.getByRole('link', { name: /CloudVitta/i })).toBeVisible();
 
     // Check hero headline and subhead
-    await expect(page.getByRole('heading', { level: 1, name: /Normalized Cloud Infrastructure Pricing/i })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Transparent Cloud Infrastructure Pricing/i })).toBeVisible();
     await expect(page.getByText(/Compare and calculate cloud infrastructure costs across 7 providers/i)).toBeVisible();
 
     // Check dual workload CTAs

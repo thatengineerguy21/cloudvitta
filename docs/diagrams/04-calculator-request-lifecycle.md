@@ -37,7 +37,7 @@ sequenceDiagram
     Handler->>Svc: GetPrices(ctx, filter)
     
     %% Cache lookup
-    Svc->>Cache: GET v1:{provider}:{category}:{region}
+    Svc->>Cache: GET v1:{provider}:{category}:{region} (span: redis.cmd.GET via redisotel)
     
     alt Cache Hit
         Cache-->>Svc: Cached Observation Slice (JSON)
@@ -46,16 +46,16 @@ sequenceDiagram
         Svc->>SF: DoChan(cache_key, queryFn)
         
         critical Singleflight DB Query Collapse
-            SF->>DB: GetNormalizedPricesByProviderCategoryRegion(provider, category, region)
+            SF->>DB: GetNormalizedPricesByProviderCategoryRegion (span: pgx.Query via otelpgx)
             DB-->>SF: []price_observations rows
-            SF->>Cache: SETEX v1:{provider}:{category}:{region} (TTL 5-15 min)
+            SF->>Cache: SETEX v1:{provider}:{category}:{region} (TTL 5-15 min, span: redis.cmd.SETEX)
             SF-->>Svc: Normalized Observations
         end
     end
     
     %% Scoring and Matching
     Svc->>Match: MatchObservations(requested_specs, observations)
-    Note over Match: Category-specific Strategy Scorer<br/>Assign match_quality (exact / close / loose)<br/>Dynamic join for DB & NoSQL candidates
+    Note over Match: Category-specific Strategy Scorer<br/>Assign match_quality (exact / close / approximate)<br/>Elastic categories (storage, network) match qualitative specs;<br/>volume applies as cost multiplier in pricing arithmetic.<br/>Dynamic join for DB & NoSQL candidates
     Match-->>Svc: Matched Price Result
     
     %% Freshness Evaluation
@@ -179,7 +179,7 @@ sequenceDiagram
             DLQ-->>FreshSvc: DLQ Failure Record (if present)
         end
         
-        FreshSvc->>FreshSvc: Resolve Overall Status (healthy / degraded / stale / blocked)
+        FreshSvc->>FreshSvc: Resolve Overall Status (healthy / partially_healthy / degraded / stale / blocked)
         FreshSvc-->>Handler: ProviderStatus Domain Model
         Handler-->>Client: 200 OK ProviderStatus JSON
     else Unknown Provider Identifier

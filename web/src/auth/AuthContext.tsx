@@ -56,12 +56,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       await authApi.signup({ email, password });
-      // Automatically log the user in following successful registration
-      const loginResponse = await authApi.login({ email, password });
-      const newTokens = mapAuthTokens(loginResponse);
-      tokensRef.current = newTokens;
-      setTokens(newTokens);
-      setUser({ email });
     } finally {
       setIsLoading(false);
     }

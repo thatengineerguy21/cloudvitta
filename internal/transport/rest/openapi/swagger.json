@@ -181,6 +181,65 @@
                 }
             }
         },
+        "/api/v1/auth/resend-verification": {
+            "post": {
+                "description": "Requests a fresh email verification link without revealing account existence",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Resend verification email",
+                "parameters": [
+                    {
+                        "description": "Recipient email",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.ResendVerificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Verification email request accepted",
+                        "schema": {
+                            "$ref": "#/definitions/rest.ResendVerificationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed request or missing email",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification requests",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/signup": {
             "post": {
                 "description": "Creates a new user account with email and password",
@@ -240,6 +299,83 @@
                 }
             }
         },
+        "/api/v1/auth/verify-email": {
+            "post": {
+                "description": "Consumes a single-use verification token to activate a user account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Verify email address",
+                "parameters": [
+                    {
+                        "description": "Verification token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.VerifyEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Email verified successfully",
+                        "schema": {
+                            "$ref": "#/definitions/rest.VerifyEmailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed request or missing token",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Verification token not found",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Verification token already consumed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "410": {
+                        "description": "Verification token expired",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/calculate": {
             "post": {
                 "description": "Calculates composite pricing across cloud providers for requested compute, storage, network, database, NoSQL, Kubernetes, and serverless specs.",
@@ -281,6 +417,120 @@
                         "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/catalog/compute/instances": {
+            "get": {
+                "description": "Returns paginated virtual machine specifications filtered by provider, category, family, and vCPU/RAM ranges.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "Search and filter compute instance catalog",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Cloud provider (aws, azure, gcp, etc.)",
+                        "name": "provider",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Instance category (general_purpose, compute_optimized, etc.)",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Instance family (t3, c5, Standard_D, etc.)",
+                        "name": "instance_family",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Minimum vCPU count",
+                        "name": "min_vcpu",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Maximum vCPU count",
+                        "name": "max_vcpu",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Minimum RAM in GiB",
+                        "name": "min_memory_gib",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Maximum RAM in GiB",
+                        "name": "max_memory_gib",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit (default: 50, max: 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset (default: 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rest.CatalogInstancesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/catalog/compute/summary": {
+            "get": {
+                "description": "Returns total instances, provider counts, and category breakdowns across all cloud providers.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "Get compute instance catalog summary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rest.CatalogSummaryResponse"
                         }
                     },
                     "500": {
@@ -893,6 +1143,59 @@
                 }
             }
         },
+        "domain.ComputeCatalogItem": {
+            "type": "object",
+            "properties": {
+                "attributes": {
+                    "$ref": "#/definitions/domain.ComputeAttributes"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "cpu_architecture": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "first_seen_at": {
+                    "type": "string"
+                },
+                "gpu_count": {
+                    "type": "integer"
+                },
+                "gpu_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "instance_family": {
+                    "type": "string"
+                },
+                "instance_type_id": {
+                    "type": "string"
+                },
+                "is_burstable": {
+                    "type": "boolean"
+                },
+                "is_current_gen": {
+                    "type": "boolean"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "memory_gib": {
+                    "type": "number"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "vcpu": {
+                    "type": "number"
+                }
+            }
+        },
         "domain.DatabaseNoSQLAttributes": {
             "type": "object",
             "properties": {
@@ -1174,6 +1477,46 @@
                     "items": {
                         "$ref": "#/definitions/rest.ProviderWarning"
                     }
+                }
+            }
+        },
+        "rest.CatalogInstancesResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "instances": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.ComputeCatalogItem"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.CatalogSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "category_breakdown": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "provider_totals": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "total_instances": {
+                    "type": "integer"
                 }
             }
         },
@@ -1626,6 +1969,9 @@
                 "monthly_cost_usd": {
                     "type": "number"
                 },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
                 "price": {
                     "$ref": "#/definitions/rest.PriceDetail"
                 },
@@ -1741,6 +2087,22 @@
                     "type": "string"
                 },
                 "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.ResendVerificationRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.ResendVerificationResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
                     "type": "string"
                 }
             }
@@ -1925,6 +2287,9 @@
                 "monthly_cost_usd": {
                     "type": "number"
                 },
+                "normalized_hourly_usd": {
+                    "type": "number"
+                },
                 "price": {
                     "$ref": "#/definitions/rest.PriceDetail"
                 },
@@ -1936,6 +2301,22 @@
                 },
                 "stale": {
                     "type": "boolean"
+                }
+            }
+        },
+        "rest.VerifyEmailRequest": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.VerifyEmailResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
                 }
             }
         }

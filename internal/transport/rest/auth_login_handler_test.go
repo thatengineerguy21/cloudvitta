@@ -30,10 +30,11 @@ func TestLoginHandler_Success(t *testing.T) {
 				return store.User{}, pgx.ErrNoRows
 			}
 			return store.User{
-				ID:           store.UUIDToPg(userUUID),
-				Email:        email,
-				PasswordHash: passwordHash,
-				CreatedAt:    store.TimestamptzFromTime(time.Now().UTC()),
+				ID:            store.UUIDToPg(userUUID),
+				Email:         email,
+				PasswordHash:  passwordHash,
+				EmailVerified: true,
+				CreatedAt:     store.TimestamptzFromTime(time.Now().UTC()),
 			}, nil
 		},
 		insertRefreshTokenFunc: func(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {

@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 )
 
-// NewPool creates a pgxpool.Pool from the application's DatabaseConfig.
-// It attaches an OpenTelemetry tracer for observability, applies
-// conservative pool limits, and verifies connectivity with a short ping.
-func NewPool(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
+// NewPoolConfig constructs a pgxpool.Config from the application's DatabaseConfig,
+// attaching the OpenTelemetry otelpgx tracer and configuring connection limits.
+func NewPoolConfig(cfg config.DatabaseConfig) (*pgxpool.Config, error) {
 	hostPort := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	encodedPassword := url.QueryEscape(cfg.Password)
 
@@ -41,6 +41,21 @@ func NewPool(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, err
 	poolCfg.MinConns = int32(cfg.MaxIdleConns)
 	poolCfg.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
 	poolCfg.MaxConnIdleTime = time.Duration(cfg.ConnMaxIdleTime) * time.Second
+
+	// Attach OpenTelemetry tracer for auto-instrumenting queries, batches, and transactions.
+	poolCfg.ConnConfig.Tracer = otelpgx.NewTracer()
+
+	return poolCfg, nil
+}
+
+// NewPool creates a pgxpool.Pool from the application's DatabaseConfig.
+// It attaches an OpenTelemetry tracer for observability, applies
+// conservative pool limits, and verifies connectivity with a short ping.
+func NewPool(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
+	poolCfg, err := NewPoolConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {

@@ -91,19 +91,22 @@ export const LandingPage: React.FC = () => {
   const { summaryState, summaryLabel, isLoading } = useProviderHealthSummary();
 
   return (
-    <div className="space-y-6" data-testid="landing-page">
+    <div className="space-y-6 relative" data-testid="landing-page">
+      {/* Ambient Warm Glow Orbs (Soft Warm Modern / Obsidian Terracotta) */}
+      <div className="absolute -top-10 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-20 right-1/4 w-80 h-80 bg-status-matchExact/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
       {/* Hero Section */}
-      <BentoCard colSpan={12}>
-        <span className="text-xs uppercase tracking-widest text-border-accent font-bold">
-          Cloud Pricing Normalization Engine
+      <BentoCard colSpan={12} className="relative overflow-hidden">
+        <span className="text-xs uppercase tracking-widest text-border-accent font-bold px-2 py-0.5 rounded-full bg-brand-500/10 inline-block w-fit">
+          Multi-Cloud Pricing Intelligence
         </span>
-        <h1 className="font-display text-4xl sm:text-5xl font-medium text-text-primary mt-3">
-          Normalized Cloud Infrastructure Pricing
+        <h1 className="font-display text-4xl sm:text-5xl font-extrabold text-text-primary mt-3 tracking-tight">
+          Transparent Cloud Infrastructure Pricing
         </h1>
-        <p className="text-sm text-text-secondary mt-3 max-w-2xl">
+        <p className="text-sm sm:text-base text-text-secondary mt-3 max-w-2xl leading-relaxed">
           Compare and calculate cloud infrastructure costs across 7 providers. Honest pricing
-          data with match quality transparency, staleness detection, and zero client-side
-          arithmetic.
+          with match quality transparency, automatic updates, and zero hidden fees.
         </p>
 
         {/* Links row */}
@@ -112,7 +115,7 @@ export const LandingPage: React.FC = () => {
             href="/docs/"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase font-bold tracking-wider text-text-primary border border-border-default bg-surface-raised hover:border-border-accent transition-colors"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold text-text-primary border border-border-default/80 bg-surface-raised hover:border-border-accent rounded-xl transition-all shadow-2xs"
           >
             <span>Swagger API Docs</span>
             <ExternalLink className="w-3 h-3" />
@@ -121,14 +124,14 @@ export const LandingPage: React.FC = () => {
             href="https://github.com/thatengineerguy21/cloudvitta"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase font-bold tracking-wider text-text-primary border border-border-default bg-surface-raised hover:border-border-accent transition-colors"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold text-text-primary border border-border-default/80 bg-surface-raised hover:border-border-accent rounded-xl transition-all shadow-2xs"
           >
             <Github className="w-3.5 h-3.5" />
             <span>GitHub</span>
           </a>
           <Link
             to="/status"
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase font-bold tracking-wider border border-border-default bg-surface-raised hover:border-border-accent transition-colors"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold border border-border-default/80 bg-surface-raised hover:border-border-accent rounded-xl transition-all shadow-2xs"
           >
             <Activity
               className={cn('w-3.5 h-3.5', HEALTH_BADGE_COLORS[summaryState])}

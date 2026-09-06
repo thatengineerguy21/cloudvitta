@@ -32,7 +32,7 @@ export const ThemeToggle: React.FC = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 border border-border-default hover:border-border-accent bg-surface-card text-text-primary transition-colors flex items-center justify-center cursor-pointer focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+      className="w-9 h-9 rounded-full border border-border-default hover:border-border-accent bg-surface-card text-text-primary transition-all flex items-center justify-center cursor-pointer shadow-2xs focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none shrink-0"
       aria-label="Toggle visual theme"
       title={theme === 'dark' ? 'Switch to Light Editorial' : 'Switch to Dark Obsidian'}
     >

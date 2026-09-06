@@ -149,7 +149,7 @@ func TestDatabaseHandler_Success(t *testing.T) {
 			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.26),
+			PriceAmount:     decimal.RequireFromString("0.26"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
@@ -168,7 +168,7 @@ func TestDatabaseHandler_Success(t *testing.T) {
 			SkuID:           "AWS-RDS-STORAGE-GP3",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.115),
+			PriceAmount:     decimal.RequireFromString("0.115"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
@@ -195,7 +195,7 @@ func TestDatabaseHandler_Success(t *testing.T) {
 			SkuID:           "AZURE-PG-GP-4VCORE",
 			Region:          "eastus",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.28),
+			PriceAmount:     decimal.RequireFromString("0.28"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
@@ -214,7 +214,7 @@ func TestDatabaseHandler_Success(t *testing.T) {
 			SkuID:           "AZURE-PG-STORAGE",
 			Region:          "eastus",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.115),
+			PriceAmount:     decimal.RequireFromString("0.115"),
 			PriceCurrency:   "USD",
 			Unit:            "GB-Mo",
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
@@ -230,6 +230,51 @@ func TestDatabaseHandler_Success(t *testing.T) {
 	azureKey := cache.BuildKey(cache.SchemaVersion, "azure", "database_rdbms", "eastus")
 	if err := cache.Warm(context.Background(), rdb, azureKey, azureObs, 10*time.Minute); err != nil {
 		t.Fatalf("failed to warm azure cache: %v", err)
+	}
+
+	// Seed GCP cache with Cloud SQL database observations (instance + storage)
+	gcpObs := []domain.PriceObservation{
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "GCP-CLOUDSQL-PG-4VCPU",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.30"),
+			PriceCurrency:   "USD",
+			Unit:            "Hrs",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				MultiAZ:        false,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: now,
+		},
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "GCP-CLOUDSQL-STORAGE-SSD",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.17"),
+			PriceCurrency:   "USD",
+			Unit:            "GB-Mo",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "postgresql",
+				StorageGB:     1,
+				MultiAZ:       false,
+				StorageFamily: "ssd",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+	}
+	gcpKey := cache.BuildKey(cache.SchemaVersion, "gcp", "database_rdbms", "us-east4")
+	if err := cache.Warm(context.Background(), rdb, gcpKey, gcpObs, 10*time.Minute); err != nil {
+		t.Fatalf("failed to warm gcp cache: %v", err)
 	}
 
 	pricingSvc := service.NewPricingService(nil, rdb)
@@ -249,8 +294,8 @@ func TestDatabaseHandler_Success(t *testing.T) {
 		t.Fatalf("failed to decode response JSON: %v", err)
 	}
 
-	if len(resp.Results) != 2 {
-		t.Fatalf("expected 2 results (aws and azure), got %d", len(resp.Results))
+	if len(resp.Results) != 3 {
+		t.Fatalf("expected 3 results (aws, azure, and gcp), got %d", len(resp.Results))
 	}
 
 	if resp.Meta.Query["engine"] != "postgresql" {
@@ -307,7 +352,7 @@ func TestDatabaseHandler_EngineMismatchWarning(t *testing.T) {
 			SkuID:           "AWS-RDS-PG-M6G-XLARGE",
 			Region:          "us-east-1",
 			RegionGroup:     "us-east",
-			PriceAmount:     decimal.NewFromFloat(0.26),
+			PriceAmount:     decimal.RequireFromString("0.26"),
 			PriceCurrency:   "USD",
 			Unit:            "Hrs",
 			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{

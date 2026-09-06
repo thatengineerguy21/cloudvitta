@@ -11,8 +11,9 @@ import (
 type Option func(*serverConfig)
 
 type serverConfig struct {
-	tracer trace.Tracer
-	meter  metric.Meter
+	tracer     trace.Tracer
+	meter      metric.Meter
+	catalogSvc *service.CatalogService
 }
 
 // WithTracer attaches an OpenTelemetry Tracer to the MCP server.
@@ -26,6 +27,13 @@ func WithTracer(tracer trace.Tracer) Option {
 func WithMeter(meter metric.Meter) Option {
 	return func(cfg *serverConfig) {
 		cfg.meter = meter
+	}
+}
+
+// WithCatalogService attaches a CatalogService to the MCP server.
+func WithCatalogService(catalogSvc *service.CatalogService) Option {
+	return func(cfg *serverConfig) {
+		cfg.catalogSvc = catalogSvc
 	}
 }
 

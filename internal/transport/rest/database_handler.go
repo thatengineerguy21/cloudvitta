@@ -172,7 +172,7 @@ func (h *DatabaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var results []DatabaseResultEntry
+	results := make([]DatabaseResultEntry, 0)
 	for _, item := range compRes.Results {
 		results = append(results, DatabaseResultEntry{
 			Provider:          item.Provider,

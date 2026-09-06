@@ -5,8 +5,10 @@ import { useComputeComparison } from '../../api/queries/useComparisonQueries';
 import { CompareTemplate, ComparisonResultRow } from '../../components/compare/CompareTemplate';
 import { DebouncedInput } from '../../components/forms/DebouncedInput';
 import { InstanceFamilySelect } from '../../components/forms/taxonomy/TaxonomySelects';
+import { InstanceTypeAutocomplete } from '../../components/forms/InstanceTypeAutocomplete';
 import { MissingAttributesIndicator } from '../../components/honesty/MissingAttributesIndicator';
-import type { ComputeQueryParams } from '../../types/api';
+import type { ComputeQueryParams, ComputeCatalogItem } from '../../types/api';
+
 
 const DEFAULT_COMPUTE_PARAMS: ComputeQueryParams = {
   region: 'us-east',
@@ -19,6 +21,7 @@ const DEFAULT_COMPUTE_PARAMS: ComputeQueryParams = {
 
 export const ComputeCompare: React.FC = () => {
   const [params, setParams] = useUrlParams<ComputeQueryParams>(DEFAULT_COMPUTE_PARAMS);
+  const [selectedInstanceId, setSelectedInstanceId] = React.useState<string | undefined>();
 
   const { data, isLoading, isError, error, refetch } = useComputeComparison(params);
 
@@ -26,13 +29,29 @@ export const ComputeCompare: React.FC = () => {
     return `${params.vcpu} vCPU • ${params.ram_gb} GB RAM • ${params.region} • ${params.currency}`;
   }, [params]);
 
+  const handleSelectCatalogInstance = (inst: ComputeCatalogItem) => {
+    setSelectedInstanceId(inst.instance_type_id);
+    setParams({
+      vcpu: inst.vcpu,
+      ram_gb: inst.memory_gib,
+      family: inst.instance_family,
+    });
+  };
+
   const handleReset = () => {
+    setSelectedInstanceId(undefined);
     setParams(DEFAULT_COMPUTE_PARAMS, { replace: false });
   };
 
   const sidebarControls = (
     <>
+      <InstanceTypeAutocomplete
+        onSelectInstance={handleSelectCatalogInstance}
+        selectedInstanceId={selectedInstanceId}
+      />
+
       <DebouncedInput
+
         label="vCPU Cores"
         type="number"
         min={1}
@@ -69,7 +88,7 @@ export const ComputeCompare: React.FC = () => {
           type="checkbox"
           checked={params.strict_family === true || params.strict_family === 'true'}
           onChange={(e) => setParams({ strict_family: e.target.checked })}
-          className="h-4 w-4 rounded-none border-border-default bg-surface-raised accent-border-accent cursor-pointer"
+          className="h-4 w-4 rounded border-border-default bg-surface-raised accent-brand-500 cursor-pointer"
           data-testid="compute-strict-family-checkbox"
         />
       </div>

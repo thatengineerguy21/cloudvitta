@@ -20,10 +20,7 @@ We resolve Open Question #7 by applying the Explicit Declaration of Supported Ca
    - `compute`
    - `storage`
    - `network`
-   - `database_rdbms`
-   - `kubernetes`
-   - `serverless`
-2. DigitalOcean intentionally omits `database_nosql` from its supported category declaration.
+2. DigitalOcean intentionally omits categories that lack public pricing API endpoints (`database_rdbms`, `kubernetes`, `serverless`, and `database_nosql`).
 3. Standalone comparison queries for unsupported categories return a standardized honesty warning (`category_not_supported`) without system errors.
 4. Composite workload calculations (`POST /api/v1/calculate` and `calculate_workload` MCP tool) containing unsupported categories mark the result with `partial: true`, omit the full total `total_normalized_hourly_usd`, and calculate `partial_total_normalized_hourly_usd` from supported categories only (ADR 0022).
 

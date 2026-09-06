@@ -11,7 +11,7 @@ describe('MissingAttributesIndicator Component', () => {
   it('renders trigger button with count and aria-expanded state (Task 4 acceptance criterion)', () => {
     render(<MissingAttributesIndicator missingAttributes={['iops', 'multi_az']} />);
 
-    const button = screen.getByRole('button', { name: '2 unverified dimensions' });
+    const button = screen.getByRole('button', { name: '2 unspecified specifications' });
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveAttribute('aria-haspopup', 'true');
@@ -22,6 +22,10 @@ describe('MissingAttributesIndicator Component', () => {
 
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip).toBeInTheDocument();
+    expect(screen.getByText('Unspecified Specifications')).toBeInTheDocument();
+    expect(
+      screen.getByText('The matched cloud configuration does not declare the following requested parameters:')
+    ).toBeInTheDocument();
     expect(screen.getByText('iops')).toBeInTheDocument();
     expect(screen.getByText('multi_az')).toBeInTheDocument();
 

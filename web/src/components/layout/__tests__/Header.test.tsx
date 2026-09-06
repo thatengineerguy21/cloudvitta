@@ -38,7 +38,7 @@ describe('Header Component', () => {
     render(<Header />, { wrapper: createWrapper() });
 
     expect(screen.getByText('CloudVitta')).toBeInTheDocument();
-    expect(screen.getByText('API Engine')).toBeInTheDocument();
+    expect(screen.getByText('Pricing Tool')).toBeInTheDocument();
     expect(screen.getByText('Compute')).toBeInTheDocument();
     expect(screen.getByText('Storage')).toBeInTheDocument();
     expect(screen.getByText('Network')).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('Header Component', () => {
 
     const modal = screen.getByRole('dialog');
     expect(modal).toBeInTheDocument();
-    expect(within(modal).getByRole('heading', { level: 2 })).toHaveTextContent('Sign In to Standard Tier');
+    expect(within(modal).getByRole('heading', { level: 2 })).toHaveTextContent('Sign In');
   });
 
   it('renders user email and logout trigger when authenticated', async () => {

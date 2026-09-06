@@ -97,7 +97,7 @@ CLOUDVITTA_DIGITALOCEAN_TOKEN=
 # CLOUDVITTA_RATELIMIT_FREE_TIER_RATE=20
 # CLOUDVITTA_RATELIMIT_IP_CEILING_RATE=60
 # CLOUDVITTA_RATELIMIT_LOGIN_RATE=10
-# CLOUDVITTA_CORS_ALLOWED_ORIGINS=http://localhost:3000,https://cloudvitta.dev
+# CLOUDVITTA_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,https://cloudvitta.thatengineerguy.in
 # CLOUDVITTA_CORS_ALLOW_CREDENTIALS=true
 
 # --- Data Freshness (Optional) ---
@@ -107,6 +107,14 @@ CLOUDVITTA_DIGITALOCEAN_TOKEN=
 # --- Observability (OpenTelemetry / Grafana Cloud) ---
 CLOUDVITTA_OBSERVABILITY_OTLP_ENDPOINT=https://otlp-gateway-prod-us-central-0.grafana.net/otlp
 CLOUDVITTA_OBSERVABILITY_OTLP_HEADERS=Authorization=Basic MTIzNDU2OmdsY19leUouLi4=
+
+# --- Transactional Email (Resend) ---
+# Resend API key (falls back to in-memory NoopSender if empty)
+CLOUDVITTA_EMAIL_RESEND_API_KEY=
+# Sender email address with verified domain
+CLOUDVITTA_EMAIL_FROM=CloudVitta <noreply@cloudvitta.thatengineerguy.in>
+# Base URL for verification links sent in emails
+CLOUDVITTA_EMAIL_VERIFY_EMAIL_BASE_URL=http://localhost:5173/verify-email
 ```
 
 ---
@@ -238,9 +246,29 @@ You can customize runtime protection policies in `.env`:
 - **`CLOUDVITTA_RATELIMIT_FREE_TIER_RATE`**: Max requests per minute for anonymous sessions with tracking cookies (default: `20`).
 - **`CLOUDVITTA_RATELIMIT_IP_CEILING_RATE`**: Outer IP burst ceiling per minute (default: `60`).
 - **`CLOUDVITTA_RATELIMIT_LOGIN_RATE`**: Max login attempts per minute per IP to prevent brute-force attacks (default: `10`).
-- **`CLOUDVITTA_CORS_ALLOWED_ORIGINS`**: Comma-separated list of allowed frontend origins (e.g. `http://localhost:3000,https://cloudvitta.dev`).
+- **`CLOUDVITTA_CORS_ALLOWED_ORIGINS`**: Comma-separated list of allowed frontend origins (e.g. `http://localhost:5173,http://localhost:3000,https://cloudvitta.thatengineerguy.in`).
 - **`CLOUDVITTA_CORS_ALLOW_CREDENTIALS`**: Set to `true` to allow authorization headers and cookies.
 - **`CLOUDVITTA_FRESHNESS_STALENESS_THRESHOLD_HOURS`**: Hours before provider pricing observations are flagged as stale (default: `168` hours = 7 days).
+
+---
+
+### Service H: Transactional Email & Account Verification (Resend)
+
+CloudVitta sends single-use email verification links during user registration:
+
+1. **Obtain API Key (`CLOUDVITTA_EMAIL_RESEND_API_KEY`)**:
+   - Log in to the [Resend Console](https://resend.com/api-keys) and create a new API key.
+   - Set `CLOUDVITTA_EMAIL_RESEND_API_KEY=re_...` in `.env`.
+   - *Fallback*: If omitted or empty, the application uses an in-memory `NoopSender` and prints outgoing verification tokens to structured logs without failing.
+
+2. **Configure Sender Address (`CLOUDVITTA_EMAIL_FROM`)**:
+   - Set your verified sender address (e.g. `CloudVitta <noreply@cloudvitta.thatengineerguy.in>`).
+   - For initial testing without a custom domain, use `CloudVitta <onboarding@resend.dev>` (delivers only to your Resend registration address).
+
+3. **Configure Verification Base URL (`CLOUDVITTA_EMAIL_VERIFY_EMAIL_BASE_URL`)**:
+   - Set the destination route for generated verification links:
+     - Local development: `http://localhost:5173/verify-email`
+     - Production: `https://cloudvitta.thatengineerguy.in/verify-email`
 
 ---
 
@@ -250,6 +278,8 @@ CloudVitta uses forward-only migrations managed via `tern` (`migrations/*.sql`):
 - `0001_initial_schema.sql`: Core pricing observations, historical tracking, anomalies, and indexes.
 - `0002_create_users_and_refresh_tokens.sql`: User accounts, hashed credentials, and refresh token families.
 - `0003_create_fx_rates.sql`: Foreign exchange rates cache table and composite base/target lookup indexes.
+- `0004_create_compute_instance_catalog.sql`: Dedicated compute hardware instance catalog table and lookup indexes (ADR 0041).
+- `0005_add_email_verification.sql`: User email verification status flag and single-use verification token table (ADR 0043).
 
 Run migrations using the built-in runner:
 
@@ -394,7 +424,15 @@ task dev:quarantine
    curl http://localhost:8080/api/v1/providers/digitalocean/status
    ```
 
-5. **Query Model Context Protocol (MCP) Streamable HTTP Tools (9 Tools)**:
+   **Provider Operational Status Vocabulary**:
+   - `healthy`: All declared and supported categories have fresh ingested pricing data within the staleness threshold.
+   - `partially_healthy`: All categories with ingested data are fresh and healthy, but one or more declared categories have zero observations (`count == 0`).
+   - `degraded`: One or more categories with ingested data have exceeded the staleness threshold or encountered active Dead Letter Queue (DLQ) failures.
+   - `stale`: All supported categories for the provider are stale or contain zero observations.
+   - `blocked`: Ingestion for a category is paused due to consecutive ingestion failures reaching the unrecoverable error threshold.
+   - `not_yet_ingested`: Ingestion pipelines for the provider are not yet active or scheduled.
+
+5. **Query Model Context Protocol (MCP) Streamable HTTP Tools (10 Tools)**:
    ```bash
    # List available tools (requires Bearer JWT)
    curl -X POST "http://localhost:8080/mcp" \
@@ -422,14 +460,27 @@ task dev:quarantine
      }'
    ```
 
-6. **Register, Authenticate, and Rotate Session**:
+6. **Register, Verify Email, Authenticate, and Rotate Session**:
    ```bash
-   # Register new user
+   # Register new user (account created with email_verified = false)
    curl -X POST "http://localhost:8080/api/v1/auth/signup" \
      -H "Content-Type: application/json" \
      -d '{"email":"user@example.com","password":"securePassword123"}'
 
-   # Authenticate and receive token pair
+   # Note: Logging in before verification returns 403 Forbidden:
+   # {"type":"https://cloudvitta.dev/errors/email-not-verified","title":"Forbidden",...}
+
+   # Verify email address using the token received in email or stdout log:
+   curl -X POST "http://localhost:8080/api/v1/auth/verify-email" \
+     -H "Content-Type: application/json" \
+     -d '{"token":"<raw_token_from_email>"}'
+
+   # (Optional) Resend verification email if expired or lost (always returns 202 Accepted):
+   curl -X POST "http://localhost:8080/api/v1/auth/resend-verification" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"user@example.com"}'
+
+   # Authenticate and receive token pair (succeeds once verified)
    curl -X POST "http://localhost:8080/api/v1/auth/login" \
      -H "Content-Type: application/json" \
      -d '{"email":"user@example.com","password":"securePassword123"}'

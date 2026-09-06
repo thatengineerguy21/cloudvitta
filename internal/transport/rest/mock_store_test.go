@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
@@ -23,6 +24,13 @@ type mockQuerier struct {
 	revokeRefreshTokenFamilyFunc          func(ctx context.Context, arg store.RevokeRefreshTokenFamilyParams) error
 	listRefreshTokensByFamilyIDFunc       func(ctx context.Context, familyID pgtype.UUID) ([]store.RefreshToken, error)
 	getProviderCategoryStatusFunc         func(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error)
+	getPriceObservationsFunc              func(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error)
+	insertVerificationTokenFunc           func(ctx context.Context, arg store.InsertVerificationTokenParams) (store.VerificationToken, error)
+	getVerificationTokenByHashFunc        func(ctx context.Context, tokenHash string) (store.VerificationToken, error)
+	consumeVerificationTokenFunc          func(ctx context.Context, arg store.ConsumeVerificationTokenParams) error
+	countActiveTokensByUserFunc           func(ctx context.Context, arg store.CountActiveTokensByUserParams) (int64, error)
+	markEmailVerifiedFunc                 func(ctx context.Context, id pgtype.UUID) error
+	revokeUnconsumedTokensByUserFunc      func(ctx context.Context, arg store.RevokeUnconsumedTokensByUserParams) error
 }
 
 func (m *mockQuerier) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
@@ -102,7 +110,10 @@ func (m *mockQuerier) ListRefreshTokensByFamilyID(ctx context.Context, familyID 
 }
 
 func (m *mockQuerier) GetPriceObservations(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error) {
-	return nil, errors.New("GetPriceObservations not implemented")
+	if m.getPriceObservationsFunc != nil {
+		return m.getPriceObservationsFunc(ctx, arg)
+	}
+	return nil, nil
 }
 
 func (m *mockQuerier) GetLatestPriceForSKU(ctx context.Context, arg store.GetLatestPriceForSKUParams) (store.PriceObservation, error) {
@@ -126,4 +137,52 @@ func (m *mockQuerier) GetProviderCategoryStatus(ctx context.Context, provider st
 		return m.getProviderCategoryStatusFunc(ctx, provider)
 	}
 	return nil, nil
+}
+
+func (m *mockQuerier) InsertVerificationToken(ctx context.Context, arg store.InsertVerificationTokenParams) (store.VerificationToken, error) {
+	if m.insertVerificationTokenFunc != nil {
+		return m.insertVerificationTokenFunc(ctx, arg)
+	}
+	return store.VerificationToken{
+		ID:        store.UUIDToPg(uuid.New()),
+		UserID:    arg.UserID,
+		TokenHash: arg.TokenHash,
+		Purpose:   arg.Purpose,
+		ExpiresAt: arg.ExpiresAt,
+	}, nil
+}
+
+func (m *mockQuerier) GetVerificationTokenByHash(ctx context.Context, tokenHash string) (store.VerificationToken, error) {
+	if m.getVerificationTokenByHashFunc != nil {
+		return m.getVerificationTokenByHashFunc(ctx, tokenHash)
+	}
+	return store.VerificationToken{}, pgx.ErrNoRows
+}
+
+func (m *mockQuerier) ConsumeVerificationToken(ctx context.Context, arg store.ConsumeVerificationTokenParams) error {
+	if m.consumeVerificationTokenFunc != nil {
+		return m.consumeVerificationTokenFunc(ctx, arg)
+	}
+	return nil
+}
+
+func (m *mockQuerier) CountActiveTokensByUser(ctx context.Context, arg store.CountActiveTokensByUserParams) (int64, error) {
+	if m.countActiveTokensByUserFunc != nil {
+		return m.countActiveTokensByUserFunc(ctx, arg)
+	}
+	return 0, nil
+}
+
+func (m *mockQuerier) MarkEmailVerified(ctx context.Context, id pgtype.UUID) error {
+	if m.markEmailVerifiedFunc != nil {
+		return m.markEmailVerifiedFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockQuerier) RevokeUnconsumedTokensByUser(ctx context.Context, arg store.RevokeUnconsumedTokensByUserParams) error {
+	if m.revokeUnconsumedTokensByUserFunc != nil {
+		return m.revokeUnconsumedTokensByUserFunc(ctx, arg)
+	}
+	return nil
 }

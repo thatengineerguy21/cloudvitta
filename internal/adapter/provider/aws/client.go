@@ -25,6 +25,9 @@ const DefaultDynamoDBPriceListURL = "https://pricing.us-east-1.amazonaws.com/off
 // DefaultEKSPriceListURL is the standard AWS Price List API URL for AmazonEKS us-east-1.
 const DefaultEKSPriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEKS/current/us-east-1/index.json"
 
+// DefaultLambdaPriceListURL is the standard AWS Price List API URL for AWS Lambda in us-east-1.
+const DefaultLambdaPriceListURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json"
+
 // Client is an HTTP client for fetching AWS Price List API data.
 type Client struct {
 	httpClient *http.Client

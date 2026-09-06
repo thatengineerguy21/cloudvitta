@@ -194,6 +194,49 @@ func TestFreshnessService_GetProviderStatus_Healthy(t *testing.T) {
 	}
 }
 
+func TestFreshnessService_GetProviderStatus_PartiallyHealthy(t *testing.T) {
+	fixedNow := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	fetchTime := fixedNow.Add(-2 * time.Hour) // well within 168h default
+
+	// Ingested categories are fresh, but serverless has count 0 / uningested
+	mockQ := &mockStatusQuerier{
+		getProviderCategoryStatusFunc: func(ctx context.Context, provider string) ([]store.GetProviderCategoryStatusRow, error) {
+			return []store.GetProviderCategoryStatusRow{
+				{
+					ServiceCategory:  "compute",
+					LastFetchedAt:    pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					ObservationCount: 450,
+				},
+				{
+					ServiceCategory:  "storage",
+					LastFetchedAt:    pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					LastSeenAt:       pgtype.Timestamptz{Time: fetchTime, Valid: true},
+					ObservationCount: 120,
+				},
+			}, nil
+		},
+	}
+
+	svc := service.NewFreshnessService(
+		mockQ,
+		nil,
+		service.WithNowFunc(func() time.Time { return fixedNow }),
+	)
+
+	status, err := svc.GetProviderStatus(context.Background(), "aws")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if status.Status != "partially_healthy" {
+		t.Errorf("expected status 'partially_healthy', got %s", status.Status)
+	}
+	if !status.Stale {
+		t.Errorf("expected Stale=true when uningested categories exist")
+	}
+}
+
 func TestFreshnessService_GetProviderStatus_DegradedDLQ(t *testing.T) {
 	fixedNow := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 	fetchTime := fixedNow.Add(-2 * time.Hour)

@@ -127,7 +127,7 @@ func (h *ComputeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	providers := service.SupportedProviders()
-	var results []ComputeResultEntry
+	results := make([]ComputeResultEntry, 0)
 	var providerErrors int
 
 	for _, prov := range providers {

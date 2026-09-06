@@ -77,8 +77,8 @@ describe('ProviderStatusCard', () => {
     });
 
     expect(screen.getByTestId('status-badge-aws')).toHaveTextContent('healthy');
-    expect(screen.getByText('450 obs')).toBeInTheDocument();
-    expect(screen.getByText('32 obs')).toBeInTheDocument();
+    expect(screen.getByText('450 price records')).toBeInTheDocument();
+    expect(screen.getByText('32 price records')).toBeInTheDocument();
     // Fresh indicators
     const freshLabels = screen.getAllByText('Fresh');
     expect(freshLabels.length).toBe(2);
@@ -162,5 +162,31 @@ describe('ProviderStatusCard', () => {
 
     expect(screen.getByText('Stale')).toBeInTheDocument();
     expect(screen.getByText('Fresh')).toBeInTheDocument();
+  });
+
+  it('renders partially_healthy provider badge with close-match styling', async () => {
+    vi.spyOn(providerApi, 'getStatus').mockResolvedValue(
+      makeStatus('aws', 'partially_healthy', {
+        categories: {
+          compute: {
+            category: 'compute',
+            supported: true,
+            observation_count: 450,
+            stale: false,
+            staleness_threshold_hours: 168,
+          },
+        },
+      })
+    );
+
+    render(<ProviderStatusCard provider="aws" />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('provider-card-aws')).toBeInTheDocument();
+    });
+
+    const badge = screen.getByTestId('status-badge-aws');
+    expect(badge).toHaveTextContent('partially healthy');
+    expect(badge).toHaveClass('text-status-matchClose');
   });
 });

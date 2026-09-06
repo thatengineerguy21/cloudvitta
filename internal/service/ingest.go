@@ -98,7 +98,13 @@ func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, err
 		insertedCount++
 	}
 
+	// Synchronize compute catalog inventory
+	if err := SyncComputeCatalog(ctx, s.queries, result.Observations); err != nil {
+		slog.WarnContext(ctx, "failed to sync compute catalog inventory", "error", err)
+	}
+
 	// Event-driven cache warming
+
 	if s.redisClient != nil && len(result.Observations) > 0 {
 		byRegion := make(map[string][]domain.PriceObservation)
 		for _, obs := range result.Observations {

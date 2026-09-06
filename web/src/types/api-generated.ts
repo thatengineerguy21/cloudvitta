@@ -103,6 +103,39 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/resend-verification": {
+    /** Requests a fresh email verification link without revealing account existence */
+    post: {
+      parameters: {
+        body: {
+          /** Recipient email */
+          request: definitions["rest.ResendVerificationRequest"];
+        };
+      };
+      responses: {
+        /** Verification email request accepted */
+        202: {
+          schema: definitions["rest.ResendVerificationResponse"];
+        };
+        /** Malformed request or missing email */
+        400: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Method Not Allowed */
+        405: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Too many verification requests */
+        429: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
   "/api/v1/auth/signup": {
     /** Creates a new user account with email and password */
     post: {
@@ -136,6 +169,51 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/verify-email": {
+    /** Consumes a single-use verification token to activate a user account */
+    post: {
+      parameters: {
+        body: {
+          /** Verification token */
+          request: definitions["rest.VerifyEmailRequest"];
+        };
+      };
+      responses: {
+        /** Email verified successfully */
+        200: {
+          schema: definitions["rest.VerifyEmailResponse"];
+        };
+        /** Malformed request or missing token */
+        400: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Verification token not found */
+        404: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Method Not Allowed */
+        405: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Verification token already consumed */
+        409: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Verification token expired */
+        410: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Rate limit exceeded */
+        429: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
   "/api/v1/calculate": {
     /** Calculates composite pricing across cloud providers for requested compute, storage, network, database, NoSQL, Kubernetes, and serverless specs. */
     post: {
@@ -157,6 +235,62 @@ export interface paths {
         /** Too Many Requests */
         429: {
           schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
+  "/api/v1/catalog/compute/instances": {
+    /** Returns paginated virtual machine specifications filtered by provider, category, family, and vCPU/RAM ranges. */
+    get: {
+      parameters: {
+        query: {
+          /** Cloud provider (aws, azure, gcp, etc.) */
+          provider?: string;
+          /** Instance category (general_purpose, compute_optimized, etc.) */
+          category?: string;
+          /** Instance family (t3, c5, Standard_D, etc.) */
+          instance_family?: string;
+          /** Minimum vCPU count */
+          min_vcpu?: number;
+          /** Maximum vCPU count */
+          max_vcpu?: number;
+          /** Minimum RAM in GiB */
+          min_memory_gib?: number;
+          /** Maximum RAM in GiB */
+          max_memory_gib?: number;
+          /** Limit (default: 50, max: 200) */
+          limit?: number;
+          /** Offset (default: 0) */
+          offset?: number;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["rest.CatalogInstancesResponse"];
+        };
+        /** Bad Request */
+        400: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
+  "/api/v1/catalog/compute/summary": {
+    /** Returns total instances, provider counts, and category breakdowns across all cloud providers. */
+    get: {
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["rest.CatalogSummaryResponse"];
         };
         /** Internal Server Error */
         500: {
@@ -477,6 +611,24 @@ export interface definitions {
     ram_gb?: number;
     vcpu?: number;
   };
+  "domain.ComputeCatalogItem": {
+    attributes?: definitions["domain.ComputeAttributes"];
+    category?: string;
+    cpu_architecture?: string;
+    display_name?: string;
+    first_seen_at?: string;
+    gpu_count?: number;
+    gpu_type?: string;
+    id?: number;
+    instance_family?: string;
+    instance_type_id?: string;
+    is_burstable?: boolean;
+    is_current_gen?: boolean;
+    last_seen_at?: string;
+    memory_gib?: number;
+    provider?: string;
+    vcpu?: number;
+  };
   "domain.DatabaseNoSQLAttributes": {
     /** @description "throughput", "storage", "request_operations" */
     component_type?: string;
@@ -591,6 +743,16 @@ export interface definitions {
     meta?: definitions["rest.CalculateMeta"];
     results?: definitions["rest.CalculateProviderResult"][];
     warnings?: definitions["rest.ProviderWarning"][];
+  };
+  "rest.CatalogInstancesResponse": {
+    count?: number;
+    instances?: definitions["domain.ComputeCatalogItem"][];
+    total?: number;
+  };
+  "rest.CatalogSummaryResponse": {
+    category_breakdown?: { [key: string]: { [key: string]: number } };
+    provider_totals?: { [key: string]: number };
+    total_instances?: number;
   };
   "rest.CategoryStatusResponse": {
     /** @example compute */
@@ -737,6 +899,7 @@ export interface definitions {
     matched_spec?: definitions["domain.NetworkAttributes"];
     missing_attributes?: string[];
     monthly_cost_usd?: number;
+    normalized_hourly_usd?: number;
     price?: definitions["rest.PriceDetail"];
     provider?: string;
     sku_id?: string;
@@ -780,6 +943,12 @@ export interface definitions {
     expires_in?: number;
     refresh_token?: string;
     token_type?: string;
+  };
+  "rest.ResendVerificationRequest": {
+    email?: string;
+  };
+  "rest.ResendVerificationResponse": {
+    message?: string;
   };
   "rest.ServerlessComparisonMeta": {
     api_version?: string;
@@ -837,10 +1006,17 @@ export interface definitions {
     matched_spec?: definitions["domain.StorageAttributes"];
     missing_attributes?: string[];
     monthly_cost_usd?: number;
+    normalized_hourly_usd?: number;
     price?: definitions["rest.PriceDetail"];
     provider?: string;
     sku_id?: string;
     stale?: boolean;
+  };
+  "rest.VerifyEmailRequest": {
+    token?: string;
+  };
+  "rest.VerifyEmailResponse": {
+    message?: string;
   };
 }
 

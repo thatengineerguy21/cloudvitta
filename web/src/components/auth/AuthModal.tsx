@@ -1,8 +1,10 @@
 // web/src/components/auth/AuthModal.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../auth/AuthContext';
+import { useNavigate } from '../../router';
+import { resendVerification } from '../../api/client';
 import { loginSchema, signupSchema, formatZodErrors } from '../../lib/validation/auth';
-import { getErrorMessage } from '../../api/errors';
+import { getErrorMessage, ApiError } from '../../api/errors';
 import { X, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
 export interface AuthModalProps {
@@ -17,19 +19,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
 }) => {
   const { login, signup, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isUnverified, setIsUnverified] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   // Sync modal mode when initialMode changes
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
 
-  // Reset form state on open/close
+  // Reset form state on open/close or mode change
   useEffect(() => {
     if (isOpen) {
       setEmail('');
@@ -37,6 +43,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setConfirmPassword('');
       setFieldErrors({});
       setApiError(null);
+      setIsUnverified(false);
+      setResendMessage(null);
     }
   }, [isOpen, mode]);
 
@@ -59,10 +67,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleResendFromModal = async () => {
+    if (resendLoading || !email.trim()) return;
+    setResendLoading(true);
+    setResendMessage(null);
+    try {
+      await resendVerification(email.trim());
+      setResendMessage('Verification email sent! Please check your inbox.');
+    } catch (err) {
+      setApiError(getErrorMessage(err));
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFieldErrors({});
     setApiError(null);
+    setIsUnverified(false);
+    setResendMessage(null);
 
     const isLogin = mode === 'login';
     const formConfig = isLogin
@@ -84,27 +108,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     try {
-      await formConfig.action();
-      onClose();
-    } catch (err) {
-      setApiError(getErrorMessage(err));
+      if (isLogin) {
+        await formConfig.action();
+        onClose();
+      } else {
+        await formConfig.action();
+        onClose();
+        navigate(`/check-email?email=${encodeURIComponent(email)}`);
+      }
+    } catch (err: unknown) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 403 || err.type?.includes('email-not-verified'))
+      ) {
+        setIsUnverified(true);
+        setApiError('Your email address has not been verified yet.');
+      } else {
+        setApiError(getErrorMessage(err));
+      }
     }
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
-      {/* Rectilinear 0px Bento Card */}
-      <div className="w-full max-w-md bg-surface-card border border-border-default shadow-none p-6 sm:p-8 relative">
+      {/* Soft Warm Modern / Obsidian Bento Modal */}
+      <div className="w-full max-w-md bg-surface-card border border-border-default/80 rounded-2xl shadow-2xl p-6 sm:p-8 relative">
         {/* Close Button */}
         <button
           onClick={onClose}
           disabled={isLoading}
-          className="absolute top-4 right-4 p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           aria-label="Close dialog"
         >
           <X className="w-4 h-4" />
@@ -114,21 +152,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="mb-6">
           <div className="inline-flex items-center space-x-2 text-xs uppercase font-bold tracking-widest text-border-accent mb-2">
             <Lock className="w-3.5 h-3.5" />
-            <span>Rate Limit Upgrade</span>
+            <span>{mode === 'login' ? 'Account Sign In' : 'Create Account'}</span>
           </div>
           <h2 id="auth-modal-title" className="font-display text-2xl font-bold text-text-primary">
-            {mode === 'login' ? 'Sign In to Standard Tier' : 'Create an Account'}
+            {mode === 'login' ? 'Sign In' : 'Create an Account'}
           </h2>
           <p className="text-xs text-text-secondary mt-1">
-            Standard tier provides 120 req/min vs 20 req/min anonymous ceiling.
+            Sign in to access higher request limits, save workloads, and configure multi-cloud environments.
           </p>
         </div>
 
         {/* API Error Alert */}
         {apiError && (
-          <div className="mb-4 p-3 bg-surface-raised border-l-2 border-status-anomaly flex items-start space-x-2.5">
+          <div className="mb-4 p-3 bg-surface-raised border-l-2 border-status-anomaly rounded-xl flex items-start space-x-2.5">
             <AlertCircle className="w-4 h-4 text-status-anomaly shrink-0 mt-0.5" />
-            <p className="text-xs font-semibold text-status-anomaly">{apiError}</p>
+            <div className="flex-1 text-left">
+              <p className="text-xs font-semibold text-status-anomaly">{apiError}</p>
+              {isUnverified && (
+                <div className="mt-2 pt-2 border-t border-border-default flex flex-col gap-1">
+                  <p className="text-xs text-text-secondary">
+                    Need a new link?{' '}
+                    <button
+                      type="button"
+                      onClick={handleResendFromModal}
+                      disabled={resendLoading}
+                      className="text-brand hover:underline font-semibold focus-visible:outline-none"
+                    >
+                      {resendLoading ? 'Sending...' : 'Resend verification email'}
+                    </button>
+                  </p>
+                  {resendMessage && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                      {resendMessage}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -146,7 +206,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
                 placeholder="name@company.com"
-                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:border-border-accent transition-colors pl-9 rounded-none"
+                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all pl-9 rounded-xl"
               />
               <Mail className="w-4 h-4 text-text-secondary absolute left-3 top-2.5" />
             </div>
@@ -167,7 +227,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:border-border-accent transition-colors pl-9 rounded-none"
+                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all pl-9 rounded-xl"
               />
               <Lock className="w-4 h-4 text-text-secondary absolute left-3 top-2.5" />
             </div>
@@ -189,7 +249,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={isLoading}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:border-border-accent transition-colors pl-9 rounded-none"
+                  className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all pl-9 rounded-xl"
                 />
                 <Lock className="w-4 h-4 text-text-secondary absolute left-3 top-2.5" />
               </div>
@@ -205,7 +265,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-border-accent text-white hover:opacity-90 font-bold text-xs uppercase tracking-widest transition-opacity flex items-center justify-center space-x-2 rounded-none disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+            className="w-full py-2.5 px-4 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center space-x-2 rounded-xl shadow-sm hover:shadow-brand-glow disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:outline-none"
           >
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>

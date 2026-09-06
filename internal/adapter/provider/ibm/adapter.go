@@ -33,13 +33,15 @@ func WithCategory(category string) AdapterOption {
 
 // Adapter handles fetching, persisting raw response to GCS, and normalizing IBM Cloud pricing.
 type Adapter struct {
-	client          *Client
-	storage         storage.RawStorage
-	category        string
-	tracer          trace.Tracer
-	meter           metric.Meter
-	fetchCounter    metric.Int64Counter
-	unmappedCounter metric.Int64Counter
+	client            *Client
+	storage           storage.RawStorage
+	category          string
+	tracer            trace.Tracer
+	meter             metric.Meter
+	fetchCounter      metric.Int64Counter
+	unmappedCounter   metric.Int64Counter
+	fetchDurationHist metric.Float64Histogram
+	bytesCounter      metric.Int64Counter
 }
 
 // NewAdapter constructs a new IBM Cloud provider adapter.
@@ -47,15 +49,27 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 	meter := otel.Meter("cloudvitta.adapter.ibm")
 	fetchCounter, _ := meter.Int64Counter("ibm.fetch.count", metric.WithDescription("Number of IBM Cloud fetch operations"))
 	unmappedCounter, _ := meter.Int64Counter("ibm.normalize.unmapped_count", metric.WithDescription("Number of unmapped IBM Cloud taxonomy items"))
+	fetchDurationHist, _ := meter.Float64Histogram(
+		"adapter.fetch.duration_seconds",
+		metric.WithDescription("Duration of provider fetch operation in seconds"),
+		metric.WithUnit("s"),
+	)
+	bytesCounter, _ := meter.Int64Counter(
+		"adapter.fetch.bytes_total",
+		metric.WithDescription("Total number of raw response bytes streamed to storage"),
+		metric.WithUnit("By"),
+	)
 
 	a := &Adapter{
-		client:          client,
-		storage:         st,
-		category:        "compute",
-		tracer:          otel.Tracer("cloudvitta.adapter.ibm"),
-		meter:           meter,
-		fetchCounter:    fetchCounter,
-		unmappedCounter: unmappedCounter,
+		client:            client,
+		storage:           st,
+		category:          "compute",
+		tracer:            otel.Tracer("cloudvitta.adapter.ibm"),
+		meter:             meter,
+		fetchCounter:      fetchCounter,
+		unmappedCounter:   unmappedCounter,
+		fetchDurationHist: fetchDurationHist,
+		bytesCounter:      bytesCounter,
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -65,14 +79,34 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 
 // Fetch retrieves the IBM Cloud Global Catalog pricing data, concurrently streams raw JSON to storage and normalizes it.
 // Returns a domain.FetchResult containing the observations and raw GCS path, and any error.
-func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.FetchResult, error) {
+func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.FetchResult, err error) {
 	ctx, span := a.tracer.Start(ctx, "ibm.fetch")
 	defer span.End()
+
+	startTime := time.Now()
+	category := a.category
+	if category == "" {
+		category = "compute"
+	}
+	defer func() {
+		dur := time.Since(startTime).Seconds()
+		status := "ok"
+		if err != nil {
+			status = "error"
+		}
+		if a.fetchDurationHist != nil {
+			a.fetchDurationHist.Record(ctx, dur, metric.WithAttributes(
+				attribute.String("provider", "ibm"),
+				attribute.String("category", category),
+				attribute.String("status", status),
+			))
+		}
+	}()
 
 	slog.DebugContext(ctx, "starting ibm fetch")
 
 	if limiter != nil {
-		if err := limiter.Wait(ctx); err != nil {
+		if err = limiter.Wait(ctx); err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			return domain.FetchResult{}, fmt.Errorf("ibm adapter: rate limit wait: %w", err)
@@ -82,10 +116,6 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	fetchedAt := time.Now().UTC()
 	fetchID := uuid.New().String()
 	dateStr := fetchedAt.Format("2006-01-02")
-	category := a.category
-	if category == "" {
-		category = "compute"
-	}
 	gcsPath := fmt.Sprintf("raw/ibm/%s/%s/%s.json", category, dateStr, fetchID)
 
 	body, err := a.client.FetchPriceList(ctx)
@@ -99,8 +129,9 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 	}
 	defer func() { _ = body.Close() }()
 
+	cr := provider.NewCountingReader(body)
 	pr, pw := io.Pipe()
-	tee := io.TeeReader(body, provider.IgnoreErrorWriter{W: pw})
+	tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
 
 	qSink := quarantine.NewStorageSink(a.storage, "ibm", category, fetchID, fetchedAt)
 	var normResult domain.NormalizationResult
@@ -140,7 +171,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		return nil
 	})
 
-	if err := g.Wait(); err != nil {
+	if err = g.Wait(); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		if a.fetchCounter != nil {
@@ -148,6 +179,13 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (domain.Fetc
 		}
 		slog.ErrorContext(ctx, "ibm fetch failed during stream processing", "error", err)
 		return domain.FetchResult{}, err
+	}
+
+	if a.bytesCounter != nil {
+		a.bytesCounter.Add(ctx, cr.BytesRead(), metric.WithAttributes(
+			attribute.String("provider", "ibm"),
+			attribute.String("category", category),
+		))
 	}
 
 	// Flush quarantined unmapped items to storage

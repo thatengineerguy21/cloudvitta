@@ -23,16 +23,17 @@ type StorageComparisonMeta struct {
 
 // StorageResultEntry represents a single provider result item in the storage comparison envelope.
 type StorageResultEntry struct {
-	Provider          string                   `json:"provider"`
-	SkuID             string                   `json:"sku_id"`
-	MatchedSpec       domain.StorageAttributes `json:"matched_spec"`
-	MatchQuality      string                   `json:"match_quality"`
-	MatchDeltaPct     float64                  `json:"match_delta_pct"`
-	MissingAttributes []string                 `json:"missing_attributes"`
-	Price             PriceDetail              `json:"price"`
-	MonthlyCostUSD    decimal.Decimal          `json:"monthly_cost_usd"`
-	FetchedAt         time.Time                `json:"fetched_at"`
-	Stale             bool                     `json:"stale"`
+	Provider            string                   `json:"provider"`
+	SkuID               string                   `json:"sku_id"`
+	MatchedSpec         domain.StorageAttributes `json:"matched_spec"`
+	MatchQuality        string                   `json:"match_quality"`
+	MatchDeltaPct       float64                  `json:"match_delta_pct"`
+	MissingAttributes   []string                 `json:"missing_attributes"`
+	Price               PriceDetail              `json:"price"`
+	MonthlyCostUSD      decimal.Decimal          `json:"monthly_cost_usd"`
+	NormalizedHourlyUSD decimal.Decimal          `json:"normalized_hourly_usd"`
+	FetchedAt           time.Time                `json:"fetched_at"`
+	Stale               bool                     `json:"stale"`
 }
 
 // StorageComparisonResponse represents the full storage comparison response envelope.
@@ -98,7 +99,7 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	storageClass := q.Get("storage_class")
 
 	providers := service.SupportedProviders()
-	var results []StorageResultEntry
+	results := make([]StorageResultEntry, 0)
 	var providerErrors int
 
 	for _, prov := range providers {
@@ -159,9 +160,10 @@ func (h *StorageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Unit:     catResult.Unit,
 				Currency: currency,
 			},
-			MonthlyCostUSD: catResult.MonthlyCost,
-			FetchedAt:      obs.FetchedAt,
-			Stale:          catResult.Stale,
+			MonthlyCostUSD:      catResult.MonthlyCost,
+			NormalizedHourlyUSD: catResult.HourlyCost,
+			FetchedAt:           obs.FetchedAt,
+			Stale:               catResult.Stale,
 		})
 	}
 

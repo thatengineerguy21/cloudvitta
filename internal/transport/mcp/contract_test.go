@@ -283,7 +283,7 @@ func setupContractParityTest(t *testing.T) *contractTestHarness {
 		},
 	}
 
-	restRouter := rest.NewRouter(pricingSvc, nil, freshnessSvc, nil, rdb, cfg)
+	restRouter := rest.NewRouter(pricingSvc, nil, freshnessSvc, nil, nil, rdb, cfg)
 	mcpServer := mcp.NewServer(pricingSvc, freshnessSvc)
 
 	ctx := context.Background()
@@ -3447,7 +3447,7 @@ func TestContractParity_Calculate(t *testing.T) {
 	})
 
 	t.Run("ADR0022PartialWorkloadHonesty", func(t *testing.T) {
-		// Request archive storage class which is not seeded in test fixtures -> partial: true
+		// Request database with unseeded engine (sqlserver) -> partial: true
 		restReq := rest.CalculateRequestBody{
 			Region: "us-east",
 			Compute: &domain.ComputeAttributes{
@@ -3455,9 +3455,11 @@ func TestContractParity_Calculate(t *testing.T) {
 				RAMGB:  4,
 				Family: "general_purpose",
 			},
-			Storage: &domain.StorageAttributes{
-				SizeGB:       100,
-				StorageClass: "archive",
+			Database: &domain.DatabaseRDBMSAttributes{
+				Engine:    "sqlserver",
+				VCPU:      2,
+				RAMGB:     4,
+				StorageGB: 50,
 			},
 		}
 
@@ -3475,9 +3477,11 @@ func TestContractParity_Calculate(t *testing.T) {
 				RAMGB:  4,
 				Family: "general_purpose",
 			},
-			Storage: &mcp.StorageRequirements{
-				SizeGB:       100,
-				StorageClass: "archive",
+			Database: &mcp.DatabaseRDBMSRequirements{
+				Engine:    "sqlserver",
+				VCPU:      2,
+				RAMGB:     4,
+				StorageGB: 50,
 			},
 		}
 

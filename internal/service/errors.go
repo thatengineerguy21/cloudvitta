@@ -38,4 +38,11 @@ var (
 	ErrRevokedToken          = auth.ErrRevokedToken
 	ErrTokenFamilyRevoked    = auth.ErrTokenFamilyRevoked
 	ErrMissingIdempotencyKey = auth.ErrMissingIdempotencyKey
+
+	// Email verification sentinel errors
+	ErrEmailNotVerified     = errors.New("email not verified")
+	ErrVerificationExpired  = errors.New("verification token expired")
+	ErrVerificationConsumed = errors.New("verification token already used")
+	ErrVerificationNotFound = errors.New("verification token not found")
+	ErrTooManyVerifications = errors.New("too many pending verification requests")
 )
