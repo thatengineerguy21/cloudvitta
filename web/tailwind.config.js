@@ -59,7 +59,12 @@ export default {
         full: '9999px',
       },
       fontFamily: {
-        brand: ['"Qasira"', '"EB Garamond"', 'serif'],
+        brand: [
+          ['"Qasira"', '"EB Garamond"', 'serif'],
+          {
+            letterSpacing: '0.06em',
+          },
+        ],
         display: ['"Manrope"', '"Inter"', 'sans-serif'],
         sans: ['"Plus Jakarta Sans"', '"Inter"', '"Manrope"', 'sans-serif'],
       },

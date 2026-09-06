@@ -59,3 +59,7 @@
 .tabular-nums {
   font-feature-settings: 'tnum';
 }
+
+.font-brand {
+  letter-spacing: 0.06em;
+}

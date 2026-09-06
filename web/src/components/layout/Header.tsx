@@ -47,7 +47,7 @@ export const Header: React.FC = () => {
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5 leading-none">
-                    <span className="font-brand text-2xl font-bold tracking-tight text-text-primary">
+                    <span className="font-brand text-2xl font-bold tracking-wider text-text-primary">
                       CloudVitta
                     </span>
                     <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40">
