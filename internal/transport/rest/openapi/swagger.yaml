@@ -611,7 +611,7 @@ definitions:
         example: not_yet_ingested
         type: string
       message:
-        example: Oracle OCI ingestion lands in stage 4.
+        example: Oracle OCI ingestion currently unavailable
         type: string
       provider:
         example: oracle

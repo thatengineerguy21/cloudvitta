@@ -9,6 +9,7 @@ import { MatchQualityBadge } from '../honesty/MatchQualityBadge';
 import { MissingAttributesIndicator } from '../honesty/MissingAttributesIndicator';
 import { StaleDataBadge } from '../honesty/StaleDataBadge';
 import { PriceDisplay, PriceDisplayProps } from '../honesty/PriceDisplay';
+import { ProviderIcon } from '../common/ProviderIcon';
 import { CompareSkeleton } from './CompareSkeleton';
 import { formatProviderName, formatRelativeTime } from '../../lib/format';
 import {
@@ -413,15 +414,18 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                           data-testid={`row-${row.provider}`}
                         >
                           <td className="py-3.5 px-4 align-top">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-text-primary uppercase tracking-wide">
-                                {formatProviderName(row.provider)}
-                              </span>
-                              {row.sku_id && (
-                                <span className="font-mono text-[10px] text-text-secondary truncate max-w-[120px]" title={row.sku_id}>
-                                  {row.sku_id}
+                            <div className="flex items-center gap-2.5">
+                              <ProviderIcon provider={row.provider} className="w-4 h-4 shrink-0" />
+                              <div className="flex flex-col">
+                                <span className="font-bold text-text-primary uppercase tracking-wide">
+                                  {formatProviderName(row.provider)}
                                 </span>
-                              )}
+                                {row.sku_id && (
+                                  <span className="font-mono text-[10px] text-text-secondary truncate max-w-[120px]" title={row.sku_id}>
+                                    {row.sku_id}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
 

@@ -104,13 +104,13 @@ func (s *FreshnessService) IsStale(provider, category string, fetchedAt time.Tim
 func futureStageWarningMessage(provider string) (string, bool) {
 	switch provider {
 	case "oracle":
-		return "Oracle OCI ingestion lands in stage 4.", true
+		return "Oracle OCI ingestion currently unavailable", true
 	case "ibm":
-		return "IBM Cloud ingestion lands in stage 4.", true
+		return "IBM Cloud ingestion currently unavailable", true
 	case "alibaba":
-		return "Alibaba Cloud ingestion lands in stage 4.", true
+		return "Alibaba Cloud ingestion currently unavailable", true
 	case "digitalocean":
-		return "DigitalOcean ingestion lands in stage 4.", true
+		return "DigitalOcean ingestion currently unavailable", true
 	default:
 		return "", false
 	}

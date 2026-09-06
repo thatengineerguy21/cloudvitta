@@ -711,13 +711,13 @@ func validateServerlessRequirements(req ServerlessRequirements) (*service.Server
 	return &wl, nil
 }
 
-// defaultUningestedWarnings returns static warnings for providers scheduled for stage 4.
+// defaultUningestedWarnings returns static warnings for providers whose ingestion is currently unavailable.
 func defaultUningestedWarnings() []ProviderWarning {
 	return []ProviderWarning{
-		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion lands in stage 4."},
-		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion lands in stage 4."},
-		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion lands in stage 4."},
-		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion lands in stage 4."},
+		{Provider: "oracle", Code: "not_yet_ingested", Message: "Oracle OCI ingestion currently unavailable"},
+		{Provider: "ibm", Code: "not_yet_ingested", Message: "IBM Cloud ingestion currently unavailable"},
+		{Provider: "alibaba", Code: "not_yet_ingested", Message: "Alibaba Cloud ingestion currently unavailable"},
+		{Provider: "digitalocean", Code: "not_yet_ingested", Message: "DigitalOcean ingestion currently unavailable"},
 	}
 }
 

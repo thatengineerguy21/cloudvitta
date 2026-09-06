@@ -2,6 +2,7 @@
 import React from 'react';
 import { BentoCard } from '../bento/BentoCard';
 import { useComputeCatalogSummary } from '../../api/queries/useCatalogQueries';
+import { ProviderIcon } from '../common/ProviderIcon';
 import { Server, Layers } from 'lucide-react';
 
 export const ComputeCatalogSummaryCard: React.FC = () => {
@@ -57,7 +58,10 @@ export const ComputeCatalogSummaryCard: React.FC = () => {
             className="p-3 border border-border-default bg-bg-surface rounded-xl flex flex-col justify-between"
             data-testid={`catalog-provider-total-${provider}`}
           >
-            <span className="text-xs font-mono uppercase text-text-secondary">{provider}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono uppercase text-text-secondary">{provider}</span>
+              <ProviderIcon provider={provider} className="w-4 h-4" />
+            </div>
             <span className="font-mono text-lg font-bold text-text-primary mt-1">
               {count.toLocaleString()}
             </span>

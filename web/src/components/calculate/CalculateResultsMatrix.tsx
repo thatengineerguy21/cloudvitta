@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { formatProviderName } from '../../lib/format';
 import { PriceDisplay } from '../honesty/PriceDisplay';
 import { WarningsBanner } from '../honesty/WarningsBanner';
+import { ProviderIcon } from '../common/ProviderIcon';
 import { CalculateCategoryBreakdown } from './CalculateCategoryBreakdown';
 import { CompareSkeleton } from '../compare/CompareSkeleton';
 import { ApiError } from '../../api/errors';
@@ -223,9 +224,10 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                 <div className="flex items-center space-x-3 min-w-0">
                   <div
                     data-testid={`provider-name-${provider}`}
-                    className="px-2.5 py-1 border border-border-default bg-surface-raised rounded-lg text-xs font-mono font-bold uppercase tracking-wider text-text-primary"
+                    className="px-2.5 py-1 border border-border-default bg-surface-raised rounded-lg text-xs font-mono font-bold uppercase tracking-wider text-text-primary flex items-center gap-2"
                   >
-                    {formatProviderName(provider)}
+                    <ProviderIcon provider={provider} className="w-3.5 h-3.5" />
+                    <span>{formatProviderName(provider)}</span>
                   </div>
                   <span className="text-xs text-text-secondary font-mono">
                     {matchedCategoryCount} of {totalRequestedCount} categories matched

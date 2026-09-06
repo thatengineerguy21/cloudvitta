@@ -399,10 +399,10 @@ func TestFreshnessService_GetProviderStatus_Stage4Providers(t *testing.T) {
 		provider string
 		msg      string
 	}{
-		{"oracle", "Oracle OCI ingestion lands in stage 4."},
-		{"ibm", "IBM Cloud ingestion lands in stage 4."},
-		{"alibaba", "Alibaba Cloud ingestion lands in stage 4."},
-		{"digitalocean", "DigitalOcean ingestion lands in stage 4."},
+		{"oracle", "Oracle OCI ingestion currently unavailable"},
+		{"ibm", "IBM Cloud ingestion currently unavailable"},
+		{"alibaba", "Alibaba Cloud ingestion currently unavailable"},
+		{"digitalocean", "DigitalOcean ingestion currently unavailable"},
 	}
 
 	for _, s4 := range stage4 {

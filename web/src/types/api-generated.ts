@@ -924,7 +924,7 @@ export interface definitions {
   "rest.ProviderStatusWarningResponse": {
     /** @example not_yet_ingested */
     code?: string;
-    /** @example Oracle OCI ingestion lands in stage 4. */
+    /** @example Oracle OCI ingestion currently unavailable */
     message?: string;
     /** @example oracle */
     provider?: string;

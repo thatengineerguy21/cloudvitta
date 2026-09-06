@@ -1,6 +1,7 @@
 import React from 'react';
 import { Github, ExternalLink } from 'lucide-react';
 import { Link } from '../../router';
+import { ProviderIcon } from '../common/ProviderIcon';
 
 export const Footer: React.FC = () => {
   return (
@@ -62,11 +63,23 @@ export const Footer: React.FC = () => {
             <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary mb-3">
               Supported Clouds
             </h4>
-            <ul className="space-y-2 text-xs text-text-secondary">
-              <li>Amazon Web Services (AWS)</li>
-              <li>Microsoft Azure</li>
-              <li>Google Cloud Platform (GCP)</li>
-              <li>Oracle Cloud (OCI), IBM, Alibaba, DigitalOcean</li>
+            <ul className="space-y-2.5 text-xs text-text-secondary">
+              <li className="flex items-center gap-2">
+                <ProviderIcon provider="aws" className="w-4 h-4 shrink-0 text-text-primary" />
+                <span>Amazon Web Services (AWS)</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <ProviderIcon provider="azure" className="w-4 h-4 shrink-0" />
+                <span>Microsoft Azure</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <ProviderIcon provider="gcp" className="w-4 h-4 shrink-0" />
+                <span>Google Cloud Platform (GCP)</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <ProviderIcon provider="oracle" className="w-4 h-4 shrink-0" />
+                <span>Oracle Cloud (OCI), IBM, Alibaba, DigitalOcean</span>
+              </li>
             </ul>
           </div>
 

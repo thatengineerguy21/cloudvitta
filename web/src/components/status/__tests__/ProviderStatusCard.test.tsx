@@ -91,7 +91,7 @@ describe('ProviderStatusCard', () => {
           {
             provider: 'oracle',
             code: 'not_yet_ingested',
-            message: 'Oracle OCI ingestion lands in stage 4.',
+            message: 'Oracle OCI ingestion currently unavailable',
           },
         ],
       })
@@ -104,7 +104,7 @@ describe('ProviderStatusCard', () => {
     });
 
     expect(screen.getByTestId('status-badge-oracle')).toHaveTextContent('not yet ingested');
-    expect(screen.getByText('Oracle OCI ingestion lands in stage 4.')).toBeInTheDocument();
+    expect(screen.getByText('Oracle OCI ingestion currently unavailable')).toBeInTheDocument();
   });
 
   it('renders error state with retry button', async () => {

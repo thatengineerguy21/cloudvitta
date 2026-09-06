@@ -36,7 +36,7 @@ type CategoryStatusResponse struct {
 type ProviderStatusWarningResponse struct {
 	Provider string `json:"provider" example:"oracle"`
 	Code     string `json:"code" example:"not_yet_ingested"`
-	Message  string `json:"message" example:"Oracle OCI ingestion lands in stage 4."`
+	Message  string `json:"message" example:"Oracle OCI ingestion currently unavailable"`
 }
 
 // ProviderStatusResponse represents the aggregate operational and data freshness status of a cloud provider.

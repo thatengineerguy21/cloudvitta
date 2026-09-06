@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { useProviderStatus } from '../../api/queries/useProviderStatusQueries';
 import { ProviderStatusSkeleton } from './ProviderStatusSkeleton';
 import { WarningsBanner } from '../honesty/WarningsBanner';
+import { ProviderIcon } from '../common/ProviderIcon';
 import { formatRelativeTime } from '../../lib/format';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import type { Provider } from '../../types';
@@ -86,15 +87,20 @@ export const ProviderStatusCard: React.FC<ProviderStatusCardProps> = ({ provider
       className="bg-surface-card border border-border-default/80 p-6 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md"
       data-testid={`provider-card-${provider}`}
     >
-      {/* Header: Provider name + status badge */}
+      {/* Header: Provider icon + name + status badge */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <span className="text-xs uppercase font-bold tracking-wider text-text-primary">
-            {provider.toUpperCase()}
-          </span>
-          <span className="block text-[11px] text-text-secondary mt-0.5">
-            {PROVIDER_DISPLAY_NAMES[provider]}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl border border-border-default/80 bg-surface-raised flex items-center justify-center shrink-0 shadow-2xs p-1.5">
+            <ProviderIcon provider={provider} className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <span className="text-xs uppercase font-bold tracking-wider text-text-primary">
+              {provider.toUpperCase()}
+            </span>
+            <span className="block text-[11px] text-text-secondary mt-0.5">
+              {PROVIDER_DISPLAY_NAMES[provider]}
+            </span>
+          </div>
         </div>
         <span
           className={cn(

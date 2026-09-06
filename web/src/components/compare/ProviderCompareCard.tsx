@@ -5,17 +5,12 @@ import { MatchQualityBadge, UIMatchQuality } from '../honesty/MatchQualityBadge'
 import { MissingAttributesIndicator } from '../honesty/MissingAttributesIndicator';
 import { StaleDataBadge } from '../honesty/StaleDataBadge';
 import { AnomalyFlag } from '../honesty/AnomalyFlag';
+import { ProviderIcon } from '../common/ProviderIcon';
 import {
   ArrowRight,
   Check,
   Code,
   X,
-  Cloud,
-  Server,
-  Database,
-  Cpu,
-  Layers,
-  HardDrive,
 } from 'lucide-react';
 import type { ComparisonResultRow } from './CompareTemplate';
 
@@ -28,24 +23,15 @@ export interface ProviderCompareCardProps {
   renderCustomSpec?: (row: ComparisonResultRow) => React.ReactNode;
 }
 
-const getProviderIcon = (provider?: string) => {
-  const p = provider?.toLowerCase() || '';
-  if (p === 'aws') return Cloud;
-  if (p === 'azure') return Layers;
-  if (p === 'gcp') return Server;
-  if (p === 'oracle') return Database;
-  if (p === 'digitalocean') return Server;
-  if (p === 'ibm') return Cpu;
-  if (p === 'alibaba') return HardDrive;
-  return Cloud;
-};
-
 const getProviderIconBg = (provider?: string) => {
   const p = provider?.toLowerCase() || '';
-  if (p === 'aws') return 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40';
+  if (p === 'aws') return 'bg-amber-50 dark:bg-amber-950/40 text-[#232F3E] dark:text-amber-400 border-amber-200 dark:border-amber-800/40';
   if (p === 'azure') return 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800/40';
-  if (p === 'gcp') return 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800/40';
-  if (p === 'oracle') return 'bg-orange-50 dark:bg-orange-950/40 text-brand-600 dark:text-brand-400 border-brand-200 dark:border-brand-800/40';
+  if (p === 'gcp') return 'bg-white dark:bg-neutral-900 border-border-default/80 shadow-2xs';
+  if (p === 'oracle') return 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/40';
+  if (p === 'digitalocean') return 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 border-blue-200 dark:border-blue-900/40';
+  if (p === 'ibm') return 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 border-indigo-200 dark:border-indigo-900/40';
+  if (p === 'alibaba') return 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 border-orange-200 dark:border-orange-900/40';
   return 'bg-surface-raised text-text-primary border-border-default';
 };
 
@@ -87,7 +73,6 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
     return num.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   };
 
-  const Icon = getProviderIcon(row.provider);
   const iconStyle = getProviderIconBg(row.provider);
   const matchQuality = (row.match_quality as UIMatchQuality) || 'approximate';
 
@@ -124,8 +109,8 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
       <div>
         {/* Top Header Row */}
         <div className="flex items-start gap-3">
-          <div className={cn('w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs mt-0.5', iconStyle)}>
-            <Icon className="w-5 h-5" aria-hidden="true" />
+          <div className={cn('w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs mt-0.5 p-1.5', iconStyle)}>
+            <ProviderIcon provider={row.provider} className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-1.5">
