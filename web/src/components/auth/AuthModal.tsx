@@ -93,18 +93,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
-      {/* Rectilinear 0px Bento Card */}
-      <div className="w-full max-w-md bg-surface-card border border-border-default shadow-none p-6 sm:p-8 relative">
+      {/* Soft Warm Modern / Obsidian Bento Modal */}
+      <div className="w-full max-w-md bg-surface-card border border-border-default/80 rounded-2xl shadow-2xl p-6 sm:p-8 relative">
         {/* Close Button */}
         <button
           onClick={onClose}
           disabled={isLoading}
-          className="absolute top-4 right-4 p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           aria-label="Close dialog"
         >
           <X className="w-4 h-4" />
@@ -126,7 +126,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* API Error Alert */}
         {apiError && (
-          <div className="mb-4 p-3 bg-surface-raised border-l-2 border-status-anomaly flex items-start space-x-2.5">
+          <div className="mb-4 p-3 bg-surface-raised border-l-2 border-status-anomaly rounded-xl flex items-start space-x-2.5">
             <AlertCircle className="w-4 h-4 text-status-anomaly shrink-0 mt-0.5" />
             <p className="text-xs font-semibold text-status-anomaly">{apiError}</p>
           </div>
@@ -146,7 +146,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
                 placeholder="name@company.com"
-                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:border-border-accent transition-colors pl-9 rounded-none"
+                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all pl-9 rounded-xl"
               />
               <Mail className="w-4 h-4 text-text-secondary absolute left-3 top-2.5" />
             </div>
@@ -167,7 +167,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:border-border-accent transition-colors pl-9 rounded-none"
+                className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all pl-9 rounded-xl"
               />
               <Lock className="w-4 h-4 text-text-secondary absolute left-3 top-2.5" />
             </div>
@@ -189,7 +189,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={isLoading}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:border-border-accent transition-colors pl-9 rounded-none"
+                  className="w-full px-3 py-2 bg-surface-raised border border-border-default text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all pl-9 rounded-xl"
                 />
                 <Lock className="w-4 h-4 text-text-secondary absolute left-3 top-2.5" />
               </div>
@@ -205,7 +205,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-border-accent text-white hover:opacity-90 font-bold text-xs uppercase tracking-widest transition-opacity flex items-center justify-center space-x-2 rounded-none disabled:opacity-50 focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+            className="w-full py-2.5 px-4 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center space-x-2 rounded-xl shadow-sm hover:shadow-brand-glow disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:outline-none"
           >
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>

@@ -43,14 +43,14 @@ export const CalculatePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Page Header */}
-      <div className="border border-border-default bg-surface-card p-6 lg:p-8 space-y-3">
+      <div className="border border-border-default/80 bg-surface-card rounded-2xl shadow-sm p-6 lg:p-8 space-y-3">
         <div className="flex items-center space-x-2">
           <Calculator className="w-4 h-4 text-border-accent" />
-          <span className="text-xs uppercase tracking-widest text-border-accent font-bold">
+          <span className="text-xs uppercase tracking-widest text-border-accent font-bold px-2 py-0.5 rounded-full bg-brand-500/10">
             Composite Workload Engine
           </span>
         </div>
-        <h1 className="font-display text-3xl sm:text-4xl font-medium text-text-primary">
+        <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-text-primary tracking-tight">
           Composite Workload Calculator
         </h1>
         <p className="text-sm text-text-secondary max-w-3xl leading-relaxed">

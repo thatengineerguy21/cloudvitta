@@ -50,7 +50,7 @@ export const ProviderStatusPage: React.FC = () => {
         <div className="mt-4">
           <span
             className={cn(
-              'inline-flex items-center space-x-2 px-3 py-1 border text-xs font-bold uppercase tracking-wider',
+              'inline-flex items-center space-x-2 px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-wider',
               stateColor
             )}
           >

@@ -91,7 +91,7 @@ export const DatabaseNoSQLCompare: React.FC = () => {
           type="checkbox"
           checked={params.multi_region === true || params.multi_region === 'true'}
           onChange={(e) => setParams({ multi_region: e.target.checked })}
-          className="h-4 w-4 rounded-none border-border-default bg-surface-raised accent-border-accent cursor-pointer"
+          className="h-4 w-4 rounded border-border-default bg-surface-raised accent-brand-500 cursor-pointer"
           data-testid="nosql-multiregion-checkbox"
         />
       </div>
@@ -131,7 +131,7 @@ export const DatabaseNoSQLCompare: React.FC = () => {
                 <span className="text-xs text-text-secondary">({String(pricingMode)})</span>
               )}
               {multiRegion && (
-                <span className="text-[10px] uppercase px-1 py-0.5 border border-border-accent text-border-accent font-bold">
+                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded border border-border-accent text-border-accent font-bold">
                   Multi-Region
                 </span>
               )}

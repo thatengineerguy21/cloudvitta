@@ -69,7 +69,7 @@ export const CalculateCategoryBreakdown: React.FC<CalculateCategoryBreakdownProp
           return (
             <div
               key={catKey}
-              className="border border-dashed border-border-default bg-surface-raised/40 p-3 space-y-1.5"
+              className="border border-dashed border-border-default bg-surface-raised/40 p-3 space-y-1.5 rounded-xl"
             >
               <div className="flex items-center space-x-1.5 text-xs font-semibold text-text-secondary">
                 <Icon className="w-3.5 h-3.5" />
@@ -86,7 +86,7 @@ export const CalculateCategoryBreakdown: React.FC<CalculateCategoryBreakdownProp
         return (
           <div
             key={catKey}
-            className="border border-border-default bg-surface-card p-3 space-y-2"
+            className="border border-border-default/80 bg-surface-card p-3 space-y-2 rounded-xl shadow-xs"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1.5 text-xs font-bold text-text-primary">

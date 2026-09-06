@@ -77,7 +77,7 @@ export const WarningsBanner: React.FC<WarningsBannerProps> = ({
         return (
           <div
             key={`${w.provider || 'all'}-${w.code || idx}-${idx}`}
-            className={cn('flex items-start space-x-3 p-3 border text-xs', config.containerClass)}
+            className={cn('flex items-start space-x-3 p-3 border rounded-xl text-xs', config.containerClass)}
           >
             <Icon className={cn('w-4 h-4 shrink-0', config.iconClass)} aria-hidden="true" />
             <div className="flex-1">

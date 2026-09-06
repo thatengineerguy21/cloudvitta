@@ -36,8 +36,8 @@ export const BentoCard: React.FC<BentoCardProps> = ({
   return (
     <div
       className={cn(
-        'bg-surface-card border border-border-default flex flex-col p-6 sm:p-8 transition-colors',
-        isHoverable && 'hover:border-border-accent',
+        'bg-surface-card border border-border-default rounded-2xl shadow-sm flex flex-col p-6 sm:p-8 transition-all duration-200',
+        isHoverable && 'hover:shadow-md hover:border-border-accent cursor-pointer',
         spanClasses[colSpan],
         className
       )}

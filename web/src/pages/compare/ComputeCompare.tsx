@@ -88,7 +88,7 @@ export const ComputeCompare: React.FC = () => {
           type="checkbox"
           checked={params.strict_family === true || params.strict_family === 'true'}
           onChange={(e) => setParams({ strict_family: e.target.checked })}
-          className="h-4 w-4 rounded-none border-border-default bg-surface-raised accent-border-accent cursor-pointer"
+          className="h-4 w-4 rounded border-border-default bg-surface-raised accent-brand-500 cursor-pointer"
           data-testid="compute-strict-family-checkbox"
         />
       </div>

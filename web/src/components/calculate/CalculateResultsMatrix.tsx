@@ -89,7 +89,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
   if (isError) {
     const isApiErr = error instanceof ApiError;
     return (
-      <div className="border border-status-anomaly bg-surface-card p-6 space-y-4">
+      <div className="border border-status-anomaly/80 bg-surface-card rounded-2xl shadow-sm p-6 space-y-4">
         <div className="flex items-center space-x-2 text-status-anomaly">
           <AlertTriangle className="w-5 h-5" />
           <h3 className="font-display text-lg font-semibold">
@@ -100,7 +100,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
           {error?.message || 'An unexpected error occurred during workload calculation.'}
         </p>
         {isApiErr && ((error as ApiError).invalidParams || (error as ApiError).rawProblem?.invalid_params) && (
-          <ul className="text-xs font-mono space-y-1 bg-surface-raised p-3 border border-border-default">
+          <ul className="text-xs font-mono space-y-1 bg-surface-raised p-3 border border-border-default rounded-xl">
             {((error as ApiError).invalidParams || (error as ApiError).rawProblem?.invalid_params)?.map((p, idx) => (
               <li key={idx} className="text-status-anomaly">
                 {p.name}: {p.reason}
@@ -112,7 +112,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
           <button
             type="button"
             onClick={refetch}
-            className="flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider px-3 py-2 border border-border-default bg-surface-raised hover:border-border-accent text-text-primary transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+            className="flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider px-3 py-2 border border-border-default bg-surface-raised hover:border-border-accent text-text-primary transition-colors rounded-xl shadow-xs focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Retry Calculation</span>
@@ -128,7 +128,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
 
   if (requestedCategories.length === 0) {
     return (
-      <div className="border border-dashed border-border-default bg-surface-card p-12 text-center space-y-3">
+      <div className="border border-dashed border-border-default bg-surface-card rounded-2xl p-12 text-center space-y-3">
         <Layers className="w-8 h-8 text-text-secondary mx-auto" />
         <h3 className="font-display text-xl font-medium text-text-primary">
           No Workload Components Selected
@@ -143,7 +143,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Header & Sort Toolbar */}
-      <div className="flex items-center justify-between p-3.5 border border-border-default bg-surface-card">
+      <div className="flex items-center justify-between p-3.5 border border-border-default/80 bg-surface-card rounded-2xl shadow-sm">
         <div className="flex items-center space-x-3">
           <span className="text-xs uppercase tracking-widest font-bold text-text-primary">
             Provider Architecture Matrix
@@ -157,7 +157,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
           <button
             type="button"
             onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-            className="flex items-center space-x-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary px-2.5 py-1 border border-border-default bg-surface-raised hover:border-border-accent transition-colors focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
+            className="flex items-center space-x-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary px-3 py-1.5 border border-border-default bg-surface-raised hover:border-border-accent transition-colors rounded-xl shadow-xs focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none"
             title={`Sort by total price (${sortOrder === 'asc' ? 'Lowest First' : 'Highest First'})`}
           >
             <ArrowUpDown className="w-3 h-3" />
@@ -202,8 +202,8 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
             <div
               key={provider}
               className={cn(
-                'border bg-surface-card transition-colors',
-                isPartial ? 'border-border-default' : 'border-border-default hover:border-border-accent/60'
+                'border bg-surface-card rounded-2xl shadow-sm transition-all overflow-hidden',
+                isPartial ? 'border-border-default/80' : 'border-border-default/80 hover:border-border-accent/60 hover:shadow-md'
               )}
             >
               {/* Provider Row Summary Header */}
@@ -223,7 +223,7 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                 <div className="flex items-center space-x-3 min-w-0">
                   <div
                     data-testid={`provider-name-${provider}`}
-                    className="px-2.5 py-1 border border-border-default bg-surface-raised text-xs font-mono font-bold uppercase tracking-wider text-text-primary"
+                    className="px-2.5 py-1 border border-border-default bg-surface-raised rounded-lg text-xs font-mono font-bold uppercase tracking-wider text-text-primary"
                   >
                     {formatProviderName(provider)}
                   </div>
@@ -235,10 +235,10 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                 {/* Right: ADR 0022 Honesty Contract Price Display */}
                 <div className="flex items-center space-x-4">
                   {isPartial ? (
-                    // ADR 0022 PARTIAL TOTAL CONTAINER: Harsh 0px dashed border, complete total cell is blank
+                    // ADR 0022 PARTIAL TOTAL CONTAINER: Dashed border pill, complete total cell is blank
                     <div className="flex flex-col items-end">
                       <div
-                        className="border border-dashed border-status-partial text-status-partial bg-status-partial/5 px-3 py-1 text-xs font-mono font-bold flex items-center space-x-1.5 cursor-help"
+                        className="border border-dashed border-status-partial text-status-partial bg-status-partial/5 px-3 py-1 text-xs font-mono font-bold flex items-center space-x-1.5 cursor-help rounded-xl"
                         data-testid={`partial-total-${provider}`}
                         title="This provider does not offer all requested services. The total reflects only matching components."
                       >

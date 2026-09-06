@@ -116,7 +116,7 @@ export const WorkloadBuilderForm: React.FC<WorkloadBuilderFormProps> = ({
   return (
     <div className="space-y-4">
       {/* Global Parameters Card */}
-      <div className="border border-border-default bg-surface-card p-4 space-y-4">
+      <div className="border border-border-default/80 bg-surface-card rounded-2xl shadow-sm p-4 space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-border-default/50">
           <div className="flex items-center space-x-2">
             <Sliders className="w-4 h-4 text-border-accent" />
@@ -127,7 +127,7 @@ export const WorkloadBuilderForm: React.FC<WorkloadBuilderFormProps> = ({
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center space-x-1 text-xs text-text-secondary hover:text-text-primary uppercase tracking-wider font-semibold transition-colors"
+            className="flex items-center space-x-1 text-xs text-text-secondary hover:text-text-primary uppercase tracking-wider font-semibold transition-colors rounded-lg px-2 py-1 hover:bg-surface-raised"
             title="Reset form to defaults"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -152,7 +152,7 @@ export const WorkloadBuilderForm: React.FC<WorkloadBuilderFormProps> = ({
               type="checkbox"
               checked={state.strict_family}
               onChange={(e) => onChange({ ...state, strict_family: e.target.checked })}
-              className="accent-border-accent"
+              className="rounded accent-brand-500"
             />
             <span>Strict instance family matching</span>
           </label>
@@ -185,7 +185,7 @@ export const WorkloadBuilderForm: React.FC<WorkloadBuilderFormProps> = ({
             Workload Components
           </span>
         </div>
-        <span className="text-xs font-mono px-2 py-0.5 border border-border-default bg-surface-raised text-text-primary">
+        <span className="text-xs font-mono px-2.5 py-0.5 border border-border-default bg-surface-raised rounded-full text-text-primary">
           {activeCount} of 7 Active
         </span>
       </div>

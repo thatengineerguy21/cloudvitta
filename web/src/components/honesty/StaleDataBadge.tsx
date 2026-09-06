@@ -17,7 +17,7 @@ export const StaleDataBadge: React.FC<StaleDataBadgeProps> = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center space-x-1 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wider',
+        'inline-flex items-center space-x-1 px-2 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full',
         'border border-status-stale text-status-stale bg-status-stale/10 select-none',
         className
       )}

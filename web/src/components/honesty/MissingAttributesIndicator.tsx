@@ -30,7 +30,7 @@ export const MissingAttributesIndicator: React.FC<MissingAttributesIndicatorProp
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-controls="missing-attrs-tooltip"
-        className="inline-flex items-center space-x-1 px-1.5 py-0.5 text-xs font-medium border border-border-default hover:border-border-accent text-text-secondary bg-surface-raised cursor-pointer"
+        className="inline-flex items-center space-x-1 px-2 py-0.5 text-xs font-medium rounded-full border border-border-default hover:border-border-accent text-text-secondary bg-surface-raised cursor-pointer transition-colors"
         aria-label={`${missingAttributes.length} unspecified specifications`}
       >
         <HelpCircle className="w-3 h-3 text-border-accent shrink-0" aria-hidden="true" />
@@ -41,7 +41,7 @@ export const MissingAttributesIndicator: React.FC<MissingAttributesIndicatorProp
         <div
           id="missing-attrs-tooltip"
           role="tooltip"
-          className="absolute z-50 left-0 bottom-full mb-1.5 w-56 p-3 bg-surface-card border border-border-default shadow-none"
+          className="absolute z-50 left-0 bottom-full mb-1.5 w-56 p-3 bg-surface-card border border-border-default rounded-xl shadow-lg"
         >
           <p className="text-xs font-bold uppercase tracking-wider text-text-primary mb-1">
             Unspecified Specifications

@@ -100,7 +100,7 @@ export const DatabaseCompare: React.FC = () => {
           type="checkbox"
           checked={params.multi_az === true || params.multi_az === 'true'}
           onChange={(e) => setParams({ multi_az: e.target.checked })}
-          className="h-4 w-4 rounded-none border-border-default bg-surface-raised accent-border-accent cursor-pointer"
+          className="h-4 w-4 rounded border-border-default bg-surface-raised accent-brand-500 cursor-pointer"
           data-testid="database-multiaz-checkbox"
         />
       </div>
@@ -140,7 +140,7 @@ export const DatabaseCompare: React.FC = () => {
                 <span className="text-xs text-text-secondary">({row.instance_type})</span>
               )}
               {multiAz && (
-                <span className="text-[10px] uppercase px-1 py-0.5 border border-border-accent text-border-accent font-bold">
+                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded border border-border-accent text-border-accent font-bold">
                   Multi-AZ
                 </span>
               )}

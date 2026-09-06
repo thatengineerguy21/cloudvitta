@@ -12,48 +12,50 @@
 
 @layer base {
   :root {
-    --color-surface-page: #F5F5DC;
-    --color-surface-card: #FCF9F8;
-    --color-surface-raised: #F0EDED;
-    --color-border-default: #DCD9D9;
-    --color-border-accent: #E2725B;
-    --color-text-primary: #1B1C1C;
-    --color-text-secondary: #54433C;
-    --color-status-match-exact: #0C5D00;
-    --color-status-match-close: #823B18;
-    --color-status-match-approximate: #6E5300;
-    --color-status-stale: #944925;
-    --color-status-partial: #005691;
+    --color-surface-page: #FAFAF8;
+    --color-surface-card: #FFFFFF;
+    --color-surface-raised: #F5F4F0;
+    --color-border-default: #E7E5E4;
+    --color-border-accent: #E06D53;
+    --color-text-primary: #1C1917;
+    --color-text-secondary: #57534E;
+    --color-text-subtle: #78716C;
+    --color-status-match-exact: #059669;
+    --color-status-match-close: #D97706;
+    --color-status-match-approximate: #0D9488;
+    --color-status-stale: #D97706;
+    --color-status-partial: #2563EB;
     --color-status-anomaly: #BA1A1A;
   }
 
   .dark {
-    --color-surface-page: #0B0E14;
-    --color-surface-card: #14171D;
-    --color-surface-raised: #1C2027;
-    --color-border-default: #2A2D35;
-    --color-border-accent: #E2725B;
-    --color-text-primary: #F5F5F5;
-    --color-text-secondary: #A48B86;
-    --color-status-match-exact: #00FF41;
-    --color-status-match-close: #FFB4A5;
-    --color-status-match-approximate: #5CDBCE;
-    --color-status-stale: #FFB596;
-    --color-status-partial: #70B8FF;
+    --color-surface-page: #111316;
+    --color-surface-card: #181B20;
+    --color-surface-raised: #1E2023;
+    --color-border-default: rgba(255, 255, 255, 0.08);
+    --color-border-accent: #E06D53;
+    --color-text-primary: #F5F2EB;
+    --color-text-secondary: #B8B2A7;
+    --color-text-subtle: #6C6860;
+    --color-status-match-exact: #2A9D8F;
+    --color-status-match-close: #E9C46A;
+    --color-status-match-approximate: #4EBAAA;
+    --color-status-stale: #E9C46A;
+    --color-status-partial: #60A5FA;
     --color-status-anomaly: #FFB4AB;
   }
 
   body {
     background-color: var(--color-surface-page);
     color: var(--color-text-primary);
-    font-family: 'Manrope', 'Hanken Grotesk', sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', 'Manrope', sans-serif;
     margin: 0;
     padding: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
 
-  * {
-    border-radius: 0px !important;
-  }
+.tabular-nums {
+  font-feature-settings: 'tnum';
 }

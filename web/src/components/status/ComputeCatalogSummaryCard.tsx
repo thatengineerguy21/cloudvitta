@@ -41,7 +41,7 @@ export const ComputeCatalogSummaryCard: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-baseline gap-2 bg-bg-surface px-4 py-2 border border-border-default">
+        <div className="flex items-baseline gap-2 bg-bg-surface px-4 py-2 border border-border-default rounded-xl">
           <span className="text-xs uppercase text-text-secondary font-mono">Total Instances</span>
           <span className="font-mono text-2xl font-bold text-text-primary" data-testid="catalog-total-instances">
             {data.total_instances?.toLocaleString() ?? 0}
@@ -54,7 +54,7 @@ export const ComputeCatalogSummaryCard: React.FC = () => {
         {Object.entries(providerTotals).map(([provider, count]) => (
           <div
             key={provider}
-            className="p-3 border border-border-default bg-bg-surface flex flex-col justify-between"
+            className="p-3 border border-border-default bg-bg-surface rounded-xl flex flex-col justify-between"
             data-testid={`catalog-provider-total-${provider}`}
           >
             <span className="text-xs font-mono uppercase text-text-secondary">{provider}</span>

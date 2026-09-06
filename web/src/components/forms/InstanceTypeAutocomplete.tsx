@@ -60,8 +60,10 @@ export const InstanceTypeAutocomplete: React.FC<InstanceTypeAutocompleteProps> =
       <div className="relative">
         <div
           className={cn(
-            'w-full flex items-center justify-between border bg-bg-surface px-3 py-2 text-xs font-mono cursor-pointer transition-colors',
-            isOpen ? 'border-border-accent' : 'border-border-default hover:border-text-secondary'
+            'w-full flex items-center justify-between border rounded-xl bg-stone-50/80 dark:bg-surface-raised px-3 py-2 text-xs font-mono cursor-pointer transition-all',
+            isOpen
+              ? 'border-brand-500 ring-2 ring-brand-500/10'
+              : 'border-border-default/80 hover:border-text-secondary/60 hover:bg-stone-100/70 dark:hover:bg-surface-card'
           )}
           onClick={() => setIsOpen(!isOpen)}
           data-testid="instance-autocomplete-trigger"
@@ -74,10 +76,10 @@ export const InstanceTypeAutocomplete: React.FC<InstanceTypeAutocompleteProps> =
 
         {isOpen && (
           <div
-            className="absolute z-50 mt-1 w-full bg-bg-surface border border-border-default shadow-lg max-h-64 overflow-y-auto"
+            className="absolute z-50 mt-1.5 w-full bg-surface-card border border-border-default rounded-xl shadow-xl max-h-64 overflow-y-auto backdrop-blur-md"
             data-testid="instance-autocomplete-dropdown"
           >
-            <div className="p-2 border-b border-border-default sticky top-0 bg-bg-surface flex items-center gap-2">
+            <div className="p-2 border-b border-border-default sticky top-0 bg-surface-card flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-text-secondary" />
               <input
                 type="text"
@@ -121,7 +123,7 @@ export const InstanceTypeAutocomplete: React.FC<InstanceTypeAutocompleteProps> =
                   >
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] uppercase font-bold text-border-accent border border-border-accent/40 px-1 py-0.2">
+                        <span className="text-[10px] uppercase font-bold text-border-accent border border-border-accent/40 px-1.5 py-0.5 rounded">
                           {inst.provider}
                         </span>
                         <span className="text-text-primary font-semibold">{inst.instance_type_id}</span>

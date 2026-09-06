@@ -33,7 +33,7 @@ export const MatchQualityBadge: React.FC<MatchQualityBadgeProps> = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 py-0.5 text-xs font-bold uppercase tracking-wider border select-none',
+        'inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full border select-none',
         styles[quality],
         className
       )}

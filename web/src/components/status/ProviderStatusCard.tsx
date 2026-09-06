@@ -51,7 +51,7 @@ export const ProviderStatusCard: React.FC<ProviderStatusCardProps> = ({ provider
   if (error && !data) {
     return (
       <div
-        className="border border-status-anomaly bg-surface-card p-6"
+        className="border border-status-anomaly/80 bg-surface-card p-6 rounded-2xl shadow-sm"
         data-testid={`provider-error-${provider}`}
       >
         <div className="flex items-center space-x-2 mb-3">
@@ -65,7 +65,7 @@ export const ProviderStatusCard: React.FC<ProviderStatusCardProps> = ({ provider
         </p>
         <button
           onClick={() => refetch()}
-          className="inline-flex items-center space-x-1.5 border border-border-default bg-surface-card px-3 py-1.5 text-xs uppercase font-bold tracking-wider text-text-primary hover:border-border-accent transition-colors"
+          className="inline-flex items-center space-x-1.5 border border-border-default bg-surface-card px-3 py-1.5 text-xs uppercase font-bold tracking-wider text-text-primary hover:border-border-accent transition-colors rounded-xl shadow-xs"
         >
           <RefreshCw className="w-3 h-3" />
           <span>Retry</span>
@@ -83,7 +83,7 @@ export const ProviderStatusCard: React.FC<ProviderStatusCardProps> = ({ provider
 
   return (
     <div
-      className="bg-surface-card border border-border-default p-6"
+      className="bg-surface-card border border-border-default/80 p-6 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md"
       data-testid={`provider-card-${provider}`}
     >
       {/* Header: Provider name + status badge */}
@@ -98,7 +98,7 @@ export const ProviderStatusCard: React.FC<ProviderStatusCardProps> = ({ provider
         </div>
         <span
           className={cn(
-            'px-2 py-0.5 text-[11px] uppercase font-bold tracking-wider border',
+            'px-2.5 py-0.5 text-[11px] uppercase font-bold tracking-wider border rounded-full',
             badgeStyle
           )}
           data-testid={`status-badge-${provider}`}
@@ -174,7 +174,7 @@ const CategoryRow: React.FC<{ name: string; category: CategoryStatusResponse }> 
 
 /** Renders sync failure details in a compact red box. */
 const DLQDetail: React.FC<{ dlq: DLQStatusResponse }> = ({ dlq }) => (
-  <div className="mt-1 border border-status-anomaly bg-status-anomaly/5 p-2 text-[11px]">
+  <div className="mt-1 border border-status-anomaly bg-status-anomaly/5 p-2 text-[11px] rounded-xl">
     <div className="flex items-center space-x-2">
       <span className="font-bold uppercase text-status-anomaly">
         Sync Issue ({dlq.status})
