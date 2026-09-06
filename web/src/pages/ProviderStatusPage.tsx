@@ -37,14 +37,13 @@ export const ProviderStatusPage: React.FC = () => {
       {/* Page Header */}
       <BentoCard colSpan={12}>
         <span className="text-xs uppercase tracking-widest text-border-accent font-bold">
-          Provider Health Telemetry
+          System Status
         </span>
         <h1 className="font-display text-3xl font-medium text-text-primary mt-2">
-          Provider Operational Status &amp; Data Freshness
+          Cloud Provider Operational Status &amp; Data Freshness
         </h1>
         <p className="text-sm text-text-secondary mt-2 max-w-2xl">
-          Live health telemetry across all 7 supported cloud providers. Each card queries
-          independently — a single provider failure does not block others.
+          Live synchronization status and pricing data freshness across all 7 supported cloud providers.
         </p>
 
         {/* Summary telemetry pill */}

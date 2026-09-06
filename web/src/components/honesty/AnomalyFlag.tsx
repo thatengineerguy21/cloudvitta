@@ -7,7 +7,7 @@ export interface AnomalyFlagProps extends React.HTMLAttributes<HTMLSpanElement> 
 }
 
 export const AnomalyFlag: React.FC<AnomalyFlagProps> = ({
-  reason = 'Price observation flagged for review: significant anomaly detected (>10x variation).',
+  reason = 'Price observation under review: An unusual rate change was detected from this provider.',
   className,
   ...props
 }) => {

@@ -20,9 +20,9 @@ export const NotFoundPage: React.FC = () => {
           Page Not Found
         </h1>
         <p className="text-sm text-text-secondary mt-3">
-          The requested path{' '}
+          The page at{' '}
           <code className="text-border-accent font-mono break-all">{pathname}</code>{' '}
-          does not exist in the CloudVitta routing registry.
+          could not be found. It may have moved or the URL might be incorrect.
         </p>
         <div className="mt-6">
           <Link

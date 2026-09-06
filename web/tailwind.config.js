@@ -39,6 +39,7 @@ export default {
         full: '0px',
       },
       fontFamily: {
+        brand: ['"Qasira"', '"EB Garamond"', 'serif'],
         display: ['"EB Garamond"', 'serif'],
         sans: ['"Manrope"', '"Hanken Grotesk"', 'sans-serif'],
       },

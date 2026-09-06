@@ -149,7 +149,7 @@ const CategoryRow: React.FC<{ name: string; category: CategoryStatusResponse }> 
           {category.supported ? (
             <>
               <span className="text-[11px] text-text-secondary font-mono">
-                {category.observation_count} obs
+                {category.observation_count} price records
               </span>
               <span
                 className={cn(
@@ -172,13 +172,15 @@ const CategoryRow: React.FC<{ name: string; category: CategoryStatusResponse }> 
   );
 };
 
-/** Renders DLQ failure details in a compact red box. */
+/** Renders sync failure details in a compact red box. */
 const DLQDetail: React.FC<{ dlq: DLQStatusResponse }> = ({ dlq }) => (
   <div className="mt-1 border border-status-anomaly bg-status-anomaly/5 p-2 text-[11px]">
     <div className="flex items-center space-x-2">
-      <span className="font-bold uppercase text-status-anomaly">DLQ {dlq.status}</span>
+      <span className="font-bold uppercase text-status-anomaly">
+        Sync Issue ({dlq.status})
+      </span>
       <span className="text-text-secondary">
-        {dlq.consecutive_failures} consecutive failure{dlq.consecutive_failures === 1 ? '' : 's'}
+        ({dlq.consecutive_failures} failed sync attempt{dlq.consecutive_failures === 1 ? '' : 's'})
       </span>
     </div>
     <p className="text-text-secondary font-mono mt-0.5 truncate">{dlq.last_error}</p>

@@ -238,8 +238,9 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                     // ADR 0022 PARTIAL TOTAL CONTAINER: Harsh 0px dashed border, complete total cell is blank
                     <div className="flex flex-col items-end">
                       <div
-                        className="border border-dashed border-status-partial text-status-partial bg-status-partial/5 px-3 py-1 text-xs font-mono font-bold flex items-center space-x-1.5"
+                        className="border border-dashed border-status-partial text-status-partial bg-status-partial/5 px-3 py-1 text-xs font-mono font-bold flex items-center space-x-1.5 cursor-help"
                         data-testid={`partial-total-${provider}`}
+                        title="This provider does not offer all requested services. The total reflects only matching components."
                       >
                         <span>Partial Estimate:</span>
                         <PriceDisplay
@@ -250,7 +251,10 @@ export const CalculateResultsMatrix: React.FC<CalculateResultsMatrixProps> = ({
                           className="inline-flex space-y-0"
                         />
                       </div>
-                      <span className="text-[10px] text-status-partial/80 mt-0.5 font-mono">
+                      <span
+                        className="text-[10px] text-status-partial/80 mt-0.5 font-mono"
+                        title="This provider does not offer all requested services. The total reflects only matching components."
+                      >
                         ({matchedCategoryCount}/{totalRequestedCount} categories included)
                       </span>
                     </div>

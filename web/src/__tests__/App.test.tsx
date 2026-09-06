@@ -26,7 +26,7 @@ describe('App application routing and layout', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Normalized Cloud Infrastructure Pricing',
+        name: 'Transparent Cloud Infrastructure Pricing',
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Compute Instances')).toBeInTheDocument();

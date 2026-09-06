@@ -25,6 +25,9 @@ func mockSPAFileSystem() fstest.MapFS {
 		"favicon.svg": &fstest.MapFile{
 			Data: []byte("<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"10\"/></svg>"),
 		},
+		"fonts/Qasira.otf": &fstest.MapFile{
+			Data: []byte("mock-font-data-qasira"),
+		},
 	}
 }
 
@@ -114,6 +117,12 @@ func TestSPAHandler_StaticHashedAssets(t *testing.T) {
 			expectedType:    "image/svg+xml",
 			expectedCache:   "public, max-age=3600",
 			expectedSnippet: "<svg xmlns=",
+		},
+		{
+			path:            "/fonts/Qasira.otf",
+			expectedType:    "font/otf",
+			expectedCache:   "public, max-age=3600",
+			expectedSnippet: "mock-font-data-qasira",
 		},
 	}
 

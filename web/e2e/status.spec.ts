@@ -35,7 +35,7 @@ test.describe('Provider Status & Telemetry E2E', () => {
     }
 
     // Verify observation counts and freshness labels
-    await expect(page.getByText(/1200 obs/i).first()).toBeVisible();
+    await expect(page.getByText(/1200 price records/i).first()).toBeVisible();
     await expect(page.getByText(/Fresh/i).first()).toBeVisible();
   });
 

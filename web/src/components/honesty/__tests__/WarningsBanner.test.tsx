@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { WarningsBanner } from '../WarningsBanner';
+import { FRIENDLY_WARNING_TITLES } from '../friendlyWarnings';
 import { ProviderWarning, WarningCode } from '../../../types';
 
 describe('WarningsBanner Component', () => {
@@ -36,15 +37,16 @@ describe('WarningsBanner Component', () => {
     expect(screen.getAllByText('[aws]').length).toBe(11);
 
     // Verify 1. Anomaly / Failure Tier (2 codes)
-    const anomalyWarnings = ['pricing_anomaly_flagged', 'fetch_failed'];
+    const anomalyWarnings: WarningCode[] = ['pricing_anomaly_flagged', 'fetch_failed'];
     anomalyWarnings.forEach((code) => {
-      const codeSpan = screen.getByText(code);
-      const row = codeSpan.closest('div.border')!;
+      const titleSpan = screen.getByText(FRIENDLY_WARNING_TITLES[code]);
+      const row = titleSpan.closest('div.border')!;
       expect(row).toHaveClass('border-status-anomaly', 'bg-status-anomaly/5');
+      expect(titleSpan).toHaveAttribute('title', code);
     });
 
     // Verify 2. Stale / Data Missing Tier (6 codes)
-    const staleWarnings = [
+    const staleWarnings: WarningCode[] = [
       'stale_pricing_data',
       'category_not_supported',
       'not_yet_ingested',
@@ -53,21 +55,23 @@ describe('WarningsBanner Component', () => {
       'non_usd_currency_unsupported',
     ];
     staleWarnings.forEach((code) => {
-      const codeSpan = screen.getByText(code);
-      const row = codeSpan.closest('div.border')!;
+      const titleSpan = screen.getByText(FRIENDLY_WARNING_TITLES[code]);
+      const row = titleSpan.closest('div.border')!;
       expect(row).toHaveClass('border-status-stale', 'bg-status-stale/5');
+      expect(titleSpan).toHaveAttribute('title', code);
     });
 
     // Verify 3. Informational Filter Explanation Tier (3 codes)
-    const informationalWarnings = [
+    const informationalWarnings: WarningCode[] = [
       'engine_mismatch_excluded',
       'architecture_unsupported_excluded',
       'cluster_topology_unspecified',
     ];
     informationalWarnings.forEach((code) => {
-      const codeSpan = screen.getByText(code);
-      const row = codeSpan.closest('div.border')!;
+      const titleSpan = screen.getByText(FRIENDLY_WARNING_TITLES[code]);
+      const row = titleSpan.closest('div.border')!;
       expect(row).toHaveClass('border-border-default', 'bg-surface-raised');
+      expect(titleSpan).toHaveAttribute('title', code);
     });
 
     // Assert decorative icons carry aria-hidden="true" (Task 4)

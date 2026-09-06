@@ -31,10 +31,10 @@ export const MissingAttributesIndicator: React.FC<MissingAttributesIndicatorProp
         aria-haspopup="true"
         aria-controls="missing-attrs-tooltip"
         className="inline-flex items-center space-x-1 px-1.5 py-0.5 text-xs font-medium border border-border-default hover:border-border-accent text-text-secondary bg-surface-raised cursor-pointer"
-        aria-label={`${missingAttributes.length} unverified dimensions`}
+        aria-label={`${missingAttributes.length} unspecified specifications`}
       >
         <HelpCircle className="w-3 h-3 text-border-accent shrink-0" aria-hidden="true" />
-        <span>{missingAttributes.length} unverified</span>
+        <span>{missingAttributes.length} unspecified specs</span>
       </button>
 
       {isOpen && (
@@ -44,10 +44,10 @@ export const MissingAttributesIndicator: React.FC<MissingAttributesIndicatorProp
           className="absolute z-50 left-0 bottom-full mb-1.5 w-56 p-3 bg-surface-card border border-border-default shadow-none"
         >
           <p className="text-xs font-bold uppercase tracking-wider text-text-primary mb-1">
-            Unverified Dimensions
+            Unspecified Specifications
           </p>
           <p className="text-xs text-text-secondary mb-2">
-            The candidate SKU does not declare the following requested parameters:
+            The matched cloud configuration does not declare the following requested parameters:
           </p>
           <ul className="list-disc list-inside text-xs text-text-primary space-y-0.5">
             {missingAttributes.map((attr) => (

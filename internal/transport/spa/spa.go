@@ -19,6 +19,10 @@ func init() {
 	_ = mime.AddExtensionType(".svg", "image/svg+xml")
 	_ = mime.AddExtensionType(".json", "application/json")
 	_ = mime.AddExtensionType(".wasm", "application/wasm")
+	_ = mime.AddExtensionType(".otf", "font/otf")
+	_ = mime.AddExtensionType(".woff", "font/woff")
+	_ = mime.AddExtensionType(".woff2", "font/woff2")
+	_ = mime.AddExtensionType(".ttf", "font/ttf")
 }
 
 //go:embed all:dist

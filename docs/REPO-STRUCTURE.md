@@ -95,7 +95,7 @@ Create directories only when their stage implementation requires them.
 │   │   ├── pages/               # compare category views (compute, storage, network, db, k8s, serverless) and composite calculator
 │   │   ├── router/              # HTML5 pushState/replaceState Router, Link, and location hooks
 │   │   └── types/               # generated OpenAPI types and domain honesty models
-│   ├── public/                  # Static assets (favicons, manifest)
+│   ├── public/                  # Static assets (favicons, brand fonts, manifest)
 │   ├── index.html               # SPA HTML entry point
 │   ├── nginx.conf               # Hardened Nginx configuration for SPA routing fallback and security headers
 │   ├── playwright.config.ts     # Playwright E2E configuration

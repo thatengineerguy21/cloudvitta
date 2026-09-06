@@ -44,11 +44,11 @@ export const Header: React.FC = () => {
             {/* Brand Logo & Name */}
             <div className="flex items-center space-x-6">
               <Link to="/" className="flex items-center space-x-3" exact>
-                <span className="font-display text-2xl font-bold tracking-tight text-text-primary">
+                <span className="font-brand text-2xl font-bold tracking-tight text-text-primary">
                   CloudVitta
                 </span>
                 <span className="text-xs uppercase tracking-widest px-1.5 py-0.5 border border-border-accent text-border-accent font-bold">
-                  API Engine
+                  Pricing Tool
                 </span>
               </Link>
 

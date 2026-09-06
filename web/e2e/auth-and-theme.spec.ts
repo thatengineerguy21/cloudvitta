@@ -76,7 +76,7 @@ test.describe('Theme Toggle & In-Memory Auth E2E', () => {
     // Verify modal appears
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('heading', { name: /Sign In to Standard Tier/i })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: /^Sign In$/i })).toBeVisible();
 
     // Fill form
     await dialog.getByPlaceholder('name@company.com').fill('developer@cloudvitta.dev');

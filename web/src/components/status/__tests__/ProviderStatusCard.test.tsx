@@ -77,8 +77,8 @@ describe('ProviderStatusCard', () => {
     });
 
     expect(screen.getByTestId('status-badge-aws')).toHaveTextContent('healthy');
-    expect(screen.getByText('450 obs')).toBeInTheDocument();
-    expect(screen.getByText('32 obs')).toBeInTheDocument();
+    expect(screen.getByText('450 price records')).toBeInTheDocument();
+    expect(screen.getByText('32 price records')).toBeInTheDocument();
     // Fresh indicators
     const freshLabels = screen.getAllByText('Fresh');
     expect(freshLabels.length).toBe(2);

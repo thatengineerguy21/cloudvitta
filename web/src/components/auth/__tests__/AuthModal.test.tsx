@@ -32,7 +32,7 @@ describe('AuthModal Component', () => {
     );
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign In to Standard Tier');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign In');
     expect(screen.getByPlaceholderText('name@company.com')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();
@@ -125,14 +125,14 @@ describe('AuthModal Component', () => {
       </AuthProvider>
     );
 
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign In to Standard Tier');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign In');
 
     await user.click(screen.getByRole('button', { name: /sign up/i }));
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Create an Account');
     expect(screen.getByText('Confirm Password')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /sign in/i }));
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign In to Standard Tier');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign In');
   });
 
   it('validates password mismatch on signup', async () => {

@@ -114,13 +114,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="mb-6">
           <div className="inline-flex items-center space-x-2 text-xs uppercase font-bold tracking-widest text-border-accent mb-2">
             <Lock className="w-3.5 h-3.5" />
-            <span>Rate Limit Upgrade</span>
+            <span>{mode === 'login' ? 'Account Sign In' : 'Create Account'}</span>
           </div>
           <h2 id="auth-modal-title" className="font-display text-2xl font-bold text-text-primary">
-            {mode === 'login' ? 'Sign In to Standard Tier' : 'Create an Account'}
+            {mode === 'login' ? 'Sign In' : 'Create an Account'}
           </h2>
           <p className="text-xs text-text-secondary mt-1">
-            Standard tier provides 120 req/min vs 20 req/min anonymous ceiling.
+            Sign in to access higher request limits, save workloads, and configure multi-cloud environments.
           </p>
         </div>
 

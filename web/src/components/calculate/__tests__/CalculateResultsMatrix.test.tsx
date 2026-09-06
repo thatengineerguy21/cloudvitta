@@ -124,7 +124,7 @@ describe('CalculateResultsMatrix & ADR 0022 Honesty Contract', () => {
     );
 
     // GCP missing attributes and stale
-    expect(screen.getByText(/1 unverified/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 unspecified/i)).toBeInTheDocument();
     expect(screen.getByText(/Stale/i)).toBeInTheDocument();
     expect(screen.getByText('gcp-compute-t2a-standard-4')).toBeInTheDocument();
   });

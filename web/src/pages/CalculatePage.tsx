@@ -54,7 +54,7 @@ export const CalculatePage: React.FC = () => {
           Composite Workload Calculator
         </h1>
         <p className="text-sm text-text-secondary max-w-3xl leading-relaxed">
-          Configure a full multi-tier cloud architecture spanning compute, storage, networking, relational databases, NoSQL, Kubernetes, and serverless within a single normalized request. Adheres strictly to the ADR 0022 Honesty Contract by distinguishing complete from partial workload totals.
+          Design a complete multi-tier cloud architecture across compute, storage, databases, networking, Kubernetes, and serverless. Real-time pricing clearly distinguishes complete quotes from partial estimates so you never face hidden infrastructure costs.
         </p>
       </div>
 

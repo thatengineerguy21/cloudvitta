@@ -2,6 +2,7 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 import { ProviderWarning, WarningCode } from '../../types';
 import { AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
+import { FRIENDLY_WARNING_TITLES } from './friendlyWarnings';
 
 export interface WarningsBannerProps extends React.HTMLAttributes<HTMLDivElement> {
   warnings: ProviderWarning[];
@@ -69,6 +70,9 @@ export const WarningsBanner: React.FC<WarningsBannerProps> = ({
       {warnings.map((w, idx) => {
         const config = getWarningConfig(w.code);
         const Icon = config.icon;
+        const friendlyTitle = w.code
+          ? FRIENDLY_WARNING_TITLES[w.code as WarningCode] || w.code
+          : undefined;
 
         return (
           <div
@@ -83,9 +87,13 @@ export const WarningsBanner: React.FC<WarningsBannerProps> = ({
                     [{w.provider}]
                   </span>
                 )}
-                {w.code && (
-                  <span className="font-mono text-[11px] text-text-secondary">
-                    {w.code}
+                {friendlyTitle && (
+                  <span
+                    className="font-semibold text-xs text-text-primary"
+                    title={w.code}
+                    data-code={w.code}
+                  >
+                    {friendlyTitle}
                   </span>
                 )}
               </div>

@@ -95,15 +95,14 @@ export const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <BentoCard colSpan={12}>
         <span className="text-xs uppercase tracking-widest text-border-accent font-bold">
-          Cloud Pricing Normalization Engine
+          Multi-Cloud Pricing Intelligence
         </span>
         <h1 className="font-display text-4xl sm:text-5xl font-medium text-text-primary mt-3">
-          Normalized Cloud Infrastructure Pricing
+          Transparent Cloud Infrastructure Pricing
         </h1>
         <p className="text-sm text-text-secondary mt-3 max-w-2xl">
           Compare and calculate cloud infrastructure costs across 7 providers. Honest pricing
-          data with match quality transparency, staleness detection, and zero client-side
-          arithmetic.
+          with match quality transparency, automatic updates, and zero hidden fees.
         </p>
 
         {/* Links row */}
