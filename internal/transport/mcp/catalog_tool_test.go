@@ -44,7 +44,7 @@ func TestMCP_GetComputeCatalog(t *testing.T) {
 	defer mr.Close()
 
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 
 	freshnessSvc := service.NewFreshnessService(nil, nil)
 	pricingSvc := service.NewPricingService(nil, rdb, service.WithFreshnessService(freshnessSvc))

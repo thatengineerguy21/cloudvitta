@@ -71,7 +71,7 @@ func (m *mockCatalogQuerier) UpsertComputeCatalogItem(ctx context.Context, arg s
 func TestCatalogService_GetCatalogSummary_CacheMissAndHit(t *testing.T) {
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 
 	dbCallCount := 0
 	mockQ := &mockCatalogQuerier{

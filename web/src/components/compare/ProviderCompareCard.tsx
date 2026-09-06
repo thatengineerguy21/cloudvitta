@@ -166,7 +166,7 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
           <div className="mt-1">
             <span className="text-[10px] font-bold uppercase text-text-secondary block">SKU Code</span>
             <span className="font-bold text-text-primary text-xs font-mono truncate block" title={row.sku_id}>
-              {row.sku_id ? row.sku_id.slice(-8) : 'Base'}
+              {row.sku_id || 'Base'}
             </span>
           </div>
         </div>

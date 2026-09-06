@@ -18,6 +18,19 @@ test.describe('Compare Views & Honesty Elements E2E', () => {
       });
     });
 
+    // Mock compute catalog instances endpoint (default empty list, overridable in tests)
+    await page.route('**/api/v1/catalog/compute/instances*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          count: 0,
+          total: 0,
+          instances: [],
+        }),
+      });
+    });
+
     // Mock compute prices endpoint
     await page.route('**/api/v1/prices/compute*', async (route) => {
       const url = new URL(route.request().url());
