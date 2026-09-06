@@ -348,6 +348,8 @@ task dev:quarantine
 | `/readyz` | `GET` | Readiness probe (verifies Postgres pool & Redis reachability) |
 | `/metrics` | `GET` | Prometheus metrics endpoint (includes `cache_requests_total`) |
 | `/docs/` | `GET` | Interactive Swagger UI OpenAPI documentation |
+| `/docs/swagger.json` | `GET` | OpenAPI specification in JSON format |
+| `/docs/swagger.yaml` | `GET` | OpenAPI specification in YAML format |
 | `/api/v1/prices/compute` | `GET` | Compute pricing lookup & SKU comparison (supports `?currency=...`) |
 | `/api/v1/prices/storage` | `GET` | Storage pricing lookup & comparison (supports `?currency=...`) |
 | `/api/v1/prices/network` | `GET` | Network egress pricing lookup & comparison (supports `?currency=...`) |

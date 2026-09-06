@@ -60,18 +60,31 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
   const [isRawJsonOpen, setIsRawJsonOpen] = useState(false);
   const [isTierSelected, setIsTierSelected] = useState(false);
 
-  const hourlyPrice = row.normalized_hourly_usd ?? (row.price?.amount ? Number(row.price.amount) : 0);
-  const monthlyPrice = row.normalized_monthly_usd ?? row.monthly_cost_usd ?? hourlyPrice * 730;
+  const parseNum = (val: unknown): number => {
+    if (val === undefined || val === null || val === '') return 0;
+    const n = typeof val === 'number' ? val : Number(val);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const hourlyPrice = parseNum(row.normalized_hourly_usd ?? row.price?.amount);
+  const monthlyPrice =
+    row.normalized_monthly_usd !== undefined || row.monthly_cost_usd !== undefined
+      ? parseNum(row.normalized_monthly_usd ?? row.monthly_cost_usd)
+      : hourlyPrice * 730;
 
   const displayPrice = timeframe === 'monthly' ? monthlyPrice : hourlyPrice;
   const unitLabel = timeframe === 'monthly' ? '/ mo' : '/ hr';
   const currSymbol = currency === 'USD' ? '$' : `${currency} `;
 
-  const formatAmount = (val: number): string => {
-    if (val >= 100) {
-      return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatAmount = (val: unknown): string => {
+    const num = parseNum(val);
+    if (num >= 100) {
+      return num.toLocaleString('en-US', {
+        minimumFractionDigits: Number.isInteger(num) ? 0 : 2,
+        maximumFractionDigits: 2,
+      });
     }
-    return val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    return num.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   };
 
   const Icon = getProviderIcon(row.provider);
@@ -79,10 +92,17 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
   const matchQuality = (row.match_quality as UIMatchQuality) || 'approximate';
 
   const spec = row.matched_spec as Record<string, unknown> | undefined;
-  const vcpu = spec?.vcpu ?? row.vcpu;
-  const ram = spec?.ram_gb ?? row.ram_gb;
-  const network = spec?.network_performance ?? 'Up to 12.5G';
-  const silicon = (spec?.cpu_architecture as string) || (row.family ? `${row.family} Gen` : (row.architecture || 'x86_64'));
+  const vcpu = (spec?.vcpu as number | undefined) ?? row.vcpu;
+  const ram = (spec?.ram_gb as number | undefined) ?? (spec?.memory_gib as number | undefined) ?? row.ram_gb;
+  const network = (spec?.network_performance as string | undefined) ?? (spec?.network as string | undefined);
+  const rawSilicon = (spec?.cpu_architecture as string | undefined) || row.architecture;
+  const silicon = rawSilicon || (row.family ? `${row.family} Gen` : undefined);
+
+  const hasComputeSpecs = vcpu !== undefined || ram !== undefined || Boolean(row.family) || Boolean(spec?.family);
+
+  // Derive human-readable title without colliding with custom spec renderers
+  const instanceType = (spec?.instance_type as string | undefined) || row.instance_type;
+  const displayTitle = instanceType || row.spec_summary || 'Standard SKU';
 
   return (
     <div
@@ -103,27 +123,25 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
 
       <div>
         {/* Top Header Row */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={cn('w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs', iconStyle)}>
-              <Icon className="w-5 h-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[11px] font-bold uppercase text-text-secondary block tracking-wider truncate">
+        <div className="flex items-start gap-3">
+          <div className={cn('w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs mt-0.5', iconStyle)}>
+            <Icon className="w-5 h-5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[11px] font-bold uppercase text-text-secondary tracking-wider truncate">
                 {formatProviderName(row.provider)}
               </span>
-              <h3 className="font-bold text-text-primary text-base truncate font-mono">
-                {row.instance_type || row.spec_summary || 'Standard SKU'}
-              </h3>
+              <MatchQualityBadge
+                quality={matchQuality}
+                score={row.match_score}
+                deltaPct={row.match_delta_pct}
+                className="shrink-0"
+              />
             </div>
-          </div>
-
-          <div className="shrink-0">
-            <MatchQualityBadge
-              quality={matchQuality}
-              score={row.match_score}
-              deltaPct={row.match_delta_pct}
-            />
+            <h3 className="font-bold text-text-primary text-base font-mono leading-tight mt-1 truncate" title={displayTitle}>
+              {displayTitle}
+            </h3>
           </div>
         </div>
 
@@ -134,77 +152,101 @@ export const ProviderCompareCard: React.FC<ProviderCompareCardProps> = ({
           </div>
         )}
 
-        {/* Silicon / Sub-architecture Tag */}
-        <div className="mt-3.5 pt-2.5 border-t border-border-default/50 flex items-center justify-between text-xs">
-          <span className="text-text-secondary">Silicon / Profile:</span>
-          <span className="font-semibold text-text-primary text-right truncate max-w-[180px]">
-            {row.family ? `${row.family} ` : ''}
-            <span className="text-text-secondary font-normal font-mono text-[11px]">({String(silicon)})</span>
-          </span>
-        </div>
+        {/* Specification Section */}
+        {hasComputeSpecs ? (
+          <>
+            {/* Silicon / Sub-architecture Tag */}
+            <div className="mt-3.5 pt-2.5 border-t border-border-default/50 flex items-center justify-between text-xs">
+              <span className="text-text-secondary">Silicon / Profile:</span>
+              <span className="font-semibold text-text-primary text-right truncate max-w-[180px]">
+                {row.family ? `${row.family} ` : ''}
+                <span className="text-text-secondary font-normal font-mono text-[11px]">({silicon || 'x86_64'})</span>
+              </span>
+            </div>
 
-        {/* 2x2 Spec Matrix Pills */}
-        <div className="grid grid-cols-2 gap-2 mt-3 bg-surface-raised p-3 rounded-xl border border-border-default/60">
-          <div>
-            <span className="text-[10px] font-bold uppercase text-text-secondary block">vCPU</span>
-            <span className="font-bold text-text-primary text-sm font-mono">
-              {vcpu ? `${vcpu} Cores` : 'Included'}
-            </span>
+            {/* 2x2 Spec Matrix Pills */}
+            <div className="grid grid-cols-2 gap-2 mt-3 bg-surface-raised p-3 rounded-xl border border-border-default/60">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-text-secondary block">vCPU</span>
+                <span className="font-bold text-text-primary text-sm font-mono">
+                  {vcpu ? `${vcpu} Cores` : 'Included'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase text-text-secondary block">Memory</span>
+                <span className="font-bold text-text-primary text-sm font-mono">
+                  {ram ? `${ram} GiB` : 'Dynamic'}
+                </span>
+              </div>
+              <div className="mt-1">
+                <span className="text-[10px] font-bold uppercase text-text-secondary block">Network</span>
+                <span className="font-bold text-text-primary text-xs font-mono truncate block" title={network || 'Standard'}>
+                  {network || 'Up to 12.5G'}
+                </span>
+              </div>
+              <div className="mt-1">
+                <span className="text-[10px] font-bold uppercase text-text-secondary block">SKU Code</span>
+                <span className="font-bold text-text-primary text-xs font-mono truncate block" title={row.sku_id}>
+                  {row.sku_id || 'Base'}
+                </span>
+              </div>
+            </div>
+
+            {/* Custom Specification Renderer (if provided on compute-like card, e.g. RDBMS) */}
+            {renderCustomSpec && (
+              <div className="mt-3 pt-2 border-t border-border-default/40">
+                {renderCustomSpec(row)}
+              </div>
+            )}
+          </>
+        ) : renderCustomSpec ? (
+          <div className="mt-3.5 p-3 rounded-xl bg-surface-raised border border-border-default/60 space-y-2">
+            {renderCustomSpec(row)}
+            {row.sku_id && (
+              <div className="pt-2 border-t border-border-default/40 flex items-center justify-between text-xs">
+                <span className="text-[10px] font-bold uppercase text-text-secondary">SKU Code</span>
+                <span className="font-bold text-text-primary font-mono text-xs truncate max-w-[160px]" title={row.sku_id}>
+                  {row.sku_id}
+                </span>
+              </div>
+            )}
           </div>
-          <div>
-            <span className="text-[10px] font-bold uppercase text-text-secondary block">Memory</span>
-            <span className="font-bold text-text-primary text-sm font-mono">
-              {ram ? `${ram} GiB` : 'Dynamic'}
-            </span>
-          </div>
-          <div className="mt-1">
-            <span className="text-[10px] font-bold uppercase text-text-secondary block">Network</span>
-            <span className="font-bold text-text-primary text-xs font-mono truncate block">
-              {String(network)}
-            </span>
-          </div>
-          <div className="mt-1">
-            <span className="text-[10px] font-bold uppercase text-text-secondary block">SKU Code</span>
-            <span className="font-bold text-text-primary text-xs font-mono truncate block" title={row.sku_id}>
+        ) : (
+          <div className="mt-3.5 p-3 rounded-xl bg-surface-raised border border-border-default/60 flex items-center justify-between text-xs">
+            <span className="text-[10px] font-bold uppercase text-text-secondary">SKU Code</span>
+            <span className="font-bold text-text-primary font-mono text-xs truncate max-w-[160px]" title={row.sku_id}>
               {row.sku_id || 'Base'}
             </span>
-          </div>
-        </div>
-
-        {/* Custom Specification Renderer (if provided) */}
-        {renderCustomSpec && (
-          <div className="mt-3 pt-2 border-t border-border-default/40">
-            {renderCustomSpec(row)}
           </div>
         )}
 
         {/* Costing Section */}
         <div className="mt-4">
-          <div className="flex items-baseline justify-between">
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-extrabold text-text-primary tracking-tight font-mono tabular-nums">
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <span className="text-2xl font-extrabold text-text-primary tracking-tight font-mono tabular-nums truncate">
                 {currSymbol}{formatAmount(displayPrice)}
               </span>
-              <span className="text-xs font-medium text-text-secondary">{unitLabel}</span>
-              {hasAnomaly && <AnomalyFlag className="ml-1" />}
+              <span className="text-xs font-medium text-text-secondary whitespace-nowrap shrink-0">{unitLabel}</span>
+              {hasAnomaly && <AnomalyFlag className="ml-1 shrink-0" />}
             </div>
 
             {isLowestTCO ? (
-              <span className="text-xs font-bold text-status-matchExact bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">
+              <span className="text-xs font-bold text-status-matchExact bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40 shrink-0">
                 Lowest TCO
               </span>
             ) : row.match_delta_pct !== undefined && row.match_delta_pct > 0 ? (
-              <span className="text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40">
+              <span className="text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40 shrink-0">
                 +{row.match_delta_pct}%
               </span>
             ) : (
-              <span className="text-xs font-semibold text-text-secondary bg-surface-raised px-2 py-0.5 rounded-full">
+              <span className="text-xs font-semibold text-text-secondary bg-surface-raised px-2 py-0.5 rounded-full shrink-0">
                 Standard Rate
               </span>
             )}
           </div>
 
-          <div className="text-xs text-text-secondary mt-1 font-medium">
+          <div className="text-xs text-text-secondary mt-1 font-medium whitespace-nowrap">
             {timeframe === 'hourly' ? (
               <>
                 Approx. <span className="font-bold text-text-primary font-mono">{currSymbol}{formatAmount(monthlyPrice)}</span> / mo

@@ -431,7 +431,7 @@ export function CompareTemplate<TResult extends ComparisonResultRow>({
                             ) : (
                               <div className="space-y-0.5">
                                 <div className="font-mono text-text-primary font-semibold">
-                                  {row.instance_type || row.spec_summary || 'Standard SKU'}
+                                  {(row.matched_spec?.instance_type as string) || row.instance_type || row.spec_summary || 'Standard SKU'}
                                 </div>
                                 {row.missing_attributes && row.missing_attributes.length > 0 && (
                                   <MissingAttributesIndicator

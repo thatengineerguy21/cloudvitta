@@ -2,13 +2,15 @@ package rest
 
 import (
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-	_ "github.com/thatengineerguy21/CloudVitta/internal/transport/rest/openapi"
+	"github.com/swaggo/swag"
+	"github.com/thatengineerguy21/CloudVitta/internal/transport/rest/openapi"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
@@ -20,7 +22,35 @@ import (
 
 // SwaggerHandler returns the OpenAPI Swagger documentation HTTP handler.
 func SwaggerHandler() http.Handler {
-	return httpSwagger.WrapHandler
+	swaggerUI := httpSwagger.Handler(
+		httpSwagger.URL("/docs/swagger.json"),
+	)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cleanPath := path.Clean(r.URL.Path)
+		switch cleanPath {
+		case "/docs/swagger.json", "/docs/doc.json":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			if len(openapi.SwaggerJSON) > 0 {
+				_, _ = w.Write(openapi.SwaggerJSON)
+			} else {
+				doc, err := swag.ReadDoc()
+				if err != nil {
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+					return
+				}
+				_, _ = w.Write([]byte(doc))
+			}
+			return
+		case "/docs/swagger.yaml":
+			w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(openapi.SwaggerYAML)
+			return
+		}
+		swaggerUI.ServeHTTP(w, r)
+	})
 }
 
 // NewRouter constructs a net/http.ServeMux with all REST API routes, health probes, metrics, and middlewares wired.
@@ -33,7 +63,7 @@ func NewRouter(pricingSvc *service.PricingService, authSvc *service.AuthService,
 	mux.Handle("/metrics", promhttp.Handler())
 
 	// OpenAPI Documentation (unlimited)
-	mux.Handle("/docs/", httpSwagger.WrapHandler)
+	mux.Handle("/docs/", SwaggerHandler())
 
 	// Fallback for unmapped API routes within REST subsystem
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
