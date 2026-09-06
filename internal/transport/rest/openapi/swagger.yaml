@@ -644,6 +644,16 @@ definitions:
       token_type:
         type: string
     type: object
+  rest.ResendVerificationRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  rest.ResendVerificationResponse:
+    properties:
+      message:
+        type: string
+    type: object
   rest.ServerlessComparisonMeta:
     properties:
       api_version:
@@ -773,6 +783,16 @@ definitions:
       stale:
         type: boolean
     type: object
+  rest.VerifyEmailRequest:
+    properties:
+      token:
+        type: string
+    type: object
+  rest.VerifyEmailResponse:
+    properties:
+      message:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
@@ -896,6 +916,46 @@ paths:
       summary: Rotate refresh token
       tags:
       - Auth
+  /api/v1/auth/resend-verification:
+    post:
+      consumes:
+      - application/json
+      description: Requests a fresh email verification link without revealing account
+        existence
+      parameters:
+      - description: Recipient email
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.ResendVerificationRequest'
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "202":
+          description: Verification email request accepted
+          schema:
+            $ref: '#/definitions/rest.ResendVerificationResponse'
+        "400":
+          description: Malformed request or missing email
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "429":
+          description: Too many verification requests
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Resend verification email
+      tags:
+      - Auth
   /api/v1/auth/signup:
     post:
       consumes:
@@ -933,6 +993,57 @@ paths:
           schema:
             $ref: '#/definitions/middleware.RFC7807Error'
       summary: Register a new user
+      tags:
+      - Auth
+  /api/v1/auth/verify-email:
+    post:
+      consumes:
+      - application/json
+      description: Consumes a single-use verification token to activate a user account
+      parameters:
+      - description: Verification token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.VerifyEmailRequest'
+      produces:
+      - application/json
+      - application/problem+json
+      responses:
+        "200":
+          description: Email verified successfully
+          schema:
+            $ref: '#/definitions/rest.VerifyEmailResponse'
+        "400":
+          description: Malformed request or missing token
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "404":
+          description: Verification token not found
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "409":
+          description: Verification token already consumed
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "410":
+          description: Verification token expired
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/middleware.RFC7807Error'
+      summary: Verify email address
       tags:
       - Auth
   /api/v1/calculate:

@@ -36,6 +36,31 @@ func TestMapServiceError(t *testing.T) {
 			wantStatus: http.StatusNotFound,
 		},
 		{
+			name:       "Email Not Verified",
+			err:        service.ErrEmailNotVerified,
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "Verification Expired",
+			err:        service.ErrVerificationExpired,
+			wantStatus: http.StatusGone,
+		},
+		{
+			name:       "Verification Consumed",
+			err:        service.ErrVerificationConsumed,
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name:       "Verification Not Found",
+			err:        service.ErrVerificationNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "Too Many Verifications",
+			err:        service.ErrTooManyVerifications,
+			wantStatus: http.StatusTooManyRequests,
+		},
+		{
 			name:       "Unknown Error",
 			err:        errors.New("some unknown DB error"),
 			wantStatus: http.StatusInternalServerError,

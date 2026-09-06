@@ -64,6 +64,8 @@ Create directories only when their stage implementation requires them.
 │   │
 │   ├── auth/                    # bcrypt hashing, JWT access token minting, refresh token rotation
 │   │
+│   ├── email/                   # email dispatch interface, Resend API adapter, and Noop fallback
+│   │
 │   └── middleware/
 │       ├── authmw/              # HTTP Bearer token parser and user claims injector
 │       └── ratelimit/           # 4-tier rate limiting engine with HMAC cookie issuance

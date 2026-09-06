@@ -28,6 +28,7 @@ type Config struct {
 	Alibaba       AlibabaConfig       `koanf:"alibaba"`
 	DigitalOcean  DigitalOceanConfig  `koanf:"digitalocean"`
 	Freshness     FreshnessConfig     `koanf:"freshness"`
+	Email         EmailConfig         `koanf:"email"`
 }
 
 type PrimaryConfig struct {
@@ -134,6 +135,12 @@ type DigitalOceanConfig struct {
 
 type FreshnessConfig struct {
 	StalenessThresholdHours int64 `koanf:"staleness_threshold_hours"`
+}
+
+type EmailConfig struct {
+	ResendAPIKey       string `koanf:"resend_api_key"`
+	From               string `koanf:"from"`
+	VerifyEmailBaseURL string `koanf:"verify_email_base_url"`
 }
 
 func Load() (*Config, error) {
@@ -389,6 +396,25 @@ func resolveEnvFallbacks(cfg *Config) error {
 	// 12. Resolve Freshness fallbacks & defaults
 	if cfg.Freshness.StalenessThresholdHours == 0 {
 		cfg.Freshness.StalenessThresholdHours = resolveEnvInt64("CLOUDVITTA_FRESHNESS_STALENESS_THRESHOLD_HOURS", "FRESHNESS_STALENESS_THRESHOLD_HOURS", 168)
+	}
+
+	// 13. Resolve Email fallbacks & defaults
+	if cfg.Email.ResendAPIKey == "" {
+		cfg.Email.ResendAPIKey = os.Getenv("RESEND_API_KEY")
+	}
+	if cfg.Email.From == "" {
+		if from := os.Getenv("EMAIL_FROM"); from != "" {
+			cfg.Email.From = from
+		} else {
+			cfg.Email.From = "CloudVitta <noreply@cloudvitta.dev>"
+		}
+	}
+	if cfg.Email.VerifyEmailBaseURL == "" {
+		if baseURL := os.Getenv("VERIFY_EMAIL_BASE_URL"); baseURL != "" {
+			cfg.Email.VerifyEmailBaseURL = baseURL
+		} else {
+			cfg.Email.VerifyEmailBaseURL = "https://cloudvitta.dev/verify-email"
+		}
 	}
 
 	return nil

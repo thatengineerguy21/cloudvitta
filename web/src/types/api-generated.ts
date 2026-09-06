@@ -103,6 +103,39 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/resend-verification": {
+    /** Requests a fresh email verification link without revealing account existence */
+    post: {
+      parameters: {
+        body: {
+          /** Recipient email */
+          request: definitions["rest.ResendVerificationRequest"];
+        };
+      };
+      responses: {
+        /** Verification email request accepted */
+        202: {
+          schema: definitions["rest.ResendVerificationResponse"];
+        };
+        /** Malformed request or missing email */
+        400: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Method Not Allowed */
+        405: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Too many verification requests */
+        429: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
   "/api/v1/auth/signup": {
     /** Creates a new user account with email and password */
     post: {
@@ -127,6 +160,51 @@ export interface paths {
         };
         /** User with this email already exists */
         409: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Internal Server Error */
+        500: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+      };
+    };
+  };
+  "/api/v1/auth/verify-email": {
+    /** Consumes a single-use verification token to activate a user account */
+    post: {
+      parameters: {
+        body: {
+          /** Verification token */
+          request: definitions["rest.VerifyEmailRequest"];
+        };
+      };
+      responses: {
+        /** Email verified successfully */
+        200: {
+          schema: definitions["rest.VerifyEmailResponse"];
+        };
+        /** Malformed request or missing token */
+        400: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Verification token not found */
+        404: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Method Not Allowed */
+        405: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Verification token already consumed */
+        409: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Verification token expired */
+        410: {
+          schema: definitions["middleware.RFC7807Error"];
+        };
+        /** Rate limit exceeded */
+        429: {
           schema: definitions["middleware.RFC7807Error"];
         };
         /** Internal Server Error */
@@ -866,6 +944,12 @@ export interface definitions {
     refresh_token?: string;
     token_type?: string;
   };
+  "rest.ResendVerificationRequest": {
+    email?: string;
+  };
+  "rest.ResendVerificationResponse": {
+    message?: string;
+  };
   "rest.ServerlessComparisonMeta": {
     api_version?: string;
     generated_at?: string;
@@ -927,6 +1011,12 @@ export interface definitions {
     provider?: string;
     sku_id?: string;
     stale?: boolean;
+  };
+  "rest.VerifyEmailRequest": {
+    token?: string;
+  };
+  "rest.VerifyEmailResponse": {
+    message?: string;
   };
 }
 

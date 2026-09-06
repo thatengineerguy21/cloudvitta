@@ -14,32 +14,35 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     email,
-    password_hash
+    password_hash,
+    email_verified
 ) VALUES (
-    $1, $2
+    $1, $2, $3
 )
-RETURNING id, email, password_hash, created_at
+RETURNING id, email, password_hash, created_at, email_verified
 `
 
 type CreateUserParams struct {
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
+	Email         string `json:"email"`
+	PasswordHash  string `json:"password_hash"`
+	EmailVerified bool   `json:"email_verified"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash, arg.EmailVerified)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.EmailVerified,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, created_at
+SELECT id, email, password_hash, created_at, email_verified
 FROM users
 WHERE email = $1
 `
@@ -52,12 +55,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.EmailVerified,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, created_at
+SELECT id, email, password_hash, created_at, email_verified
 FROM users
 WHERE id = $1
 `
@@ -71,6 +75,18 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.EmailVerified,
 	)
 	return i, err
+}
+
+const markEmailVerified = `-- name: MarkEmailVerified :exec
+UPDATE users
+SET email_verified = true
+WHERE id = $1
+`
+
+func (q *Queries) MarkEmailVerified(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markEmailVerified, id)
+	return err
 }

@@ -11,20 +11,72 @@ sequenceDiagram
     participant Router as REST Router / Handler
     participant Svc as AuthService
     participant Cache as In-Memory RotationCache
-    participant DB as Postgres (users, refresh_tokens)
+    participant Email as EmailSender (Resend)
+    participant DB as Postgres (users, refresh_tokens, verification_tokens)
 
-    %% Login / Signup Flow
+    %% Signup Flow
+    Note over Client,DB: User Signup Flow
+    Client->>Router: POST /api/v1/auth/signup {email, password}
+    Router->>Svc: Signup(ctx, email, password)
+    Svc->>Svc: HashPasswordBcrypt()
+    Svc->>DB: CreateUser(email, password_hash, email_verified=false)
+    DB-->>Svc: user record
+    Svc->>DB: InsertVerificationToken(user_id, token_hash, expires_at)
+    DB-->>Svc: verification_token record
+    Svc->>Email: Send(ctx, Message{To: email, Subject, HTML})
+    Email-->>Svc: nil
+    Svc-->>Router: User
+    Router-->>Client: 201 Created {id, email, created_at}
+
+    %% Email Verification Flow
+    Note over Client,DB: Email Verification Flow
+    Client->>Router: POST /api/v1/auth/verify-email {token}
+    Router->>Svc: VerifyEmail(ctx, token)
+    Svc->>DB: ConsumeVerificationToken(token_hash)
+    alt Token Missing or Expired or Consumed
+        DB-->>Svc: ErrNoRows or token state check
+        Svc-->>Router: ErrVerificationNotFound / Expired / Consumed
+        Router-->>Client: 404 / 410 / 409 Problem Details
+    else Token Valid
+        DB-->>Svc: verification_token record
+        Svc->>DB: MarkEmailVerified(user_id)
+        DB-->>Svc: nil
+        Svc-->>Router: nil
+        Router-->>Client: 200 OK {"message": "email verified successfully"}
+    end
+
+    %% Resend Verification Flow
+    Note over Client,Email: Resend Verification Flow
+    Client->>Router: POST /api/v1/auth/resend-verification {email}
+    Router->>Svc: ResendVerification(ctx, email)
+    Svc->>DB: GetUserByEmail(email)
+    alt User Exists and email_verified == false
+        Svc->>DB: CountActiveVerificationTokens(user_id)
+        alt Active Tokens < 3
+            Svc->>DB: InsertVerificationToken(user_id, token_hash, expires_at)
+            Svc->>Email: Send(ctx, Message{To: email, Subject, HTML})
+        end
+    end
+    Svc-->>Router: nil
+    Router-->>Client: 202 Accepted {"message": "if an account exists..."}
+
+    %% Login Flow
     Note over Client,DB: User Login Flow
     Client->>Router: POST /api/v1/auth/login {email, password}
     Router->>Svc: Login(ctx, email, password)
     Svc->>DB: GetUserByEmail(email)
     DB-->>Svc: user record
     Svc->>Svc: CheckPasswordTimingSafe()
-    Svc->>DB: InsertRefreshToken(user_id, family_id, token_hash, expires_at)
-    DB-->>Svc: refresh_token record
-    Svc->>Svc: GenerateAccessToken(user_id, standard)
-    Svc-->>Router: TokenPair (access_token, refresh_token)
-    Router-->>Client: 200 OK {access_token, refresh_token, token_type, expires_in}
+    alt Email Not Verified
+        Svc-->>Router: ErrEmailNotVerified
+        Router-->>Client: 403 Forbidden (RFC 7807 problem details)
+    else Email Verified
+        Svc->>DB: InsertRefreshToken(user_id, family_id, token_hash, expires_at)
+        DB-->>Svc: refresh_token record
+        Svc->>Svc: GenerateAccessToken(user_id, standard)
+        Svc-->>Router: TokenPair (access_token, refresh_token)
+        Router-->>Client: 200 OK {access_token, refresh_token, token_type, expires_in}
+    end
 
     %% Refresh Rotation Flow
     Note over Client,DB: Refresh Token Rotation Flow
@@ -79,3 +131,6 @@ sequenceDiagram
 
 3. **Concurrency Safety:**
    Rotation uses `SELECT ... FOR UPDATE` row-level database locking inside an isolated transaction. Concurrent requests with identical tokens wait on the lock and then evaluate against the replay cache safely.
+
+4. **Email Verification Gate and Enumeration Suppression:**
+   Accounts created through `POST /api/v1/auth/signup` persist with `email_verified = false`. Login attempts for unverified accounts receive `403 Forbidden` with problem detail type `https://cloudvitta.dev/errors/email-not-verified`. The resend endpoint `POST /api/v1/auth/resend-verification` enforces a maximum of 3 active verification tokens and uniformly returns `202 Accepted` to prevent user email enumeration.

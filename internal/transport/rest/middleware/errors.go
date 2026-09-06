@@ -58,6 +58,16 @@ func MapServiceError(err error) (status int, errorType string, title string) {
 		return http.StatusUnauthorized, "https://cloudvitta.dev/errors/unauthorized", "Unauthorized"
 	case errors.Is(err, service.ErrUserAlreadyExists):
 		return http.StatusConflict, "https://cloudvitta.dev/errors/conflict", "Conflict"
+	case errors.Is(err, service.ErrEmailNotVerified):
+		return http.StatusForbidden, "https://cloudvitta.dev/errors/email-not-verified", "Email Not Verified"
+	case errors.Is(err, service.ErrVerificationExpired):
+		return http.StatusGone, "https://cloudvitta.dev/errors/verification-expired", "Verification Link Expired"
+	case errors.Is(err, service.ErrVerificationConsumed):
+		return http.StatusConflict, "https://cloudvitta.dev/errors/verification-consumed", "Verification Link Already Consumed"
+	case errors.Is(err, service.ErrVerificationNotFound):
+		return http.StatusNotFound, "https://cloudvitta.dev/errors/verification-not-found", "Verification Token Not Found"
+	case errors.Is(err, service.ErrTooManyVerifications):
+		return http.StatusTooManyRequests, "https://cloudvitta.dev/errors/too-many-verifications", "Too Many Verification Requests"
 	case errors.Is(err, service.ErrProviderUnavailable):
 		return http.StatusBadGateway, "https://cloudvitta.dev/errors/provider-unavailable", "Provider Unavailable"
 	case errors.Is(err, service.ErrNoMatchFound):

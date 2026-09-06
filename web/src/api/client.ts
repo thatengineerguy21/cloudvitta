@@ -14,6 +14,10 @@ import type {
   RefreshResponse,
   LogoutRequest,
   LogoutResponse,
+  VerifyEmailRequest,
+  VerifyEmailResponse,
+  ResendVerificationRequest,
+  ResendVerificationResponse,
   ProviderStatusResponse,
   CatalogSummaryResponse,
   CatalogInstancesResponse,
@@ -283,7 +287,31 @@ export const authApi = {
       body: JSON.stringify(data),
       skipAuth: true,
     }),
+
+  verifyEmail: (data: VerifyEmailRequest, options?: RequestOptions) =>
+    apiFetch<VerifyEmailResponse>('/api/v1/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      skipAuth: true,
+      ...options,
+    }),
+
+  resendVerification: (data: ResendVerificationRequest, options?: RequestOptions) =>
+    apiFetch<ResendVerificationResponse>('/api/v1/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      skipAuth: true,
+      ...options,
+    }),
 };
+
+export async function verifyEmail(token: string, options?: RequestOptions): Promise<VerifyEmailResponse> {
+  return authApi.verifyEmail({ token }, options);
+}
+
+export async function resendVerification(email: string, options?: RequestOptions): Promise<ResendVerificationResponse> {
+  return authApi.resendVerification({ email }, options);
+}
 
 // Typed Provider Status API
 export const providerApi = {

@@ -1,8 +1,10 @@
 // web/src/components/auth/AuthModal.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../auth/AuthContext';
+import { useNavigate } from '../../router';
+import { resendVerification } from '../../api/client';
 import { loginSchema, signupSchema, formatZodErrors } from '../../lib/validation/auth';
-import { getErrorMessage } from '../../api/errors';
+import { getErrorMessage, ApiError } from '../../api/errors';
 import { X, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
 export interface AuthModalProps {
@@ -17,19 +19,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
 }) => {
   const { login, signup, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isUnverified, setIsUnverified] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   // Sync modal mode when initialMode changes
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
 
-  // Reset form state on open/close
+  // Reset form state on open/close or mode change
   useEffect(() => {
     if (isOpen) {
       setEmail('');
@@ -37,6 +43,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setConfirmPassword('');
       setFieldErrors({});
       setApiError(null);
+      setIsUnverified(false);
+      setResendMessage(null);
     }
   }, [isOpen, mode]);
 
@@ -59,10 +67,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleResendFromModal = async () => {
+    if (resendLoading || !email.trim()) return;
+    setResendLoading(true);
+    setResendMessage(null);
+    try {
+      await resendVerification(email.trim());
+      setResendMessage('Verification email sent! Please check your inbox.');
+    } catch (err) {
+      setApiError(getErrorMessage(err));
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFieldErrors({});
     setApiError(null);
+    setIsUnverified(false);
+    setResendMessage(null);
 
     const isLogin = mode === 'login';
     const formConfig = isLogin
@@ -84,10 +108,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     try {
-      await formConfig.action();
-      onClose();
-    } catch (err) {
-      setApiError(getErrorMessage(err));
+      if (isLogin) {
+        await formConfig.action();
+        onClose();
+      } else {
+        await formConfig.action();
+        onClose();
+        navigate(`/check-email?email=${encodeURIComponent(email)}`);
+      }
+    } catch (err: unknown) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 403 || err.type?.includes('email-not-verified'))
+      ) {
+        setIsUnverified(true);
+        setApiError('Your email address has not been verified yet.');
+      } else {
+        setApiError(getErrorMessage(err));
+      }
     }
   };
 
@@ -128,7 +166,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {apiError && (
           <div className="mb-4 p-3 bg-surface-raised border-l-2 border-status-anomaly rounded-xl flex items-start space-x-2.5">
             <AlertCircle className="w-4 h-4 text-status-anomaly shrink-0 mt-0.5" />
-            <p className="text-xs font-semibold text-status-anomaly">{apiError}</p>
+            <div className="flex-1 text-left">
+              <p className="text-xs font-semibold text-status-anomaly">{apiError}</p>
+              {isUnverified && (
+                <div className="mt-2 pt-2 border-t border-border-default flex flex-col gap-1">
+                  <p className="text-xs text-text-secondary">
+                    Need a new link?{' '}
+                    <button
+                      type="button"
+                      onClick={handleResendFromModal}
+                      disabled={resendLoading}
+                      className="text-brand hover:underline font-semibold focus-visible:outline-none"
+                    >
+                      {resendLoading ? 'Sending...' : 'Resend verification email'}
+                    </button>
+                  </p>
+                  {resendMessage && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                      {resendMessage}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

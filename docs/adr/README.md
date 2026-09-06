@@ -50,3 +50,4 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0040-unified-monolith-and-embedded-static-asset-serving.md](0040-unified-monolith-and-embedded-static-asset-serving.md): Unified Monolith and Embedded Static Asset Serving
 - [0041-dedicated-compute-instance-catalog-table.md](0041-dedicated-compute-instance-catalog-table.md): Dedicated Compute Instance Catalog Table and Hardware Specification Normalization
 - [0042-soft-warm-modern-and-obsidian-terracotta-bento-redesign.md](0042-soft-warm-modern-and-obsidian-terracotta-bento-redesign.md): Soft Warm Modern and Obsidian Terracotta Bento Redesign
+- [0043-email-verification-resend-and-login-gate.md](0043-email-verification-resend-and-login-gate.md): Email Verification with Resend and Strict Login Gate

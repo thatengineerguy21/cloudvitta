@@ -31,6 +31,17 @@ erDiagram
         UUID id PK
         TEXT email
         TEXT password_hash
+        BOOLEAN email_verified
+        TIMESTAMPTZ created_at
+    }
+
+    verification_tokens {
+        UUID id PK
+        UUID user_id FK
+        TEXT token_hash
+        TEXT purpose
+        TIMESTAMPTZ expires_at
+        TIMESTAMPTZ consumed_at
         TIMESTAMPTZ created_at
     }
 
@@ -76,6 +87,7 @@ erDiagram
     }
 
     users ||--o{ refresh_tokens : "owns"
+    users ||--o{ verification_tokens : "owns"
     refresh_tokens ||--o| refresh_tokens : "replaced_by chain"
 ```
 
@@ -235,3 +247,16 @@ The `compute_instance_catalog` table stores slowly changing virtual machine hard
 - **`first_seen_at`**: Timestamp when the system first observed this instance type.
 - **`last_seen_at`**: Timestamp of the latest price observation ingestion.
 - **`attributes`**: Optional JSONB payload with extra hardware dimensions.
+
+---
+
+## 5. Verification Tokens (`verification_tokens` - ADR 0043)
+
+The `verification_tokens` table stores single-use cryptographic tokens for account email verification:
+- **`id`**: Unique token identifier (UUID primary key).
+- **`user_id`**: Foreign key reference to `users.id` with cascade deletion.
+- **`token_hash`**: Hex-encoded SHA-256 hash of the 32-byte cryptographically secure random raw token.
+- **`purpose`**: Token purpose identifier (for example, `email_verification`).
+- **`expires_at`**: Expiration timestamp (30 minutes after creation).
+- **`consumed_at`**: Timestamp when the token was successfully verified (NULL until consumed).
+- **`created_at`**: Token creation timestamp.

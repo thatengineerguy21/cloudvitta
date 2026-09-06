@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thatengineerguy21/CloudVitta/internal/auth"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/email"
 	"github.com/thatengineerguy21/CloudVitta/internal/service"
 	"github.com/thatengineerguy21/CloudVitta/internal/store"
 )
@@ -32,6 +33,12 @@ type mockQuerier struct {
 	revokeRefreshTokenByHashFunc          func(ctx context.Context, arg store.RevokeRefreshTokenByHashParams) error
 	revokeRefreshTokenFamilyFunc          func(ctx context.Context, arg store.RevokeRefreshTokenFamilyParams) error
 	listRefreshTokensByFamilyIDFunc       func(ctx context.Context, familyID pgtype.UUID) ([]store.RefreshToken, error)
+	insertVerificationTokenFunc           func(ctx context.Context, arg store.InsertVerificationTokenParams) (store.VerificationToken, error)
+	getVerificationTokenByHashFunc        func(ctx context.Context, tokenHash string) (store.VerificationToken, error)
+	consumeVerificationTokenFunc          func(ctx context.Context, arg store.ConsumeVerificationTokenParams) error
+	countActiveTokensByUserFunc           func(ctx context.Context, arg store.CountActiveTokensByUserParams) (int64, error)
+	markEmailVerifiedFunc                 func(ctx context.Context, id pgtype.UUID) error
+	revokeUnconsumedTokensByUserFunc      func(ctx context.Context, arg store.RevokeUnconsumedTokensByUserParams) error
 }
 
 func (m *mockQuerier) CreateUser(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
@@ -110,6 +117,54 @@ func (m *mockQuerier) ListRefreshTokensByFamilyID(ctx context.Context, familyID 
 	return nil, nil
 }
 
+func (m *mockQuerier) InsertVerificationToken(ctx context.Context, arg store.InsertVerificationTokenParams) (store.VerificationToken, error) {
+	if m.insertVerificationTokenFunc != nil {
+		return m.insertVerificationTokenFunc(ctx, arg)
+	}
+	return store.VerificationToken{
+		ID:        store.UUIDToPg(uuid.New()),
+		UserID:    arg.UserID,
+		TokenHash: arg.TokenHash,
+		Purpose:   arg.Purpose,
+		ExpiresAt: arg.ExpiresAt,
+	}, nil
+}
+
+func (m *mockQuerier) GetVerificationTokenByHash(ctx context.Context, tokenHash string) (store.VerificationToken, error) {
+	if m.getVerificationTokenByHashFunc != nil {
+		return m.getVerificationTokenByHashFunc(ctx, tokenHash)
+	}
+	return store.VerificationToken{}, pgx.ErrNoRows
+}
+
+func (m *mockQuerier) ConsumeVerificationToken(ctx context.Context, arg store.ConsumeVerificationTokenParams) error {
+	if m.consumeVerificationTokenFunc != nil {
+		return m.consumeVerificationTokenFunc(ctx, arg)
+	}
+	return nil
+}
+
+func (m *mockQuerier) CountActiveTokensByUser(ctx context.Context, arg store.CountActiveTokensByUserParams) (int64, error) {
+	if m.countActiveTokensByUserFunc != nil {
+		return m.countActiveTokensByUserFunc(ctx, arg)
+	}
+	return 0, nil
+}
+
+func (m *mockQuerier) MarkEmailVerified(ctx context.Context, id pgtype.UUID) error {
+	if m.markEmailVerifiedFunc != nil {
+		return m.markEmailVerifiedFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockQuerier) RevokeUnconsumedTokensByUser(ctx context.Context, arg store.RevokeUnconsumedTokensByUserParams) error {
+	if m.revokeUnconsumedTokensByUserFunc != nil {
+		return m.revokeUnconsumedTokensByUserFunc(ctx, arg)
+	}
+	return nil
+}
+
 func (m *mockQuerier) GetPriceObservations(ctx context.Context, arg store.GetPriceObservationsParams) ([]store.PriceObservation, error) {
 	return nil, errors.New("GetPriceObservations not implemented")
 }
@@ -140,6 +195,19 @@ type mockTransactor struct {
 
 func (m *mockTransactor) ExecTx(ctx context.Context, fn func(q store.Querier) error) error {
 	return fn(m.q)
+}
+
+type mockEmailSender struct {
+	sendFunc func(ctx context.Context, msg email.Message) error
+	sent     []email.Message
+}
+
+func (m *mockEmailSender) Send(ctx context.Context, msg email.Message) error {
+	m.sent = append(m.sent, msg)
+	if m.sendFunc != nil {
+		return m.sendFunc(ctx, msg)
+	}
+	return nil
 }
 
 func TestSignup_Success(t *testing.T) {
@@ -268,10 +336,11 @@ func TestLogin_Success(t *testing.T) {
 				return store.User{}, pgx.ErrNoRows
 			}
 			return store.User{
-				ID:           store.UUIDToPg(userUUID),
-				Email:        email,
-				PasswordHash: passwordHash,
-				CreatedAt:    store.TimestamptzFromTime(time.Now().UTC()),
+				ID:            store.UUIDToPg(userUUID),
+				Email:         email,
+				PasswordHash:  passwordHash,
+				EmailVerified: true,
+				CreatedAt:     store.TimestamptzFromTime(time.Now().UTC()),
 			}, nil
 		},
 		insertRefreshTokenFunc: func(ctx context.Context, arg store.InsertRefreshTokenParams) (store.RefreshToken, error) {
@@ -704,5 +773,314 @@ func TestLogout_DatabaseError(t *testing.T) {
 	err := authSvc.Logout(ctx, rawToken)
 	if err == nil {
 		t.Fatalf("expected error on DB failure during logout, got nil")
+	}
+}
+
+func TestSignup_SendsVerificationEmail(t *testing.T) {
+	ctx := context.Background()
+	userUUID := uuid.New()
+	userEmail := "verifytest@example.com"
+	password := "securePassword123"
+
+	var capturedUser store.CreateUserParams
+	var capturedToken store.InsertVerificationTokenParams
+	emailSender := &mockEmailSender{}
+
+	mock := &mockQuerier{
+		createUserFunc: func(ctx context.Context, arg store.CreateUserParams) (store.User, error) {
+			capturedUser = arg
+			return store.User{
+				ID:            store.UUIDToPg(userUUID),
+				Email:         arg.Email,
+				PasswordHash:  arg.PasswordHash,
+				EmailVerified: arg.EmailVerified,
+				CreatedAt:     store.TimestamptzFromTime(time.Now().UTC()),
+			}, nil
+		},
+		insertVerificationTokenFunc: func(ctx context.Context, arg store.InsertVerificationTokenParams) (store.VerificationToken, error) {
+			capturedToken = arg
+			return store.VerificationToken{
+				ID:        store.UUIDToPg(uuid.New()),
+				UserID:    arg.UserID,
+				TokenHash: arg.TokenHash,
+				Purpose:   arg.Purpose,
+				ExpiresAt: arg.ExpiresAt,
+			}, nil
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret,
+		service.WithEmailSender(emailSender),
+		service.WithVerifyBaseURL("https://cloudvitta.dev/verify-email"),
+	)
+
+	user, err := authSvc.Signup(ctx, userEmail, password)
+	if err != nil {
+		t.Fatalf("Signup failed: %v", err)
+	}
+
+	if user.EmailVerified {
+		t.Errorf("expected user.EmailVerified = false, got true")
+	}
+	if capturedUser.EmailVerified {
+		t.Errorf("expected capturedUser.EmailVerified = false, got true")
+	}
+	if capturedToken.TokenHash == "" {
+		t.Errorf("expected verification token hash to be populated")
+	}
+	if capturedToken.Purpose != "email_verification" {
+		t.Errorf("expected purpose 'email_verification', got %q", capturedToken.Purpose)
+	}
+	if len(emailSender.sent) != 1 {
+		t.Fatalf("expected 1 email sent, got %d", len(emailSender.sent))
+	}
+	sentMsg := emailSender.sent[0]
+	if sentMsg.To != userEmail {
+		t.Errorf("sentMsg.To = %q, want %q", sentMsg.To, userEmail)
+	}
+	if !strings.Contains(sentMsg.HTML, "https://cloudvitta.dev/verify-email?token=") {
+		t.Errorf("expected verify URL in HTML, got %s", sentMsg.HTML)
+	}
+}
+
+func TestLogin_RejectsUnverifiedUser(t *testing.T) {
+	ctx := context.Background()
+	userEmail := "unverified@example.com"
+	password := "securePassword123"
+	hash, _ := auth.HashPassword(password)
+
+	mock := &mockQuerier{
+		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
+			return store.User{
+				ID:            store.UUIDToPg(uuid.New()),
+				Email:         userEmail,
+				PasswordHash:  hash,
+				EmailVerified: false,
+			}, nil
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret)
+	_, err := authSvc.Login(ctx, userEmail, password)
+	if !errors.Is(err, service.ErrEmailNotVerified) {
+		t.Fatalf("expected ErrEmailNotVerified, got: %v", err)
+	}
+}
+
+func TestLogin_AllowsVerifiedUser(t *testing.T) {
+	ctx := context.Background()
+	userEmail := "verified@example.com"
+	password := "securePassword123"
+	hash, _ := auth.HashPassword(password)
+
+	mock := &mockQuerier{
+		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
+			return store.User{
+				ID:            store.UUIDToPg(uuid.New()),
+				Email:         userEmail,
+				PasswordHash:  hash,
+				EmailVerified: true,
+			}, nil
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret)
+	tokens, err := authSvc.Login(ctx, userEmail, password)
+	if err != nil {
+		t.Fatalf("expected login to succeed, got: %v", err)
+	}
+	if tokens.AccessToken == "" || tokens.RefreshToken == "" {
+		t.Errorf("expected access and refresh tokens, got %+v", tokens)
+	}
+}
+
+func TestVerifyEmail_HappyPath(t *testing.T) {
+	ctx := context.Background()
+	rawToken := "raw-verification-token-123"
+	tokenHash := auth.HashRefreshToken(rawToken)
+	tokenID := uuid.New()
+	userID := uuid.New()
+	fixedNow := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+
+	var consumedID uuid.UUID
+	var verifiedUserID uuid.UUID
+
+	mock := &mockQuerier{
+		getVerificationTokenByHashFunc: func(ctx context.Context, hash string) (store.VerificationToken, error) {
+			if hash != tokenHash {
+				return store.VerificationToken{}, pgx.ErrNoRows
+			}
+			return store.VerificationToken{
+				ID:        store.UUIDToPg(tokenID),
+				UserID:    store.UUIDToPg(userID),
+				TokenHash: hash,
+				Purpose:   "email_verification",
+				ExpiresAt: store.TimestamptzFromTime(fixedNow.Add(30 * time.Minute)),
+			}, nil
+		},
+		consumeVerificationTokenFunc: func(ctx context.Context, arg store.ConsumeVerificationTokenParams) error {
+			consumedID = store.PgToUUID(arg.ID)
+			return nil
+		},
+		markEmailVerifiedFunc: func(ctx context.Context, id pgtype.UUID) error {
+			verifiedUserID = store.PgToUUID(id)
+			return nil
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret,
+		service.WithClock(func() time.Time { return fixedNow }),
+		service.WithTransactor(&mockTransactor{q: mock}),
+	)
+
+	err := authSvc.VerifyEmail(ctx, rawToken)
+	if err != nil {
+		t.Fatalf("expected VerifyEmail to succeed, got: %v", err)
+	}
+	if consumedID != tokenID {
+		t.Errorf("consumedID = %v, want %v", consumedID, tokenID)
+	}
+	if verifiedUserID != userID {
+		t.Errorf("verifiedUserID = %v, want %v", verifiedUserID, userID)
+	}
+}
+
+func TestVerifyEmail_ExpiredToken(t *testing.T) {
+	ctx := context.Background()
+	rawToken := "expired-token"
+	tokenHash := auth.HashRefreshToken(rawToken)
+	fixedNow := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+
+	mock := &mockQuerier{
+		getVerificationTokenByHashFunc: func(ctx context.Context, hash string) (store.VerificationToken, error) {
+			if hash != tokenHash {
+				return store.VerificationToken{}, pgx.ErrNoRows
+			}
+			return store.VerificationToken{
+				ID:        store.UUIDToPg(uuid.New()),
+				UserID:    store.UUIDToPg(uuid.New()),
+				TokenHash: hash,
+				Purpose:   "email_verification",
+				ExpiresAt: store.TimestamptzFromTime(fixedNow.Add(-5 * time.Minute)), // expired 5 mins ago
+			}, nil
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret,
+		service.WithClock(func() time.Time { return fixedNow }),
+		service.WithTransactor(&mockTransactor{q: mock}),
+	)
+
+	err := authSvc.VerifyEmail(ctx, rawToken)
+	if !errors.Is(err, service.ErrVerificationExpired) {
+		t.Fatalf("expected ErrVerificationExpired, got: %v", err)
+	}
+}
+
+func TestVerifyEmail_AlreadyConsumed(t *testing.T) {
+	ctx := context.Background()
+	rawToken := "consumed-token"
+	tokenHash := auth.HashRefreshToken(rawToken)
+	fixedNow := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+
+	mock := &mockQuerier{
+		getVerificationTokenByHashFunc: func(ctx context.Context, hash string) (store.VerificationToken, error) {
+			if hash != tokenHash {
+				return store.VerificationToken{}, pgx.ErrNoRows
+			}
+			return store.VerificationToken{
+				ID:         store.UUIDToPg(uuid.New()),
+				UserID:     store.UUIDToPg(uuid.New()),
+				TokenHash:  hash,
+				Purpose:    "email_verification",
+				ExpiresAt:  store.TimestamptzFromTime(fixedNow.Add(30 * time.Minute)),
+				ConsumedAt: store.TimestamptzFromTime(fixedNow.Add(-10 * time.Minute)),
+			}, nil
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret,
+		service.WithClock(func() time.Time { return fixedNow }),
+		service.WithTransactor(&mockTransactor{q: mock}),
+	)
+
+	err := authSvc.VerifyEmail(ctx, rawToken)
+	if !errors.Is(err, service.ErrVerificationConsumed) {
+		t.Fatalf("expected ErrVerificationConsumed, got: %v", err)
+	}
+}
+
+func TestVerifyEmail_UnknownToken(t *testing.T) {
+	ctx := context.Background()
+	mock := &mockQuerier{
+		getVerificationTokenByHashFunc: func(ctx context.Context, hash string) (store.VerificationToken, error) {
+			return store.VerificationToken{}, pgx.ErrNoRows
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret)
+	err := authSvc.VerifyEmail(ctx, "nonexistent-token")
+	if !errors.Is(err, service.ErrVerificationNotFound) {
+		t.Fatalf("expected ErrVerificationNotFound, got: %v", err)
+	}
+}
+
+func TestResendVerification_RateLimits(t *testing.T) {
+	ctx := context.Background()
+	userEmail := "ratelimit@example.com"
+	mock := &mockQuerier{
+		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
+			return store.User{
+				ID:            store.UUIDToPg(uuid.New()),
+				Email:         userEmail,
+				EmailVerified: false,
+			}, nil
+		},
+		countActiveTokensByUserFunc: func(ctx context.Context, arg store.CountActiveTokensByUserParams) (int64, error) {
+			return 3, nil // max reached
+		},
+	}
+
+	authSvc := service.NewAuthService(mock, testJWTSecret)
+	err := authSvc.ResendVerification(ctx, userEmail)
+	if !errors.Is(err, service.ErrTooManyVerifications) {
+		t.Fatalf("expected ErrTooManyVerifications, got: %v", err)
+	}
+}
+
+func TestResendVerification_NoEnumeration(t *testing.T) {
+	ctx := context.Background()
+	sender := &mockEmailSender{}
+
+	// Case 1: Nonexistent user
+	mockNonexistent := &mockQuerier{
+		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
+			return store.User{}, pgx.ErrNoRows
+		},
+	}
+	authSvc1 := service.NewAuthService(mockNonexistent, testJWTSecret, service.WithEmailSender(sender))
+	if err := authSvc1.ResendVerification(ctx, "missing@example.com"); err != nil {
+		t.Errorf("expected nil for nonexistent email, got %v", err)
+	}
+	if len(sender.sent) != 0 {
+		t.Errorf("expected no emails sent for nonexistent user")
+	}
+
+	// Case 2: Already verified user
+	mockVerified := &mockQuerier{
+		getUserByEmailFunc: func(ctx context.Context, email string) (store.User, error) {
+			return store.User{
+				ID:            store.UUIDToPg(uuid.New()),
+				Email:         email,
+				EmailVerified: true,
+			}, nil
+		},
+	}
+	authSvc2 := service.NewAuthService(mockVerified, testJWTSecret, service.WithEmailSender(sender))
+	if err := authSvc2.ResendVerification(ctx, "alreadyverified@example.com"); err != nil {
+		t.Errorf("expected nil for already verified user, got %v", err)
+	}
+	if len(sender.sent) != 0 {
+		t.Errorf("expected no emails sent for already verified user")
 	}
 }

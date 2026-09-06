@@ -193,6 +193,65 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/resend-verification": {
+            "post": {
+                "description": "Requests a fresh email verification link without revealing account existence",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Resend verification email",
+                "parameters": [
+                    {
+                        "description": "Recipient email",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.ResendVerificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Verification email request accepted",
+                        "schema": {
+                            "$ref": "#/definitions/rest.ResendVerificationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed request or missing email",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification requests",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/signup": {
             "post": {
                 "description": "Creates a new user account with email and password",
@@ -239,6 +298,83 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "User with this email already exists",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/verify-email": {
+            "post": {
+                "description": "Consumes a single-use verification token to activate a user account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/problem+json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Verify email address",
+                "parameters": [
+                    {
+                        "description": "Verification token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.VerifyEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Email verified successfully",
+                        "schema": {
+                            "$ref": "#/definitions/rest.VerifyEmailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed request or missing token",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Verification token not found",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "405": {
+                        "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Verification token already consumed",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "410": {
+                        "description": "Verification token expired",
+                        "schema": {
+                            "$ref": "#/definitions/middleware.RFC7807Error"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
                         "schema": {
                             "$ref": "#/definitions/middleware.RFC7807Error"
                         }
@@ -1967,6 +2103,22 @@ const docTemplate = `{
                 }
             }
         },
+        "rest.ResendVerificationRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.ResendVerificationResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "rest.ServerlessComparisonMeta": {
             "type": "object",
             "properties": {
@@ -2161,6 +2313,22 @@ const docTemplate = `{
                 },
                 "stale": {
                     "type": "boolean"
+                }
+            }
+        },
+        "rest.VerifyEmailRequest": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.VerifyEmailResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
                 }
             }
         }

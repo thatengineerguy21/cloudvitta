@@ -19,6 +19,12 @@ export type RefreshResponse = definitions['rest.RefreshResponse'];
 export type LogoutRequest = definitions['rest.LogoutRequest'];
 export type LogoutResponse = definitions['rest.LogoutResponse'];
 
+export type VerifyEmailRequest = definitions['rest.VerifyEmailRequest'];
+export type VerifyEmailResponse = definitions['rest.VerifyEmailResponse'];
+
+export type ResendVerificationRequest = definitions['rest.ResendVerificationRequest'];
+export type ResendVerificationResponse = definitions['rest.ResendVerificationResponse'];
+
 // Provider Status Endpoints
 export type ProviderStatusResponse = definitions['rest.ProviderStatusResponse'];
 export type CategoryStatusResponse = definitions['rest.CategoryStatusResponse'];

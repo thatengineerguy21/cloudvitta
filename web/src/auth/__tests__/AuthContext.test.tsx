@@ -88,19 +88,14 @@ describe('AuthContext & AuthProvider', () => {
     expect(window.sessionStorage.length).toBe(0);
   });
 
-  it('handles signup with automatic login', async () => {
+  it('handles signup without automatic login pending verification', async () => {
     const user = userEvent.setup();
     const signupSpy = vi.spyOn(authApi, 'signup').mockResolvedValue({
       id: 'usr_123',
       email: 'signup@example.com',
       created_at: '2026-08-27T00:00:00Z',
     });
-    const loginSpy = vi.spyOn(authApi, 'login').mockResolvedValue({
-      access_token: 'signup_access_jwt',
-      refresh_token: 'signup_refresh_token',
-      token_type: 'Bearer',
-      expires_in: 900,
-    });
+    const loginSpy = vi.spyOn(authApi, 'login');
 
     render(
       <AuthProvider>
@@ -111,11 +106,9 @@ describe('AuthContext & AuthProvider', () => {
     await user.click(screen.getByText('Signup'));
 
     expect(signupSpy).toHaveBeenCalledWith({ email: 'signup@example.com', password: 'password123' });
-    expect(loginSpy).toHaveBeenCalledWith({ email: 'signup@example.com', password: 'password123' });
+    expect(loginSpy).not.toHaveBeenCalled();
 
-    expect(screen.getByTestId('auth-status')).toHaveTextContent('authenticated');
-    expect(screen.getByTestId('user-email')).toHaveTextContent('signup@example.com');
-    expect(screen.getByTestId('access-token')).toHaveTextContent('signup_access_jwt');
+    expect(screen.getByTestId('auth-status')).toHaveTextContent('unauthenticated');
   });
 
   it('handles logout and clears in-memory state cleanly even if backend fails', async () => {

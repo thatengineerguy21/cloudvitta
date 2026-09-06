@@ -81,8 +81,15 @@ classDiagram
         Anonymous Cookie Verification
     }
 
+    class email {
+        Sender Interface
+        ResendSender
+        NoopSender
+    }
+
     cmd --> transport : Wires dependencies
     cmd --> adapter : Instantiates factories
+    cmd --> email : Instantiates email sender
     
     transport --> middleware : Routes through middlewares
     middleware --> auth : Verifies JWT and cookies
@@ -96,6 +103,7 @@ classDiagram
     service --> matching : Uses matching strategies
     service --> fx : Uses currency conversion
     service --> auth : Uses authentication primitives
+    service --> email : Sends transactional emails
     service --> domain : Returns domain types
     service --> adapter : Builds and runs jobs
     

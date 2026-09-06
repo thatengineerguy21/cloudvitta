@@ -11,6 +11,8 @@ import (
 )
 
 type Querier interface {
+	ConsumeVerificationToken(ctx context.Context, arg ConsumeVerificationTokenParams) error
+	CountActiveTokensByUser(ctx context.Context, arg CountActiveTokensByUserParams) (int64, error)
 	CountComputeCatalogItems(ctx context.Context, arg CountComputeCatalogItemsParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetComputeCatalogItem(ctx context.Context, arg GetComputeCatalogItemParams) (ComputeInstanceCatalog, error)
@@ -26,14 +28,18 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	// Note: Retained for Stage 1.9 user profile/tier lookup during token refresh rotation.
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
+	GetVerificationTokenByHash(ctx context.Context, tokenHash string) (VerificationToken, error)
 	InsertPriceObservation(ctx context.Context, arg InsertPriceObservationParams) (int64, error)
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
+	InsertVerificationToken(ctx context.Context, arg InsertVerificationTokenParams) (VerificationToken, error)
 	ListComputeCatalogItems(ctx context.Context, arg ListComputeCatalogItemsParams) ([]ComputeInstanceCatalog, error)
 	ListLatestFXRates(ctx context.Context, baseCurrency string) ([]FxRate, error)
 	ListRefreshTokensByFamilyID(ctx context.Context, familyID pgtype.UUID) ([]RefreshToken, error)
+	MarkEmailVerified(ctx context.Context, id pgtype.UUID) error
 	RevokeRefreshTokenByHash(ctx context.Context, arg RevokeRefreshTokenByHashParams) error
 	RevokeRefreshTokenFamily(ctx context.Context, arg RevokeRefreshTokenFamilyParams) error
 	RevokeRefreshTokenWithReplacement(ctx context.Context, arg RevokeRefreshTokenWithReplacementParams) error
+	RevokeUnconsumedTokensByUser(ctx context.Context, arg RevokeUnconsumedTokensByUserParams) error
 	UpdatePriceObservationLastSeenAt(ctx context.Context, arg UpdatePriceObservationLastSeenAtParams) error
 	UpsertComputeCatalogItem(ctx context.Context, arg UpsertComputeCatalogItemParams) (int64, error)
 	UpsertFXRate(ctx context.Context, arg UpsertFXRateParams) (FxRate, error)

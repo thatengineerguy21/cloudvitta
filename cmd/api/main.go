@@ -16,6 +16,7 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/cache"
 	"github.com/thatengineerguy21/CloudVitta/internal/config"
 	"github.com/thatengineerguy21/CloudVitta/internal/dlq"
+	"github.com/thatengineerguy21/CloudVitta/internal/email"
 	"github.com/thatengineerguy21/CloudVitta/internal/fx"
 	"github.com/thatengineerguy21/CloudVitta/internal/fx/frankfurter"
 	"github.com/thatengineerguy21/CloudVitta/internal/middleware/authmw"
@@ -128,11 +129,20 @@ func main() {
 		service.WithFreshnessService(freshnessSvc),
 		service.WithFXService(fxSvc),
 	)
+	var emailSender email.Sender
+	if cfg.Email.ResendAPIKey != "" {
+		emailSender = email.NewResendSender(cfg.Email.ResendAPIKey, cfg.Email.From)
+	} else {
+		emailSender = &email.NoopSender{}
+	}
+
 	authSvc := service.NewAuthService(
 		queries,
 		[]byte(cfg.Auth.JWTSecret),
 		service.WithTransactor(transactor),
 		service.WithAuthTracer(otelProviders.Tracer),
+		service.WithEmailSender(emailSender),
+		service.WithVerifyBaseURL(cfg.Email.VerifyEmailBaseURL),
 	)
 
 	catalogSvc := service.NewCatalogService(queries, redisClient)
