@@ -66,44 +66,63 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Provider Sync Telemetry Card */}
+          {/* Developer Resources */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary mb-3">
-              Provider Sync
+              Developer Resources
             </h4>
-            <div className="bg-surface-raised rounded-xl border border-border-default/80 p-3.5 text-xs space-y-2">
-              <div className="flex justify-between items-center text-text-secondary">
-                <span>Sync Frequency</span>
-                <span className="font-semibold text-status-matchExact">Every 15m</span>
-              </div>
-              <div className="flex justify-between items-center text-text-secondary">
-                <span>Global Regions</span>
-                <span className="font-semibold text-text-primary">142 Tracked</span>
-              </div>
-              <div className="flex justify-between items-center text-text-secondary">
-                <span>Accuracy SLA</span>
-                <span className="font-semibold text-text-primary">99.98%</span>
-              </div>
-            </div>
+            <ul className="space-y-2 text-xs text-text-secondary">
+              <li>
+                <a
+                  href="/docs/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 hover:text-text-primary transition-colors"
+                >
+                  <span>REST API Documentation</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/docs/swagger.json"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 hover:text-text-primary transition-colors"
+                >
+                  <span>OpenAPI Specification</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </li>
+              <li>
+                <Link to="/status" className="inline-flex items-center gap-1.5 hover:text-text-primary transition-colors">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                  <span>Provider Operational Status</span>
+                </Link>
+              </li>
+              <li>
+                <a
+                  href="https://github.com/thatengineerguy21/cloudvitta"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 hover:text-text-primary transition-colors"
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  <span>GitHub Repository</span>
+                </a>
+              </li>
+            </ul>
           </div>
         </div>
 
         {/* Bottom Bar */}
         <div className="mt-8 pt-6 border-t border-border-default/60 flex flex-col sm:flex-row items-center justify-between text-xs text-text-secondary gap-3">
           <p>&copy; {new Date().getFullYear()} CloudVitta Technologies Inc. Real-time rates subject to region-specific variances.</p>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <Link to="/status" className="hover:text-text-primary transition-colors">
-              Status Page
+              System Status
             </Link>
-            <a
-              href="/docs/"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 hover:text-text-primary transition-colors"
-            >
-              <span>API Access</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            <span className="text-border-default">•</span>
             <a
               href="https://github.com/thatengineerguy21/cloudvitta"
               target="_blank"

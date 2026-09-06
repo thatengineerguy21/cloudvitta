@@ -50,10 +50,7 @@ export const Header: React.FC = () => {
                     <span className="font-brand text-2xl font-bold tracking-wider text-text-primary">
                       CloudVitta
                     </span>
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40">
-                      PRO
-                    </span>
-                    <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 border border-border-accent text-border-accent font-bold rounded">
+                    <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 border border-border-accent text-border-accent font-bold rounded-full">
                       Pricing Tool
                     </span>
                   </div>
