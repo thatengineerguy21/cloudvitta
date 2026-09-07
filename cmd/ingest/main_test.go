@@ -89,3 +89,45 @@ func TestFactory_ConditionalRegistrations(t *testing.T) {
 		}
 	}
 }
+
+func TestFactory_MultiRegionClientConfiguration(t *testing.T) {
+	memStorage := storage.NewMemoryRawStorage()
+	cfg := &config.Config{
+		Primary: config.PrimaryConfig{
+			Environment: "test",
+		},
+	}
+
+	factory := buildProviderFactory(cfg, memStorage, context.Background())
+	jobs := factory.BuildJobs()
+
+	providerCounts := make(map[string]int)
+	for _, j := range jobs {
+		if j.Provider != "aws" && j.Provider != "azure" {
+			continue
+		}
+		providerCounts[j.Provider]++
+
+		checker, ok := j.Adapter.(interface{ HasCustomURL() bool })
+		if !ok {
+			t.Fatalf("%s adapter for category %s does not implement HasCustomURL()", j.Provider, j.Category)
+		}
+
+		if j.Category == "network" {
+			if !checker.HasCustomURL() {
+				t.Errorf("%s network client should have custom URL set to global offer/meter", j.Provider)
+			}
+		} else {
+			if checker.HasCustomURL() {
+				t.Errorf("%s %s client should not have custom URL (must support multi-region)", j.Provider, j.Category)
+			}
+		}
+	}
+
+	if providerCounts["aws"] != 7 {
+		t.Errorf("expected 7 AWS jobs, got %d", providerCounts["aws"])
+	}
+	if providerCounts["azure"] != 7 {
+		t.Errorf("expected 7 Azure jobs, got %d", providerCounts["azure"])
+	}
+}

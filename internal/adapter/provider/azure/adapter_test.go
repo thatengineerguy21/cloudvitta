@@ -423,14 +423,54 @@ func TestAdapter_Fetch_Network_HappyPath(t *testing.T) {
 }
 
 func TestBuildRegionalRetailPricesURL(t *testing.T) {
-	u := azure.BuildRegionalRetailPricesURL("compute", "germanywestcentral")
-	expected := "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Virtual%20Machines'%20and%20armRegionName%20eq%20'germanywestcentral'%20and%20priceType%20eq%20'Consumption'"
-	if u != expected {
-		t.Errorf("BuildRegionalRetailPricesURL() = %q, want %q", u, expected)
+	tests := []struct {
+		category string
+		region   string
+		expected string
+	}{
+		{
+			category: "compute",
+			region:   "germanywestcentral",
+			expected: "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Virtual%20Machines'%20and%20armRegionName%20eq%20'germanywestcentral'%20and%20priceType%20eq%20'Consumption'",
+		},
+		{
+			category: "storage",
+			region:   "japaneast",
+			expected: "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Storage'%20and%20armRegionName%20eq%20'japaneast'%20and%20priceType%20eq%20'Consumption'",
+		},
+		{
+			category: "database_rdbms",
+			region:   "centralindia",
+			expected: "https://prices.azure.com/api/retail/prices?$filter=(serviceName%20eq%20'Azure%20Database%20for%20PostgreSQL'%20or%20serviceName%20eq%20'Azure%20Database%20for%20MySQL'%20or%20serviceName%20eq%20'SQL%20Database')%20and%20armRegionName%20eq%20'centralindia'%20and%20priceType%20eq%20'Consumption'",
+		},
+		{
+			category: "database_nosql",
+			region:   "australiaeast",
+			expected: "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Azure%20Cosmos%20DB'%20and%20armRegionName%20eq%20'australiaeast'%20and%20priceType%20eq%20'Consumption'",
+		},
+		{
+			category: "kubernetes",
+			region:   "uksouth",
+			expected: "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Azure%20Kubernetes%20Service'%20and%20armRegionName%20eq%20'uksouth'%20and%20priceType%20eq%20'Consumption'",
+		},
+		{
+			category: "serverless",
+			region:   "southeastasia",
+			expected: "https://prices.azure.com/api/retail/prices?$filter=(serviceName%20eq%20'Azure%20Functions'%20or%20serviceName%20eq%20'Functions')%20and%20armRegionName%20eq%20'southeastasia'%20and%20priceType%20eq%20'Consumption'",
+		},
+		{
+			category: "network",
+			region:   "centralindia",
+			expected: azure.DefaultNetworkRetailPricesURL,
+		},
 	}
 
-	uNet := azure.BuildRegionalRetailPricesURL("network", "germanywestcentral")
-	if uNet != azure.DefaultNetworkRetailPricesURL {
-		t.Errorf("BuildRegionalRetailPricesURL(network) = %q, want %q", uNet, azure.DefaultNetworkRetailPricesURL)
+	for _, tt := range tests {
+		t.Run(tt.category+"_"+tt.region, func(t *testing.T) {
+			u := azure.BuildRegionalRetailPricesURL(tt.category, tt.region)
+			if u != tt.expected {
+				t.Errorf("BuildRegionalRetailPricesURL(%q, %q) = %q, want %q", tt.category, tt.region, u, tt.expected)
+			}
+		})
 	}
 }

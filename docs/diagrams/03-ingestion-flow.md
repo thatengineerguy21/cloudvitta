@@ -182,10 +182,19 @@ CloudVitta supports two automated execution pathways and one manual trigger path
 ## Multi-Region Ingestion Architecture (8 Strategic Global Hubs)
 
 To supply accurate global cost calculations while preventing memory exhaustion on Cloud Run, the ingestion pipeline uses bounded parallelism:
-- **Global Concurrency Semaphore**: Capped at `MaxConcurrency = 3` worker goroutines via `errgroup.SetLimit(3)`.
-- **Sequential Regional Ingestion**: Within regional adapters (such as AWS and Azure), regional price lists for the 8 global hubs (`us-east-1`, `us-west-2`, `eu-central-1`, `eu-west-2`, `ap-southeast-1`, `ap-northeast-1`, `ap-south-1`, and `ap-southeast-2`) are streamed sequentially.
-- **Run Timeout**: The Cloud Run job timeout and context deadline are set to 35 minutes (`35m`), which allows sufficient time for regional iteration with network retry buffers.
-- **Cache Warming**: On successful completion of an ingestion job, `Orchestrator.warmCache` groups observations by region and writes cache keys (`v1:{provider}:{category}:{region}`) across all 8 hubs.
+- **Global Concurrency Semaphore**: Bounded at `MaxConcurrency = 3` worker goroutines via `errgroup.SetLimit(3)`.
+- **Sequential Regional Ingestion**: AWS and Azure regional adapters (`compute`, `storage`, `database_rdbms`, `database_nosql`, `kubernetes`, and `serverless`) iterate sequentially across all eight strategic global hubs (`TargetAWSRegions()` and `TargetAzureRegions()`):
+  - `us-east-virginia` (`us-east-1` / `eastus`)
+  - `us-west-oregon` (`us-west-2` / `westus2`)
+  - `europe-frankfurt` (`eu-central-1` / `germanywestcentral`)
+  - `uk-london` (`eu-west-2` / `uksouth`)
+  - `asia-singapore` (`ap-southeast-1` / `southeastasia`)
+  - `asia-tokyo` (`ap-northeast-1` / `japaneast`)
+  - `india-mumbai` (`ap-south-1` / `centralindia`)
+  - `australia-sydney` (`ap-southeast-2` / `australiaeast`)
+- **Global Network Offers**: The `network` category remains explicitly single-target because AWS Data Transfer uses a single global file (`AWSDataTransfer`) and Azure uses a single global meter (`Bandwidth`).
+- **Run Timeout**: The Cloud Run job timeout and context deadline are set to 35 minutes (`35m`), which allows sufficient duration for sequential multi-region iteration with network retry buffers.
+- **Cache Warming**: On successful completion of an ingestion job, `Orchestrator.warmCache` groups observations by region and writes cache keys (`v1:{provider}:{category}:{region}`) across all eight hubs.
 
 ---
 

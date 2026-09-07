@@ -78,6 +78,11 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 	return a
 }
 
+// HasCustomURL reports whether the underlying Azure client has a custom endpoint URL configured.
+func (a *Adapter) HasCustomURL() bool {
+	return a.client.HasCustomURL()
+}
+
 // Fetch retrieves the Azure price list, concurrently streams raw JSON to storage and normalizes it.
 // Returns a domain.FetchResult containing the observations and raw GCS path, and any error.
 func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.FetchResult, err error) {

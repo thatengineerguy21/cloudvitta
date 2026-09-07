@@ -525,10 +525,50 @@ func TestAdapter_Fetch_CategoryFiltering_ExcludesOtherCategories(t *testing.T) {
 }
 
 func TestBuildRegionalURL(t *testing.T) {
-	url := BuildRegionalURL("AmazonEC2", "ap-southeast-1")
-	expected := "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-1/index.json"
-	if url != expected {
-		t.Errorf("BuildRegionalURL() = %q, want %q", url, expected)
+	tests := []struct {
+		offerCode string
+		region    string
+		expected  string
+	}{
+		{
+			offerCode: "AmazonEC2",
+			region:    "us-west-2",
+			expected:  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-west-2/index.json",
+		},
+		{
+			offerCode: "AmazonS3",
+			region:    "eu-central-1",
+			expected:  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/eu-central-1/index.json",
+		},
+		{
+			offerCode: "AmazonRDS",
+			region:    "ap-south-1",
+			expected:  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-south-1/index.json",
+		},
+		{
+			offerCode: "AmazonDynamoDB",
+			region:    "ap-northeast-1",
+			expected:  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/ap-northeast-1/index.json",
+		},
+		{
+			offerCode: "AmazonEKS",
+			region:    "eu-west-2",
+			expected:  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEKS/current/eu-west-2/index.json",
+		},
+		{
+			offerCode: "AWSLambda",
+			region:    "ap-southeast-2",
+			expected:  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/ap-southeast-2/index.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.offerCode+"_"+tt.region, func(t *testing.T) {
+			url := BuildRegionalURL(tt.offerCode, tt.region)
+			if url != tt.expected {
+				t.Errorf("BuildRegionalURL(%q, %q) = %q, want %q", tt.offerCode, tt.region, url, tt.expected)
+			}
+		})
 	}
 }
 

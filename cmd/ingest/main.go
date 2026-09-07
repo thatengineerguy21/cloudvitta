@@ -214,7 +214,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, awsAdapter)
 
 	// Register AWS storage adapter with rate limiting and retry config
-	awsStorageClient := aws.NewClient(aws.WithURL(aws.DefaultS3PriceListURL))
+	awsStorageClient := aws.NewClient()
 	awsStorageAdapter := aws.NewAdapter(awsStorageClient, rawStorage, aws.WithCategory("storage"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
@@ -236,7 +236,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, awsNetworkAdapter)
 
 	// Register AWS database adapter with rate limiting and retry config
-	awsDBClient := aws.NewClient(aws.WithURL(aws.DefaultRDSPriceListURL))
+	awsDBClient := aws.NewClient()
 	awsDBAdapter := aws.NewAdapter(awsDBClient, rawStorage, aws.WithCategory("database_rdbms"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
@@ -247,7 +247,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, awsDBAdapter)
 
 	// Register AWS NoSQL database adapter with rate limiting and retry config
-	awsNoSQLDBClient := aws.NewClient(aws.WithURL(aws.DefaultDynamoDBPriceListURL))
+	awsNoSQLDBClient := aws.NewClient()
 	awsNoSQLDBAdapter := aws.NewAdapter(awsNoSQLDBClient, rawStorage, aws.WithCategory("database_nosql"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
@@ -258,7 +258,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, awsNoSQLDBAdapter)
 
 	// Register AWS Kubernetes adapter with rate limiting and retry config
-	awsKubernetesClient := aws.NewClient(aws.WithURL(aws.DefaultEKSPriceListURL))
+	awsKubernetesClient := aws.NewClient()
 	awsKubernetesAdapter := aws.NewAdapter(awsKubernetesClient, rawStorage, aws.WithCategory("kubernetes"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
@@ -269,7 +269,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, awsKubernetesAdapter)
 
 	// Register AWS Serverless adapter with rate limiting and retry config
-	awsLambdaClient := aws.NewClient(aws.WithURL(aws.DefaultLambdaPriceListURL))
+	awsLambdaClient := aws.NewClient()
 	awsLambdaAdapter := aws.NewAdapter(awsLambdaClient, rawStorage, aws.WithCategory("serverless"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "aws",
@@ -291,7 +291,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, azureAdapter)
 
 	// Register Azure storage adapter with rate limiting and retry config
-	azureStorageClient := azure.NewClient(azure.WithURL(azure.DefaultStorageRetailPricesURL))
+	azureStorageClient := azure.NewClient()
 	azureStorageAdapter := azure.NewAdapter(azureStorageClient, rawStorage, azure.WithCategory("storage"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
@@ -313,7 +313,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, azureNetworkAdapter)
 
 	// Register Azure database adapter with rate limiting and retry config
-	azureDBClient := azure.NewClient(azure.WithURL(azure.DefaultDatabaseRetailPricesURL))
+	azureDBClient := azure.NewClient()
 	azureDBAdapter := azure.NewAdapter(azureDBClient, rawStorage, azure.WithCategory("database_rdbms"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
@@ -324,7 +324,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, azureDBAdapter)
 
 	// Register Azure NoSQL database adapter with rate limiting and retry config
-	azureNoSQLDBClient := azure.NewClient(azure.WithURL(azure.DefaultCosmosDBRetailPricesURL))
+	azureNoSQLDBClient := azure.NewClient()
 	azureNoSQLDBAdapter := azure.NewAdapter(azureNoSQLDBClient, rawStorage, azure.WithCategory("database_nosql"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
@@ -335,7 +335,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, azureNoSQLDBAdapter)
 
 	// Register Azure Kubernetes adapter with rate limiting and retry config
-	azureKubernetesClient := azure.NewClient(azure.WithURL(azure.DefaultKubernetesRetailPricesURL))
+	azureKubernetesClient := azure.NewClient()
 	azureKubernetesAdapter := azure.NewAdapter(azureKubernetesClient, rawStorage, azure.WithCategory("kubernetes"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
@@ -346,7 +346,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	}, azureKubernetesAdapter)
 
 	// Register Azure Serverless adapter with rate limiting and retry config
-	azureServerlessClient := azure.NewClient(azure.WithURL(azure.DefaultFunctionsRetailPricesURL))
+	azureServerlessClient := azure.NewClient()
 	azureServerlessAdapter := azure.NewAdapter(azureServerlessClient, rawStorage, azure.WithCategory("serverless"))
 	factory.Register(provider.ProviderConfig{
 		Provider:       "azure",
