@@ -677,6 +677,7 @@ export interface definitions {
   };
   "domain.NetworkAttributes": {
     egress_gb?: number;
+    network_group?: string;
     transfer_type?: string;
   };
   "domain.ServerlessRateAttributes": {
@@ -690,13 +691,11 @@ export interface definitions {
     unit?: string;
   };
   "domain.StorageAttributes": {
-    /**
-     * @description IOPS holds provisioned IOPS where reported (e.g. block storage EBS gp3/io2).
-     * Currently unpopulated for S3/Blob/GCS object storage in stage 1.4.
-     */
     iops?: number;
     size_gb?: number;
     storage_class?: string;
+    storage_group?: string;
+    throughput_mbps?: number;
   };
   "middleware.RFC7807Error": {
     detail?: string;

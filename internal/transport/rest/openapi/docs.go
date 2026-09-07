@@ -1309,6 +1309,9 @@ const docTemplate = `{
                 "egress_gb": {
                     "type": "number"
                 },
+                "network_group": {
+                    "type": "string"
+                },
                 "transfer_type": {
                     "type": "string"
                 }
@@ -1339,7 +1342,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "iops": {
-                    "description": "IOPS holds provisioned IOPS where reported (e.g. block storage EBS gp3/io2).\nCurrently unpopulated for S3/Blob/GCS object storage in stage 1.4.",
                     "type": "integer"
                 },
                 "size_gb": {
@@ -1347,6 +1349,12 @@ const docTemplate = `{
                 },
                 "storage_class": {
                     "type": "string"
+                },
+                "storage_group": {
+                    "type": "string"
+                },
+                "throughput_mbps": {
+                    "type": "number"
                 }
             }
         },
