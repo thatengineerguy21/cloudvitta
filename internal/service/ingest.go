@@ -18,8 +18,8 @@ type Fetcher interface {
 	Fetch(ctx context.Context) (domain.FetchResult, error)
 }
 
-// IngestionService orchestrates fetching, normalizing, storage persistence,
-// database insertion, and Redis cache warming of provider pricing observations.
+// Deprecated: IngestionService is the legacy single-job AWS compute ingestion engine from Stage 0.
+// Production ingestion uses IngestionOrchestrator (internal/service/ingest_orchestrator.go).
 type IngestionService struct {
 	queries     *store.Queries
 	fetcher     Fetcher
@@ -27,6 +27,7 @@ type IngestionService struct {
 }
 
 // NewIngestionService constructs a new IngestionService.
+// Deprecated: Use IngestionOrchestrator instead.
 func NewIngestionService(queries *store.Queries, fetcher Fetcher, redisClient redis.Cmdable) *IngestionService {
 	return &IngestionService{
 		queries:     queries,
@@ -39,6 +40,7 @@ func NewIngestionService(queries *store.Queries, fetcher Fetcher, redisClient re
 // fetches AWS price list, streams raw payload to storage, normalizes pricing records,
 // upserts each observation into Postgres (inserting only on new/changed price, bumping last_seen_at on unchanged),
 // and immediately warms Redis cache keys. Returns the total number of inserted records.
+// Deprecated: Use IngestionOrchestrator.RunAll instead.
 func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, error) {
 	result, err := s.fetcher.Fetch(ctx)
 	if err != nil {
@@ -71,7 +73,7 @@ func (s *IngestionService) RunAWSComputeIngestion(ctx context.Context) (int, err
 		}
 
 		// Check if price and billing dimensions are identical
-		if hasPrior && !oldPrice.IsZero() && oldPrice.Equal(obs.PriceAmount) &&
+		if hasPrior && oldPrice.Equal(obs.PriceAmount) &&
 			prev.Unit == obs.Unit && prev.PricingModel == obs.PricingModel && prev.PriceCurrency == obs.PriceCurrency {
 			// Unchanged observation: bump last_seen_at timestamp on existing row
 			if updateErr := s.queries.UpdatePriceObservationLastSeenAt(ctx, store.UpdatePriceObservationLastSeenAtParams{

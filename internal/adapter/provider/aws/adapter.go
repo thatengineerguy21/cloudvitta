@@ -61,7 +61,7 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 	a := &Adapter{
 		client:            client,
 		storage:           st,
-		category:          "compute",
+		category:          "",
 		tracer:            otel.Tracer("cloudvitta.adapter.aws"),
 		meter:             meter,
 		fetchCounter:      fetchCounter,
@@ -180,8 +180,19 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 		a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
 	}
 
+	obsList := normResult.Observations
+	if a.category != "" {
+		filtered := make([]domain.PriceObservation, 0, len(obsList))
+		for _, obs := range obsList {
+			if obs.ServiceCategory == a.category {
+				filtered = append(filtered, obs)
+			}
+		}
+		obsList = filtered
+	}
+
 	return domain.FetchResult{
-		Observations:  normResult.Observations,
+		Observations:  obsList,
 		RawGCSPath:    gcsPath,
 		UnmappedCount: qSink.Count(),
 		IgnoredCount:  normResult.IgnoredCount,

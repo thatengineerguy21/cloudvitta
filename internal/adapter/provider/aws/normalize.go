@@ -255,24 +255,7 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string, fetchedAt time.T
 	}
 
 	if isStorageProduct(prod, prod.Attributes) {
-		category, err := catalogmap.MapAWSProduct(serviceCode)
-		if err != nil {
-			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-				if sink != nil {
-					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-						Provider:   "aws",
-						Category:   "storage",
-						Kind:       "product",
-						RawValue:   serviceCode,
-						SkuID:      sku,
-						ObservedAt: fetchedAt,
-					})
-				}
-				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
-				return nil, nil
-			}
-			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-		}
+		category := "storage"
 
 		location := prod.Attributes["location"]
 		if location == "" {
@@ -341,24 +324,7 @@ func parseSingleProduct(prod awsProduct, sku, offerCode string, fetchedAt time.T
 	}
 
 	if isNetworkProduct(prod, prod.Attributes) {
-		category, err := catalogmap.MapAWSProduct(serviceCode)
-		if err != nil {
-			if errors.Is(err, catalogmap.ErrUnmappedProduct) {
-				if sink != nil {
-					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-						Provider:   "aws",
-						Category:   "network",
-						Kind:       "product",
-						RawValue:   serviceCode,
-						SkuID:      sku,
-						ObservedAt: fetchedAt,
-					})
-				}
-				slog.Warn("aws normalize: skipping SKU due to unmapped product", "sku", sku, "product", serviceCode)
-				return nil, nil
-			}
-			return nil, fmt.Errorf("aws normalize sku %s: %w", sku, err)
-		}
+		category := "network"
 
 		location := prod.Attributes["fromLocation"]
 		if location == "" {

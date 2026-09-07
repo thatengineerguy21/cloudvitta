@@ -495,3 +495,31 @@ func TestAdapter_Fetch_Network_HappyPath(t *testing.T) {
 		t.Errorf("NetworkAttributes.EgressGB = %v, want 1", obs.NetworkAttributes.EgressGB)
 	}
 }
+
+func TestAdapter_Fetch_CategoryFiltering_ExcludesOtherCategories(t *testing.T) {
+	fixtureBytes, err := os.ReadFile(filepath.Join("testdata", "datatransfer_us_east_1_sample.json"))
+	if err != nil {
+		t.Fatalf("failed to read test fixture: %v", err)
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixtureBytes)
+	}))
+	defer ts.Close()
+
+	client := NewClient(WithURL(ts.URL), WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := NewAdapter(client, memStorage, WithCategory("compute"))
+
+	result, err := adapter.Fetch(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
+	}
+
+	// Should filter out all network observations because adapter is configured for "compute"
+	if len(result.Observations) != 0 {
+		t.Errorf("Fetch() returned %d observations, want 0 (network observations filtered from compute adapter)", len(result.Observations))
+	}
+}

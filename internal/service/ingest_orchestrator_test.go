@@ -979,3 +979,308 @@ func TestOrchestrator_UpsertWithHistory_PriceChangeInsertsNewRow(t *testing.T) {
 		t.Fatalf("expected 2 rows after price change, got %d", rowCount)
 	}
 }
+
+func TestOrchestrator_UpsertWithHistory_ZeroDollarPrice_DeduplicatesAndBumpsLastSeen(t *testing.T) {
+	dbURL := testDatabaseURL(t)
+	ctx := context.Background()
+
+	pool, err := store.NewPool(ctx, parseDatabaseConfig(t, dbURL))
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	queries := store.New(pool)
+
+	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-ZERO-DEDUP'")
+	defer func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id = 'SKU-TEST-ZERO-DEDUP'")
+	}()
+
+	t0 := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
+	obs0 := domain.PriceObservation{
+		Provider:        "aws",
+		ServiceCategory: "network",
+		SkuID:           "SKU-TEST-ZERO-DEDUP",
+		DisplayName:     "AWS Free Tier Ingress",
+		Region:          "us-east-1",
+		RegionGroup:     "us-east",
+		Unit:            "GB",
+		PriceAmount:     decimal.Zero,
+		PriceCurrency:   "USD",
+		PricingModel:    "OnDemand",
+		NetworkAttributes: domain.NetworkAttributes{
+			EgressGB:     1,
+			TransferType: "internet_egress",
+		},
+		FetchedAt: t0,
+	}
+
+	adapter := &mockFetcher{
+		result: domain.FetchResult{
+			Observations: []domain.PriceObservation{obs0},
+			RawGCSPath:   "raw/aws/network/zero-1.json",
+		},
+	}
+
+	factory := provider.NewFactory()
+	factory.Register(provider.ProviderConfig{
+		Provider: "aws",
+		Category: "network",
+		Retry:    provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
+	}, adapter)
+
+	orch := service.NewOrchestrator(queries, nil, nil, factory, service.OrchestratorConfig{
+		MaxConcurrency: 1,
+		LockTTL:        30 * time.Second,
+	})
+
+	// Run 1: First ingestion inserts new $0.00 row
+	res1 := orch.RunAll(ctx)
+	if len(res1) != 1 || res1[0].Err != nil {
+		t.Fatalf("Run 1 failed: %v", res1)
+	}
+	if res1[0].InsertedCount != 1 {
+		t.Errorf("Run 1 InsertedCount = %d, want 1", res1[0].InsertedCount)
+	}
+
+	// Verify 1 row in DB
+	var rowCount int
+	var fetchedAt, lastSeenAt time.Time
+	err = pool.QueryRow(ctx, "SELECT COUNT(*), MIN(fetched_at), MAX(last_seen_at) FROM price_observations WHERE sku_id = 'SKU-TEST-ZERO-DEDUP'").Scan(&rowCount, &fetchedAt, &lastSeenAt)
+	if err != nil {
+		t.Fatalf("query row count after run 1: %v", err)
+	}
+	if rowCount != 1 {
+		t.Fatalf("expected 1 row after run 1, got %d", rowCount)
+	}
+
+	// Run 2: Second ingestion with IDENTICAL $0.00 price at t1
+	t1 := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
+	obs1 := obs0
+	obs1.FetchedAt = t1
+
+	adapter.result = domain.FetchResult{
+		Observations: []domain.PriceObservation{obs1},
+		RawGCSPath:   "raw/aws/network/zero-2.json",
+	}
+
+	res2 := orch.RunAll(ctx)
+	if len(res2) != 1 || res2[0].Err != nil {
+		t.Fatalf("Run 2 failed: %v", res2)
+	}
+	if res2[0].UpdatedCount != 1 {
+		t.Errorf("Run 2 UpdatedCount = %d, want 1", res2[0].UpdatedCount)
+	}
+	if res2[0].InsertedCount != 0 {
+		t.Errorf("Run 2 InsertedCount = %d, want 0", res2[0].InsertedCount)
+	}
+
+	// Verify still exactly 1 row in DB with bumped last_seen_at
+	err = pool.QueryRow(ctx, "SELECT COUNT(*), MIN(fetched_at), MAX(last_seen_at) FROM price_observations WHERE sku_id = 'SKU-TEST-ZERO-DEDUP'").Scan(&rowCount, &fetchedAt, &lastSeenAt)
+	if err != nil {
+		t.Fatalf("query row count after run 2: %v", err)
+	}
+	if rowCount != 1 {
+		t.Fatalf("expected exactly 1 row after run 2, got %d", rowCount)
+	}
+	if !lastSeenAt.Equal(t1) {
+		t.Errorf("last_seen_at after run 2 = %v, want bumped %v", lastSeenAt, t1)
+	}
+}
+
+func TestOrchestrator_AnomalyDetection_DirectionalFlags(t *testing.T) {
+	dbURL := testDatabaseURL(t)
+	ctx := context.Background()
+
+	pool, err := store.NewPool(ctx, parseDatabaseConfig(t, dbURL))
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	queries := store.New(pool)
+
+	skuFreeToBillable := "SKU-TEST-FREE-TO-BILLABLE"
+	skuBillableToFree := "SKU-TEST-BILLABLE-TO-FREE"
+
+	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id IN ($1, $2)", skuFreeToBillable, skuBillableToFree)
+	defer func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id IN ($1, $2)", skuFreeToBillable, skuBillableToFree)
+	}()
+
+	t0 := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
+	obsFree := domain.PriceObservation{
+		Provider:        "aws",
+		ServiceCategory: "network",
+		SkuID:           skuFreeToBillable,
+		DisplayName:     "AWS Free Tier",
+		Region:          "us-east-1",
+		RegionGroup:     "us-east",
+		Unit:            "GB",
+		PriceAmount:     decimal.Zero,
+		PriceCurrency:   "USD",
+		PricingModel:    "OnDemand",
+		FetchedAt:       t0,
+	}
+
+	priceBillable := decimal.RequireFromString("0.05")
+	obsBillable := domain.PriceObservation{
+		Provider:        "aws",
+		ServiceCategory: "network",
+		SkuID:           skuBillableToFree,
+		DisplayName:     "AWS Paid Tier",
+		Region:          "us-east-1",
+		RegionGroup:     "us-east",
+		Unit:            "GB",
+		PriceAmount:     priceBillable,
+		PriceCurrency:   "USD",
+		PricingModel:    "OnDemand",
+		FetchedAt:       t0,
+	}
+
+	adapter := &mockFetcher{
+		result: domain.FetchResult{
+			Observations: []domain.PriceObservation{obsFree, obsBillable},
+			RawGCSPath:   "raw/aws/network/base.json",
+		},
+	}
+
+	factory := provider.NewFactory()
+	factory.Register(provider.ProviderConfig{
+		Provider: "aws",
+		Category: "network",
+		Retry:    provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
+	}, adapter)
+
+	orch := service.NewOrchestrator(queries, nil, nil, factory, service.OrchestratorConfig{
+		MaxConcurrency: 1,
+		LockTTL:        30 * time.Second,
+	})
+
+	// Run 1: Initial baseline
+	res1 := orch.RunAll(ctx)
+	if len(res1) != 1 || res1[0].Err != nil {
+		t.Fatalf("Run 1 failed: %v", res1)
+	}
+
+	// Run 2: Transition Free -> Billable ($0.00 -> $0.05) and Billable -> Free ($0.05 -> $0.00)
+	t1 := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
+	obsFreeChanged := obsFree
+	obsFreeChanged.PriceAmount = priceBillable
+	obsFreeChanged.FetchedAt = t1
+
+	obsBillableChanged := obsBillable
+	obsBillableChanged.PriceAmount = decimal.Zero
+	obsBillableChanged.FetchedAt = t1
+
+	adapter.result = domain.FetchResult{
+		Observations: []domain.PriceObservation{obsFreeChanged, obsBillableChanged},
+		RawGCSPath:   "raw/aws/network/transitions.json",
+	}
+
+	res2 := orch.RunAll(ctx)
+	if len(res2) != 1 || res2[0].Err != nil {
+		t.Fatalf("Run 2 failed: %v", res2)
+	}
+	if res2[0].AnomalyCount != 2 {
+		t.Errorf("Run 2 AnomalyCount = %d, want 2", res2[0].AnomalyCount)
+	}
+
+	// Check free_to_billable status in DB
+	var statusFreeToBillable, statusBillableToFree string
+	err = pool.QueryRow(ctx, "SELECT anomaly_status FROM price_observations WHERE sku_id = $1 AND fetched_at = $2", skuFreeToBillable, t1).Scan(&statusFreeToBillable)
+	if err != nil {
+		t.Fatalf("query status free_to_billable: %v", err)
+	}
+	if statusFreeToBillable != "pending_review:free_to_billable" {
+		t.Errorf("statusFreeToBillable = %q, want pending_review:free_to_billable", statusFreeToBillable)
+	}
+
+	err = pool.QueryRow(ctx, "SELECT anomaly_status FROM price_observations WHERE sku_id = $1 AND fetched_at = $2", skuBillableToFree, t1).Scan(&statusBillableToFree)
+	if err != nil {
+		t.Fatalf("query status billable_to_free: %v", err)
+	}
+	if statusBillableToFree != "pending_review:billable_to_free" {
+		t.Errorf("statusBillableToFree = %q, want pending_review:billable_to_free", statusBillableToFree)
+	}
+}
+
+func TestOrchestrator_InvariantGuard_DropsMismatchedCategoryOrProvider(t *testing.T) {
+	dbURL := testDatabaseURL(t)
+	ctx := context.Background()
+
+	pool, err := store.NewPool(ctx, parseDatabaseConfig(t, dbURL))
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	queries := store.New(pool)
+
+	badSkuCategory := "SKU-BAD-CATEGORY"
+	badSkuProvider := "SKU-BAD-PROVIDER"
+
+	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id IN ($1, $2)", badSkuCategory, badSkuProvider)
+	defer func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE sku_id IN ($1, $2)", badSkuCategory, badSkuProvider)
+	}()
+
+	adapter := &mockFetcher{
+		result: domain.FetchResult{
+			Observations: []domain.PriceObservation{
+				{
+					Provider:        "aws",
+					ServiceCategory: "network", // Mismatched category for compute job!
+					SkuID:           badSkuCategory,
+					DisplayName:     "Mismatched Category",
+					Region:          "us-east-1",
+					RegionGroup:     "us-east",
+					Unit:            "GB",
+					PriceAmount:     decimal.RequireFromString("0.10"),
+					PriceCurrency:   "USD",
+					PricingModel:    "OnDemand",
+					FetchedAt:       time.Now().UTC(),
+				},
+				{
+					Provider:        "gcp", // Mismatched provider for aws job!
+					ServiceCategory: "compute",
+					SkuID:           badSkuProvider,
+					DisplayName:     "Mismatched Provider",
+					Region:          "us-east1",
+					RegionGroup:     "us-east",
+					Unit:            "Hrs",
+					PriceAmount:     decimal.RequireFromString("0.20"),
+					PriceCurrency:   "USD",
+					PricingModel:    "OnDemand",
+					FetchedAt:       time.Now().UTC(),
+				},
+			},
+			RawGCSPath: "raw/aws/compute/bad.json",
+		},
+	}
+
+	factory := provider.NewFactory()
+	factory.Register(provider.ProviderConfig{
+		Provider: "aws",
+		Category: "compute",
+		Retry:    provider.RetryConfig{MaxAttempts: 1, BaseDelay: time.Millisecond},
+	}, adapter)
+
+	orch := service.NewOrchestrator(queries, nil, nil, factory, service.OrchestratorConfig{
+		MaxConcurrency: 1,
+		LockTTL:        30 * time.Second,
+	})
+
+	res := orch.RunAll(ctx)
+	if len(res) != 1 || res[0].Err != nil {
+		t.Fatalf("Run failed: %v", res)
+	}
+	if res[0].InsertedCount != 0 {
+		t.Errorf("InsertedCount = %d, want 0 (both dropped by invariant guard)", res[0].InsertedCount)
+	}
+
+	// Verify neither row was inserted into DB
+	var count int
+	_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM price_observations WHERE sku_id IN ($1, $2)", badSkuCategory, badSkuProvider).Scan(&count)
+	if count != 0 {
+		t.Errorf("expected 0 rows in DB, got %d", count)
+	}
+}

@@ -79,12 +79,15 @@ sequenceDiagram
                 Orch->>DLQ: Record as 'blocked' (span: dlq.record, metric: dlq_operations_total)
             else Normal Unmapped Ratio (<= 5%)
                 loop For each observation
-                    Orch->>DB: GetLatestPriceForSKU (span: pgx.Query via otelpgx)
-                    alt Price ratio >= 10x
+                    Orch->>Orch: Invariant check (provider & category match job)
+                    Orch->>DB: GetLatestPriceForSKUAndCategory (span: pgx.Query via otelpgx)
+                    alt Free-to-billable or billable-to-free transition
+                        Orch->>DB: Upsert with anomaly_status = 'pending_review:{direction}'
+                    else Price ratio >= 10x
                         Orch->>DB: Upsert with anomaly_status = 'pending_review'
-                    else Price unchanged
+                    else Price unchanged (including $0.00 == $0.00)
                         Orch->>DB: Update last_seen_at timestamp
-                    else Price changed
+                    else Normal price change
                         Orch->>DB: Insert new row with anomaly_status = NULL
                     end
                 end

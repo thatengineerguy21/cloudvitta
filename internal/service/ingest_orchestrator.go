@@ -245,8 +245,20 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 			)
 		}
 
+		// Invariant Guard: Drop cross-category or cross-provider observations from misbehaving adapters
+		if obs.ServiceCategory != job.Category || obs.Provider != job.Provider {
+			slog.WarnContext(ctx, "dropping cross-category or cross-provider observation from adapter",
+				"job_provider", job.Provider,
+				"job_category", job.Category,
+				"obs_provider", obs.Provider,
+				"obs_category", obs.ServiceCategory,
+				"sku", obs.SkuID,
+			)
+			continue
+		}
+
 		// Check if price and billing dimensions are identical
-		if hasPrior && !oldPrice.IsZero() && oldPrice.Equal(obs.PriceAmount) &&
+		if hasPrior && oldPrice.Equal(obs.PriceAmount) &&
 			prev.Unit == obs.Unit && prev.PricingModel == obs.PricingModel && prev.PriceCurrency == obs.PriceCurrency {
 			// Unchanged observation: bump last_seen_at timestamp on existing row
 			if err := o.queries.UpdatePriceObservationLastSeenAt(ctx, store.UpdatePriceObservationLastSeenAtParams{
@@ -266,22 +278,52 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 
 		// New SKU or price change: check for anomaly against prior price
 		anomalyStatus := ""
-		if hasPrior && !oldPrice.IsZero() && !obs.PriceAmount.IsZero() {
-			ratio := obs.PriceAmount.Div(oldPrice)
-			if ratio.LessThan(decimal.NewFromInt(1)) {
-				ratio = oldPrice.Div(obs.PriceAmount)
-			}
-			threshold := decimal.NewFromInt(AnomalyThreshold)
-			if ratio.GreaterThanOrEqual(threshold) {
-				slog.WarnContext(ctx, "price anomaly detected",
+		if hasPrior && !oldPrice.Equal(obs.PriceAmount) {
+			if oldPrice.IsZero() && !obs.PriceAmount.IsZero() {
+				// Transition from free ($0.00) to billable (> $0.00) requires urgent triage
+				slog.WarnContext(ctx, "price anomaly detected: free to billable transition",
 					"provider", obs.Provider,
 					"sku", obs.SkuID,
 					"region", obs.Region,
-					"ratio", ratio.StringFixed(2),
+					"old_price", oldPrice.String(),
+					"new_price", obs.PriceAmount.String(),
+					"direction", "free_to_billable",
 				)
-				anomalyStatus = "pending_review"
+				anomalyStatus = "pending_review:free_to_billable"
 				result.AnomalyCount++
-				o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID)
+				o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID, "free_to_billable")
+			} else if !oldPrice.IsZero() && obs.PriceAmount.IsZero() {
+				// Transition from billable (> $0.00) to free ($0.00)
+				slog.WarnContext(ctx, "price anomaly detected: billable to free transition",
+					"provider", obs.Provider,
+					"sku", obs.SkuID,
+					"region", obs.Region,
+					"old_price", oldPrice.String(),
+					"new_price", obs.PriceAmount.String(),
+					"direction", "billable_to_free",
+				)
+				anomalyStatus = "pending_review:billable_to_free"
+				result.AnomalyCount++
+				o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID, "billable_to_free")
+			} else {
+				// Both are non-zero: calculate ratio
+				ratio := obs.PriceAmount.Div(oldPrice)
+				if ratio.LessThan(decimal.NewFromInt(1)) {
+					ratio = oldPrice.Div(obs.PriceAmount)
+				}
+				threshold := decimal.NewFromInt(AnomalyThreshold)
+				if ratio.GreaterThanOrEqual(threshold) {
+					slog.WarnContext(ctx, "price anomaly detected: ratio threshold exceeded",
+						"provider", obs.Provider,
+						"sku", obs.SkuID,
+						"region", obs.Region,
+						"ratio", ratio.StringFixed(2),
+						"direction", "ratio_threshold",
+					)
+					anomalyStatus = "pending_review"
+					result.AnomalyCount++
+					o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID, "ratio_threshold")
+				}
 			}
 		}
 
@@ -364,12 +406,13 @@ func (o *Orchestrator) recordJobMetric(ctx context.Context, provider, category, 
 	}
 }
 
-func (o *Orchestrator) recordAnomalyMetric(ctx context.Context, provider, category, sku string) {
+func (o *Orchestrator) recordAnomalyMetric(ctx context.Context, provider, category, sku, anomalyType string) {
 	if o.anomaliesTotal != nil {
 		o.anomaliesTotal.Add(ctx, 1, metric.WithAttributes(
 			attribute.String("provider", provider),
 			attribute.String("category", category),
 			attribute.String("sku", sku),
+			attribute.String("anomaly_type", anomalyType),
 		))
 	}
 }

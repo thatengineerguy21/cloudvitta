@@ -63,7 +63,7 @@ func NewAdapter(client *Client, st storage.RawStorage, opts ...AdapterOption) *A
 	a := &Adapter{
 		client:            client,
 		storage:           st,
-		category:          "compute",
+		category:          "",
 		tracer:            otel.Tracer("cloudvitta.adapter.azure"),
 		meter:             meter,
 		fetchCounter:      fetchCounter,
@@ -210,13 +210,24 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 		}
 	}
 
+	obsList := allObservations
+	if a.category != "" {
+		filtered := make([]domain.PriceObservation, 0, len(obsList))
+		for _, obs := range obsList {
+			if obs.ServiceCategory == a.category {
+				filtered = append(filtered, obs)
+			}
+		}
+		obsList = filtered
+	}
+
 	span.SetStatus(codes.Ok, "")
-	span.SetAttributes(attribute.Int("observations.count", len(allObservations)))
+	span.SetAttributes(attribute.Int("observations.count", len(obsList)))
 	a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
-	slog.InfoContext(ctx, "azure fetch completed", "observations", len(allObservations), "pages", pageIdx, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
+	slog.InfoContext(ctx, "azure fetch completed", "observations", len(obsList), "pages", pageIdx, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
 
 	return domain.FetchResult{
-		Observations:  allObservations,
+		Observations:  obsList,
 		RawGCSPath:    firstGCSPath,
 		UnmappedCount: qSink.Count(),
 		IgnoredCount:  totalIgnoredCount,
