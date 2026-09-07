@@ -29,7 +29,7 @@ func testDatabaseURL(t *testing.T) string {
 	return urlStr
 }
 
-func TestIngestionService_RunAWSComputeIngestion(t *testing.T) {
+func TestIngestionOrchestrator_RunAWSComputeIngestion(t *testing.T) {
 	dbURL := testDatabaseURL(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -83,18 +83,35 @@ func TestIngestionService_RunAWSComputeIngestion(t *testing.T) {
 	queries := store.New(pool)
 	memStorage := storage.NewMemoryRawStorage()
 	awsClient := aws.NewClient(aws.WithURL(ts.URL), aws.WithHTTPClient(ts.Client()))
-	awsAdapter := aws.NewAdapter(awsClient, memStorage)
-	job := provider.Job{Adapter: awsAdapter}
+	awsAdapter := aws.NewAdapter(awsClient, memStorage, aws.WithCategory("compute"))
 
-	ingestSvc := service.NewIngestionService(queries, job, nil)
+	factory := provider.NewFactory()
+	factory.Register(provider.ProviderConfig{
+		Provider: "aws",
+		Category: "compute",
+	}, awsAdapter)
 
-	// First ingestion run
-	count1, err := ingestSvc.RunAWSComputeIngestion(ctx)
-	if err != nil {
-		t.Fatalf("RunAWSComputeIngestion run 1 failed: %v", err)
+	orch := service.NewOrchestrator(queries, nil, nil, factory, service.DefaultOrchestratorConfig())
+
+	// Clean up any prior test rows before starting and after finishing
+	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE provider = 'aws' AND sku_id IN ('SKU-C5-XLARGE', 'SKU-M5-LARGE')")
+	defer func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE provider = 'aws' AND sku_id IN ('SKU-C5-XLARGE', 'SKU-M5-LARGE')")
+	}()
+
+	// First ingestion run: inserts new price observations
+	results1 := orch.RunAll(ctx)
+	if len(results1) != 1 {
+		t.Fatalf("expected 1 job result, got %d", len(results1))
 	}
-	if count1 != 2 {
-		t.Fatalf("run 1 count = %d, want 2", count1)
+	if results1[0].Err != nil {
+		t.Fatalf("run 1 failed: %v", results1[0].Err)
+	}
+	if results1[0].InsertedCount != 2 {
+		t.Fatalf("run 1 InsertedCount = %d, want 2", results1[0].InsertedCount)
+	}
+	if results1[0].UpdatedCount != 0 {
+		t.Fatalf("run 1 UpdatedCount = %d, want 0", results1[0].UpdatedCount)
 	}
 
 	// Verify rows land in DB
@@ -106,18 +123,23 @@ func TestIngestionService_RunAWSComputeIngestion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPriceObservations: %v", err)
 	}
-
 	if len(rows1) < 2 {
 		t.Fatalf("expected at least 2 rows in DB, got %d", len(rows1))
 	}
 
-	// Verify "always insert, never diff-and-skip" by running ingestion a second time
-	count2, err := ingestSvc.RunAWSComputeIngestion(ctx)
-	if err != nil {
-		t.Fatalf("RunAWSComputeIngestion run 2 failed: %v", err)
+	// Second ingestion run with identical prices: should bump last_seen_at idempotently without creating duplicate rows
+	results2 := orch.RunAll(ctx)
+	if len(results2) != 1 {
+		t.Fatalf("expected 1 job result, got %d", len(results2))
 	}
-	if count2 != 2 {
-		t.Fatalf("run 2 count = %d, want 2", count2)
+	if results2[0].Err != nil {
+		t.Fatalf("run 2 failed: %v", results2[0].Err)
+	}
+	if results2[0].InsertedCount != 0 {
+		t.Errorf("run 2 InsertedCount = %d, want 0 (idempotent deduplication)", results2[0].InsertedCount)
+	}
+	if results2[0].UpdatedCount != 2 {
+		t.Errorf("run 2 UpdatedCount = %d, want 2 (bumped last_seen_at)", results2[0].UpdatedCount)
 	}
 
 	rows2, err := queries.GetPriceObservations(ctx, store.GetPriceObservationsParams{
@@ -129,8 +151,8 @@ func TestIngestionService_RunAWSComputeIngestion(t *testing.T) {
 		t.Fatalf("GetPriceObservations after run 2: %v", err)
 	}
 
-	if len(rows2) != len(rows1)+2 {
-		t.Errorf("DB rows count after run 2 = %d, want %d (always insert property violated)", len(rows2), len(rows1)+2)
+	if len(rows2) != len(rows1) {
+		t.Errorf("DB rows count after run 2 = %d, want %d (idempotent update violated)", len(rows2), len(rows1))
 	}
 
 	// Verify memory raw storage recorded raw files
@@ -138,7 +160,4 @@ func TestIngestionService_RunAWSComputeIngestion(t *testing.T) {
 	if len(files) != 2 {
 		t.Errorf("MemoryStorage recorded %d files, want 2 (one per fetch)", len(files))
 	}
-
-	// Clean up inserted test rows from DB
-	_, _ = pool.Exec(ctx, "DELETE FROM price_observations WHERE provider = 'aws' AND sku_id IN ('SKU-C5-XLARGE', 'SKU-M5-LARGE')")
 }
