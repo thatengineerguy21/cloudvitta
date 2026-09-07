@@ -2,8 +2,11 @@ package gcp
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
 
 func TestGCPNormalize_Database(t *testing.T) {
@@ -90,5 +93,80 @@ func TestGCPNormalize_Database(t *testing.T) {
 	}
 	if cloudSQLStor.family != "ssd" || cloudSQLStor.multiAZ != true {
 		t.Errorf("unexpected storage attrs: %+v", cloudSQLStor)
+	}
+}
+
+func TestGCPNormalize_Database_GenericStorageAndNonInstanceIgnored(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
+
+	jsonBody := `{
+		"skus": [
+			{
+				"skuId": "SKU-GCP-GENERIC-STORAGE",
+				"description": "Storage PD SSD in Virginia",
+				"category": {
+					"serviceDisplayName": "Cloud SQL",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "PDSSD",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "GiBy.mo",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 170000000}}]
+						}
+					}
+				]
+			},
+			{
+				"skuId": "SKU-GCP-CLOUDSQL-EGRESS",
+				"description": "Cloud SQL: Network Egress - Worldwide",
+				"category": {
+					"serviceDisplayName": "Cloud SQL",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "Network",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "GiBy",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 120000000}}]
+						}
+					}
+				]
+			}
+		]
+	}`
+
+	memSink := quarantine.NewMemorySink()
+	res, _, err := Normalize(strings.NewReader(jsonBody), fixedTime, memSink)
+	if err != nil {
+		t.Fatalf("Normalize() error = %v", err)
+	}
+
+	if len(res.Observations) != 1 {
+		t.Fatalf("expected 1 observation (generic storage), got %d", len(res.Observations))
+	}
+	obs := res.Observations[0]
+	if obs.SkuID != "SKU-GCP-GENERIC-STORAGE" {
+		t.Errorf("expected SKU-GCP-GENERIC-STORAGE, got %s", obs.SkuID)
+	}
+	if obs.DatabaseRDBMSAttributes.ComponentType != "storage" {
+		t.Errorf("expected ComponentType storage, got %s", obs.DatabaseRDBMSAttributes.ComponentType)
+	}
+	if obs.DatabaseRDBMSAttributes.Engine != "" {
+		t.Errorf("expected generic storage to have empty engine, got %s", obs.DatabaseRDBMSAttributes.Engine)
+	}
+
+	if res.IgnoredCount != 1 {
+		t.Errorf("expected 1 ignored out-of-scope SKU (network egress), got %d", res.IgnoredCount)
+	}
+
+	if memSink.Count() != 0 {
+		t.Errorf("expected 0 quarantine items, got %d", memSink.Count())
 	}
 }

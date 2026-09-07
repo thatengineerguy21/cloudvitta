@@ -127,12 +127,16 @@ var knownGCPVMSpecs = map[string]domain.ComputeAttributes{
 }
 
 // Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
+type gcpComponentKey struct {
+	family string
+	region string
+}
+
 type gcpComponentSpec struct {
 	corePrice decimal.Decimal
 	ramPrice  decimal.Decimal
 	unit      string
 	currency  string
-	regions   []string
 }
 
 // Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
@@ -148,7 +152,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 	var observations []domain.PriceObservation
 	var nextPageToken string
 	var ignoredCount int
-	components := make(map[string]*gcpComponentSpec)
+	components := make(map[gcpComponentKey]*gcpComponentSpec)
 
 	// Advance to the first token
 	t, err := dec.Token()
@@ -714,7 +718,7 @@ func parseGCPComponent(sku gcpSKU) (string, bool, bool) {
 	return family, isCore, isRAM
 }
 
-func collectComponentPricing(sku gcpSKU, components map[string]*gcpComponentSpec) {
+func collectComponentPricing(sku gcpSKU, components map[gcpComponentKey]*gcpComponentSpec) {
 	if len(sku.PricingInfo) == 0 || len(sku.PricingInfo[0].PricingExpression.TieredRates) == 0 {
 		return
 	}
@@ -728,90 +732,87 @@ func collectComponentPricing(sku gcpSKU, components map[string]*gcpComponentSpec
 		return
 	}
 
-	comp, ok := components[family]
-	if !ok {
-		regions := sku.ServiceRegions
-		if len(regions) == 0 {
-			regions = []string{"global"}
-		}
-		currency := unitPrice.CurrencyCode
-		if currency == "" {
-			currency = "USD"
-		}
-		unit := sku.PricingInfo[0].PricingExpression.UsageUnit
-		if unit == "h" || unit == "hour" {
-			unit = "Hrs"
-		}
-		comp = &gcpComponentSpec{
-			unit:     unit,
-			currency: currency,
-			regions:  regions,
-		}
-		components[family] = comp
+	regions := sku.ServiceRegions
+	if len(regions) == 0 {
+		regions = []string{"global"}
+	}
+	currency := unitPrice.CurrencyCode
+	if currency == "" {
+		currency = "USD"
+	}
+	unit := sku.PricingInfo[0].PricingExpression.UsageUnit
+	if unit == "h" || unit == "hour" {
+		unit = "Hrs"
 	}
 
-	if isCore {
-		comp.corePrice = priceAmount
-	}
-	if isRAM {
-		comp.ramPrice = priceAmount
-	}
-	if len(sku.ServiceRegions) > 0 {
-		comp.regions = sku.ServiceRegions
+	for _, region := range regions {
+		if !regionmap.IsTargetRegion("gcp", region) {
+			continue
+		}
+		key := gcpComponentKey{family: family, region: region}
+		comp, ok := components[key]
+		if !ok {
+			comp = &gcpComponentSpec{
+				unit:     unit,
+				currency: currency,
+			}
+			components[key] = comp
+		}
+
+		if isCore {
+			comp.corePrice = priceAmount
+		}
+		if isRAM {
+			comp.ramPrice = priceAmount
+		}
 	}
 }
 
-func composeMachineTypePricing(components map[string]*gcpComponentSpec, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
+func composeMachineTypePricing(components map[gcpComponentKey]*gcpComponentSpec, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
 	var observations []domain.PriceObservation
-	for family, comp := range components {
+	for key, comp := range components {
 		if comp.corePrice.IsZero() || comp.ramPrice.IsZero() {
 			continue
 		}
+		regionGroup, err := regionmap.MapGCPRegion(key.region)
+		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "gcp",
+						Category:   "compute",
+						Kind:       "region",
+						RawValue:   key.region,
+						SkuID:      fmt.Sprintf("SKU-GCP-COMPONENTS-%s", key.family),
+						ObservedAt: fetchedAt,
+					})
+				}
+				continue
+			}
+			return nil, fmt.Errorf("gcp compose region %s: %w", key.region, err)
+		}
+
 		for machineType, spec := range knownGCPVMSpecs {
-			if spec.Family != family {
+			if spec.Family != key.family {
 				continue
 			}
 			hourlyPrice := comp.corePrice.Mul(decimal.NewFromFloat(spec.VCPU)).Add(comp.ramPrice.Mul(decimal.NewFromFloat(spec.RAMGB)))
 			skuID := fmt.Sprintf("SKU-GCP-VM-%s", strings.ToUpper(machineType))
 
-			for _, region := range comp.regions {
-				regionGroup, err := regionmap.MapGCPRegion(region)
-				if err != nil {
-					if errors.Is(err, regionmap.ErrUnmappedRegion) {
-						if sink != nil {
-							_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-								Provider:   "gcp",
-								Category:   "compute",
-								Kind:       "region",
-								RawValue:   region,
-								SkuID:      skuID,
-								ObservedAt: fetchedAt,
-							})
-						}
-						continue
-					}
-					return nil, fmt.Errorf("gcp compose region %s: %w", region, err)
-				}
-
-				if !regionmap.IsTargetRegion("gcp", region) {
-					continue
-				}
-
-				observations = append(observations, domain.PriceObservation{
-					Provider:        "gcp",
-					ServiceCategory: "compute",
-					SkuID:           skuID,
-					DisplayName:     machineType,
-					Region:          region,
-					RegionGroup:     regionGroup,
-					Unit:            "Hrs",
-					PriceAmount:     hourlyPrice,
-					PriceCurrency:   comp.currency,
-					PricingModel:    "OnDemand",
-					Attributes:      spec,
-					FetchedAt:       fetchedAt,
-				})
-			}
+			observations = append(observations, domain.PriceObservation{
+				Provider:        "gcp",
+				ServiceCategory: "compute",
+				SkuID:           skuID,
+				DisplayName:     machineType,
+				Region:          key.region,
+				RegionGroup:     regionGroup,
+				Unit:            "Hrs",
+				PriceAmount:     hourlyPrice,
+				PriceCurrency:   comp.currency,
+				PricingModel:    "OnDemand",
+				Attributes:      spec,
+				FetchedAt:       fetchedAt,
+			})
 		}
 	}
 	return observations, nil
@@ -936,29 +937,45 @@ func normalizeDatabaseSKU(sku gcpSKU, category string, fetchedAt time.Time, sink
 		return nil, nil
 	}
 
-	engine, err := parseGCPDatabaseEngine(sku)
-	if err != nil {
-		if errors.Is(err, databaseenginemap.ErrUnmappedDatabaseEngine) {
-			if sink != nil {
-				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
-					Provider:   "gcp",
-					Category:   category,
-					Kind:       "database_engine",
-					RawValue:   sku.Description,
-					SkuID:      sku.SkuID,
-					ObservedAt: fetchedAt,
-				})
-			}
-			slog.Warn("gcp normalize: skipping SKU due to unmapped database engine", "sku", sku.SkuID, "desc", sku.Description)
-			return nil, nil
-		}
-		return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
-	}
-
 	isStorage := strings.Contains(sku.Description, "Storage") ||
 		strings.Contains(sku.Category.ResourceGroup, "PD") ||
 		strings.Contains(sku.PricingInfo[0].PricingExpression.UsageUnitDescription, "month") ||
 		strings.Contains(sku.PricingInfo[0].PricingExpression.UsageUnit, "mo")
+
+	vcpu, ram, tier := parseGCPDatabaseAttributes(sku.Description, sku.Name)
+	isInstance := vcpu > 0 || ram > 0 || strings.Contains(sku.Description, "Instance")
+
+	// If it is neither storage nor an instance (e.g. network egress, backups, PITR), it is out of scope.
+	if !isStorage && !isInstance {
+		return nil, nil
+	}
+
+	var engine string
+	if isInstance {
+		var err error
+		engine, err = parseGCPDatabaseEngine(sku)
+		if err != nil {
+			if errors.Is(err, databaseenginemap.ErrUnmappedDatabaseEngine) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "gcp",
+						Category:   category,
+						Kind:       "database_engine",
+						RawValue:   sku.Description,
+						SkuID:      sku.SkuID,
+						ObservedAt: fetchedAt,
+					})
+				}
+				slog.Warn("gcp normalize: skipping SKU due to unmapped database engine", "sku", sku.SkuID, "desc", sku.Description)
+				return nil, nil
+			}
+			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+		}
+	} else if isStorage {
+		if eng, err := parseGCPDatabaseEngine(sku); err == nil {
+			engine = eng
+		}
+	}
 
 	multiAZ := strings.Contains(sku.Description, "Regional") ||
 		strings.Contains(sku.Description, "HA") ||
@@ -1028,7 +1045,6 @@ func normalizeDatabaseSKU(sku gcpSKU, category string, fetchedAt time.Time, sink
 				FetchedAt: fetchedAt,
 			})
 		} else {
-			vcpu, ram, tier := parseGCPDatabaseAttributes(sku.Description, sku.Name)
 			unit := sku.PricingInfo[0].PricingExpression.UsageUnit
 			if unit == "h" || unit == "hour" {
 				unit = "Hrs"

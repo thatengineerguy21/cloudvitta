@@ -78,9 +78,10 @@ sequenceDiagram
             alt Unmapped Ratio Exceeds Threshold (> 5%)
                 Orch->>DLQ: Record as 'blocked' (span: dlq.record, metric: dlq_operations_total)
             else Normal Unmapped Ratio (<= 5%)
+                Note over Orch,DB: Persist Observations (span: ingest.persist, DB tracing disabled via WithoutTracer)
                 loop For each observation
                     Orch->>Orch: Invariant check (provider & category match job)
-                    Orch->>DB: GetLatestPriceForSKUAndCategory (span: pgx.Query via otelpgx)
+                    Orch->>DB: GetLatestPriceForSKUAndCategory
                     alt Free-to-billable or billable-to-free transition
                         Orch->>DB: Upsert with anomaly_status = 'pending_review:{direction}'
                     else Price ratio >= 10x

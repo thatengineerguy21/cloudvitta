@@ -45,3 +45,21 @@ func TestNewPoolConfig(t *testing.T) {
 		t.Fatal("expected ConnConfig.Tracer to be non-nil (otelpgx tracer attached)")
 	}
 }
+
+func TestNewPoolConfig_WithoutTracer(t *testing.T) {
+	cfg := config.DatabaseConfig{
+		Host: "localhost",
+		Port: 5432,
+		User: "cloudvitta",
+		Name: "cloudvitta_test",
+	}
+
+	poolCfg, err := store.NewPoolConfig(cfg, store.WithoutTracer())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if poolCfg.ConnConfig.Tracer != nil {
+		t.Fatal("expected ConnConfig.Tracer to be nil when WithoutTracer() option is provided")
+	}
+}

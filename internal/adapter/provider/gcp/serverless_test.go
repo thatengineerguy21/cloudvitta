@@ -172,3 +172,69 @@ func TestNormalize_GCPServerless_UnmappedUnitQuarantine(t *testing.T) {
 		t.Fatalf("expected 0 normalized observations, got %d", len(obs))
 	}
 }
+
+func TestNormalize_GCPServerless_FreeTierBypass(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
+	rawJSON := `{
+		"skus": [
+			{
+				"name": "services/29E7-DA93-CA13/skus/SKU-GCP-CF-INVOCATIONS-TIERED",
+				"skuId": "SKU-GCP-CF-INVOCATIONS-TIERED",
+				"description": "Cloud Functions Invocations with Free Tier",
+				"category": {
+					"serviceDisplayName": "Cloud Functions",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "Invocations",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": [
+					"us-central1"
+				],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "Calls",
+							"usageUnitDescription": "invocations",
+							"tieredRates": [
+								{
+									"startUsageAmount": 0,
+									"unitPrice": {
+										"currencyCode": "USD",
+										"units": "0",
+										"nanos": 0
+									}
+								},
+								{
+									"startUsageAmount": 2000000,
+									"unitPrice": {
+										"currencyCode": "USD",
+										"units": "0",
+										"nanos": 400000
+									}
+								}
+							]
+						}
+					}
+				],
+				"serviceProviderName": "Google"
+			}
+		]
+	}`
+
+	res, _, err := gcp.Normalize(strings.NewReader(rawJSON), fixedTime)
+	if err != nil {
+		t.Fatalf("Normalize() unexpected error: %v", err)
+	}
+
+	if len(res.Observations) != 1 {
+		t.Fatalf("expected 1 observation extracting billable tier rate, got %d", len(res.Observations))
+	}
+
+	obs := res.Observations[0]
+	if obs.PriceAmount.String() != "0.0004" {
+		t.Errorf("expected PriceAmount 0.0004 from tier 1, got %s", obs.PriceAmount.String())
+	}
+	if obs.ServerlessRateAttributes.ComponentType != domain.ComponentTypeRequestFee {
+		t.Errorf("expected request_fee component, got %s", obs.ServerlessRateAttributes.ComponentType)
+	}
+}

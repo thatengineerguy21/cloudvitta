@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,5 +92,102 @@ func TestGCPNormalize_GoldenCorpus(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestComposeMachineTypePricing_MultiRegion(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)
+
+	jsonBody := `{
+		"skus": [
+			{
+				"skuId": "SKU-GCP-N2-CORE-VIRGINIA",
+				"description": "N2 Instance Core running in Virginia",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 31611000}}]
+						}
+					}
+				]
+			},
+			{
+				"skuId": "SKU-GCP-N2-RAM-VIRGINIA",
+				"description": "N2 Instance Ram running in Virginia",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 4237000}}]
+						}
+					}
+				]
+			},
+			{
+				"skuId": "SKU-GCP-N2-CORE-FRANKFURT",
+				"description": "N2 Instance Core running in Frankfurt",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["europe-west3"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 34772000}}]
+						}
+					}
+				]
+			},
+			{
+				"skuId": "SKU-GCP-N2-RAM-FRANKFURT",
+				"description": "N2 Instance Ram running in Frankfurt",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["europe-west3"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 4661000}}]
+						}
+					}
+				]
+			}
+		]
+	}`
+
+	res, _, err := Normalize(strings.NewReader(jsonBody), fixedTime)
+	if err != nil {
+		t.Fatalf("Normalize() error = %v", err)
+	}
+
+	regionsFound := make(map[string]int)
+	for _, o := range res.Observations {
+		if o.ServiceCategory != "compute" {
+			t.Errorf("expected compute observation, got %s", o.ServiceCategory)
+		}
+		regionsFound[o.Region]++
+	}
+
+	if regionsFound["us-east4"] == 0 {
+		t.Errorf("expected observations in us-east4, got 0")
+	}
+	if regionsFound["europe-west3"] == 0 {
+		t.Errorf("expected observations in europe-west3, got 0")
 	}
 }

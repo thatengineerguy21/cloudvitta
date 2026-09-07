@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/matching/serverlessarchmap"
@@ -21,10 +22,18 @@ func normalizeServerlessSKU(sku gcpSKU, category string, fetchedAt time.Time, si
 		return nil, nil
 	}
 
-	unitPrice := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice
-	priceAmount, err := extractUnitPrice(unitPrice)
-	if err != nil {
-		return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+	var priceAmount decimal.Decimal
+	var unitPrice gcpUnitPrice
+	for _, rate := range sku.PricingInfo[0].PricingExpression.TieredRates {
+		ratePrice, err := extractUnitPrice(rate.UnitPrice)
+		if err != nil {
+			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+		}
+		if !ratePrice.IsZero() {
+			priceAmount = ratePrice
+			unitPrice = rate.UnitPrice
+			break
+		}
 	}
 	if priceAmount.IsZero() {
 		return nil, nil
@@ -32,20 +41,22 @@ func normalizeServerlessSKU(sku gcpSKU, category string, fetchedAt time.Time, si
 
 	desc := sku.Description
 	resGroup := sku.Category.ResourceGroup
+	descLower := strings.ToLower(desc)
+	resGroupLower := strings.ToLower(resGroup)
 
 	var componentType string
 	switch {
-	case strings.Contains(desc, "Invocation") || strings.Contains(resGroup, "Invocation"):
+	case strings.Contains(descLower, "invocation") || strings.Contains(resGroupLower, "invocation") || strings.Contains(descLower, "request"):
 		componentType = domain.ComponentTypeRequestFee
-	case strings.Contains(desc, "CPU Time") || strings.Contains(desc, "CPU") || strings.Contains(resGroup, "CPU") ||
-		strings.Contains(desc, "GHz") || strings.Contains(desc, "vCPU"):
+	case strings.Contains(descLower, "cpu time") || strings.Contains(descLower, "cpu") || strings.Contains(resGroupLower, "cpu") ||
+		strings.Contains(descLower, "ghz") || strings.Contains(descLower, "vcpu"):
 		componentType = domain.ComponentTypeDurationFeeCPU
-	case strings.Contains(desc, "Memory Time") || strings.Contains(desc, "Memory") || strings.Contains(resGroup, "Memory") ||
-		strings.Contains(desc, "GB-Second") || strings.Contains(desc, "GiB-Second") || strings.Contains(desc, "GiBy.s") || strings.Contains(desc, "GB.s"):
+	case strings.Contains(descLower, "memory time") || strings.Contains(descLower, "memory") || strings.Contains(resGroupLower, "memory") ||
+		strings.Contains(descLower, "gb-second") || strings.Contains(descLower, "gib-second") || strings.Contains(descLower, "giby.s") || strings.Contains(descLower, "gb.s"):
 		componentType = domain.ComponentTypeDurationFeeMemory
-	case strings.Contains(desc, "Execution Time") || strings.Contains(desc, "Time") || strings.Contains(resGroup, "Time"):
+	case strings.Contains(descLower, "execution time") || strings.Contains(descLower, "time") || strings.Contains(resGroupLower, "time"):
 		// Generic time meter fallback: if memory is mentioned, treat as memory duration; otherwise CPU duration
-		if strings.Contains(desc, "Memory") {
+		if strings.Contains(descLower, "memory") {
 			componentType = domain.ComponentTypeDurationFeeMemory
 		} else {
 			componentType = domain.ComponentTypeDurationFeeCPU

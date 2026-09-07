@@ -22,7 +22,9 @@ The table below defines all custom and auto-instrumented spans:
 | `transport/rest` | `HTTP {METHOD} {route}` | Server | `http.method`, `http.route`, `http.status_code` | Auto-instrumented by `otelhttp` |
 | `service` | `ComparePrices` | Internal | `category`, `provider`, `region` | Pricing comparison lifecycle |
 | `service` | `CalculateWorkload` | Internal | `categories.count`, `providers.count` | Composite multi-category calculation |
-| `store` | `pgx.Connect`, `pgx.Query`, `pgx.Exec`, `pgx.Batch` | Client | `db.system=postgresql`, `db.statement` | Auto-instrumented by `otelpgx` |
+| `store` | `pgx.Connect`, `pgx.Query`, `pgx.Exec`, `pgx.Batch` | Client | `db.system=postgresql`, `db.statement` | Auto-instrumented by `otelpgx` in API server. Disabled in bulk ingestion via `store.WithoutTracer()` to prevent trace size limit rejections (`TRACE_TOO_LARGE`). |
+| `service` | `ingest.job` | Internal | `provider`, `category` | Ingestion job lifecycle execution |
+| `service` | `ingest.persist` | Internal | `provider`, `category`, `observations.count`, `observations.inserted`, `observations.updated`, `observations.anomalies` | Bulk database upsert execution during ingestion |
 | `cache` | `redis.{command}` | Client | `db.system=redis`, `db.operation` | Auto-instrumented by `redisotel` |
 | `storage` | `gcs.write` | Client | `gcs.bucket`, `gcs.path` | GCS object stream upload |
 | `storage` | `gcs.read` | Client | `gcs.bucket`, `gcs.path` | GCS object stream read |

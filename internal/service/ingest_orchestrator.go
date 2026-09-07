@@ -221,8 +221,16 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 	}
 
 	// Step 3: Upsert-with-history observations with anomaly detection
+	persistCtx, persistSpan := o.tracer.Start(ctx, "ingest.persist",
+		trace.WithAttributes(
+			attribute.String("provider", job.Provider),
+			attribute.String("category", job.Category),
+			attribute.Int("observations.count", len(fetchResult.Observations)),
+		),
+	)
+
 	for _, obs := range fetchResult.Observations {
-		prev, prevErr := o.queries.GetLatestPriceForSKUAndCategory(ctx, store.GetLatestPriceForSKUAndCategoryParams{
+		prev, prevErr := o.queries.GetLatestPriceForSKUAndCategory(persistCtx, store.GetLatestPriceForSKUAndCategoryParams{
 			Provider:        obs.Provider,
 			ServiceCategory: obs.ServiceCategory,
 			SkuID:           obs.SkuID,
@@ -237,7 +245,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 				oldPrice = dec
 			}
 		} else if !store.IsNotFound(prevErr) {
-			slog.WarnContext(ctx, "failed to query previous price observation",
+			slog.WarnContext(persistCtx, "failed to query previous price observation",
 				"provider", obs.Provider,
 				"sku", obs.SkuID,
 				"region", obs.Region,
@@ -247,7 +255,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 
 		// Invariant Guard: Drop cross-category or cross-provider observations from misbehaving adapters
 		if obs.ServiceCategory != job.Category || obs.Provider != job.Provider {
-			slog.WarnContext(ctx, "dropping cross-category or cross-provider observation from adapter",
+			slog.WarnContext(persistCtx, "dropping cross-category or cross-provider observation from adapter",
 				"job_provider", job.Provider,
 				"job_category", job.Category,
 				"obs_provider", obs.Provider,
@@ -261,11 +269,11 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		if hasPrior && oldPrice.Equal(obs.PriceAmount) &&
 			prev.Unit == obs.Unit && prev.PricingModel == obs.PricingModel && prev.PriceCurrency == obs.PriceCurrency {
 			// Unchanged observation: bump last_seen_at timestamp on existing row
-			if err := o.queries.UpdatePriceObservationLastSeenAt(ctx, store.UpdatePriceObservationLastSeenAtParams{
+			if err := o.queries.UpdatePriceObservationLastSeenAt(persistCtx, store.UpdatePriceObservationLastSeenAtParams{
 				ID:         prev.ID,
 				LastSeenAt: store.TimestamptzFromTime(obs.FetchedAt),
 			}); err != nil {
-				slog.ErrorContext(ctx, "failed to update last_seen_at",
+				slog.ErrorContext(persistCtx, "failed to update last_seen_at",
 					"provider", job.Provider,
 					"sku", obs.SkuID,
 					"error", err,
@@ -281,7 +289,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 		if hasPrior && !oldPrice.Equal(obs.PriceAmount) {
 			if oldPrice.IsZero() && !obs.PriceAmount.IsZero() {
 				// Transition from free ($0.00) to billable (> $0.00) requires urgent triage
-				slog.WarnContext(ctx, "price anomaly detected: free to billable transition",
+				slog.WarnContext(persistCtx, "price anomaly detected: free to billable transition",
 					"provider", obs.Provider,
 					"sku", obs.SkuID,
 					"region", obs.Region,
@@ -291,10 +299,10 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 				)
 				anomalyStatus = "pending_review:free_to_billable"
 				result.AnomalyCount++
-				o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID, "free_to_billable")
+				o.recordAnomalyMetric(persistCtx, job.Provider, job.Category, obs.SkuID, "free_to_billable")
 			} else if !oldPrice.IsZero() && obs.PriceAmount.IsZero() {
 				// Transition from billable (> $0.00) to free ($0.00)
-				slog.WarnContext(ctx, "price anomaly detected: billable to free transition",
+				slog.WarnContext(persistCtx, "price anomaly detected: billable to free transition",
 					"provider", obs.Provider,
 					"sku", obs.SkuID,
 					"region", obs.Region,
@@ -304,7 +312,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 				)
 				anomalyStatus = "pending_review:billable_to_free"
 				result.AnomalyCount++
-				o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID, "billable_to_free")
+				o.recordAnomalyMetric(persistCtx, job.Provider, job.Category, obs.SkuID, "billable_to_free")
 			} else {
 				// Both are non-zero: calculate ratio
 				ratio := obs.PriceAmount.Div(oldPrice)
@@ -313,7 +321,7 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 				}
 				threshold := decimal.NewFromInt(AnomalyThreshold)
 				if ratio.GreaterThanOrEqual(threshold) {
-					slog.WarnContext(ctx, "price anomaly detected: ratio threshold exceeded",
+					slog.WarnContext(persistCtx, "price anomaly detected: ratio threshold exceeded",
 						"provider", obs.Provider,
 						"sku", obs.SkuID,
 						"region", obs.Region,
@@ -322,14 +330,14 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 					)
 					anomalyStatus = "pending_review"
 					result.AnomalyCount++
-					o.recordAnomalyMetric(ctx, job.Provider, job.Category, obs.SkuID, "ratio_threshold")
+					o.recordAnomalyMetric(persistCtx, job.Provider, job.Category, obs.SkuID, "ratio_threshold")
 				}
 			}
 		}
 
 		params, marshalErr := store.ToInsertPriceObservationParams(obs, fetchResult.RawGCSPath, anomalyStatus)
 		if marshalErr != nil {
-			slog.ErrorContext(ctx, "failed to build insert params",
+			slog.ErrorContext(persistCtx, "failed to build insert params",
 				"provider", job.Provider,
 				"sku", obs.SkuID,
 				"error", marshalErr,
@@ -337,8 +345,8 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 			continue
 		}
 
-		if _, insertErr := o.queries.InsertPriceObservation(ctx, params); insertErr != nil {
-			slog.ErrorContext(ctx, "failed to insert observation",
+		if _, insertErr := o.queries.InsertPriceObservation(persistCtx, params); insertErr != nil {
+			slog.ErrorContext(persistCtx, "failed to insert observation",
 				"provider", job.Provider,
 				"sku", obs.SkuID,
 				"error", insertErr,
@@ -350,14 +358,20 @@ func (o *Orchestrator) runJob(ctx context.Context, job provider.Job) JobResult {
 
 	// Step 3b: Synchronize compute catalog inventory if compute category
 	if job.Category == "compute" && len(fetchResult.Observations) > 0 {
-		if syncErr := SyncComputeCatalog(ctx, o.queries, fetchResult.Observations); syncErr != nil {
-			slog.WarnContext(ctx, "failed to sync compute catalog inventory",
+		if syncErr := SyncComputeCatalog(persistCtx, o.queries, fetchResult.Observations); syncErr != nil {
+			slog.WarnContext(persistCtx, "failed to sync compute catalog inventory",
 				"provider", job.Provider,
 				"category", job.Category,
 				"error", syncErr,
 			)
 		}
 	}
+	persistSpan.SetAttributes(
+		attribute.Int("observations.inserted", result.InsertedCount),
+		attribute.Int("observations.updated", result.UpdatedCount),
+		attribute.Int("observations.anomalies", result.AnomalyCount),
+	)
+	persistSpan.End()
 
 	// Step 4: Clear DLQ entry on success
 

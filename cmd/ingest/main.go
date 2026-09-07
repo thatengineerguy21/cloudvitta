@@ -73,7 +73,9 @@ func run() error {
 	slog.InfoContext(ctx, "starting ingestion job runner...", "environment", cfg.Primary.Environment)
 
 	// --- Database ---
-	dbPool, err := store.NewPool(ctx, cfg.Database)
+	// Disable per-query OpenTelemetry tracing for ingestion to prevent query spans
+	// from exceeding Tempo/OTLP trace payload limits (TRACE_TOO_LARGE). Pool metrics are retained.
+	dbPool, err := store.NewPool(ctx, cfg.Database, store.WithoutTracer())
 	if err != nil {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
