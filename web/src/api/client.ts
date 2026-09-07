@@ -1,5 +1,13 @@
 import { ApiError } from './errors';
-import type { RFC7807ProblemDetails, AuthTokens, Provider } from '../types';
+import type {
+  RFC7807ProblemDetails,
+  AuthTokens,
+  Provider,
+  McpJsonRpcRequest,
+  McpJsonRpcResponse,
+  McpToolsListResult,
+  McpCallToolResult,
+} from '../types';
 import {
   setAuthTokenProvider,
   getAuthTokenProvider,
@@ -64,6 +72,23 @@ export function mapAuthTokens(res: LoginResponse | RefreshResponse): AuthTokens 
     tokenType: res.token_type || 'Bearer',
     expiresIn: res.expires_in || 900,
   };
+}
+
+/**
+ * Safely parses either direct JSON or Server-Sent Events (SSE) data stream payload.
+ */
+export function parseSseOrJson<T>(rawText: string): T {
+  const lines = rawText.split(/\r?\n/);
+  const dataLines: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trim());
+    }
+  }
+  if (dataLines.length > 0) {
+    return JSON.parse(dataLines.join('\n')) as T;
+  }
+  return JSON.parse(rawText) as T;
 }
 
 /**
@@ -226,6 +251,12 @@ export async function apiFetch<T>(
       return {} as T;
     }
 
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/event-stream')) {
+      const rawText = await response.text();
+      return parseSseOrJson<T>(rawText);
+    }
+
     return (await response.json()) as T;
   } catch (err: unknown) {
     if (err instanceof ApiError) {
@@ -372,6 +403,118 @@ export const catalogApi = {
   getComputeInstances: (query?: ComputeCatalogQueryParams, options?: RequestOptions) =>
     apiFetch<CatalogInstancesResponse>(
       buildComparisonUrl('/api/v1/catalog/compute/instances', (query || {}) as Record<string, QueryParamValue>),
+      options
+    ),
+};
+
+export const DEFAULT_MCP_TOOL_ARGUMENTS: Record<string, Record<string, unknown>> = {
+  compare_compute: {
+    region: 'us-east-1',
+    vcpu: 4,
+    ram_gb: 16,
+    family: 'general_purpose',
+    currency: 'USD',
+  },
+  compare_storage: {
+    region: 'us-east-1',
+    size_gb: 1000,
+    storage_class: 'standard',
+    currency: 'USD',
+  },
+  compare_network: {
+    region: 'us-east-1',
+    egress_gb: 5000,
+    transfer_type: 'internet_egress',
+    currency: 'USD',
+  },
+  compare_database: {
+    region: 'us-east-1',
+    engine: 'postgresql',
+    vcpu: 4,
+    ram_gb: 16,
+    storage_gb: 100,
+    currency: 'USD',
+  },
+  compare_database_nosql: {
+    region: 'us-east-1',
+    data_model: 'key_value',
+    storage_gb: 50,
+    read_units: 100,
+    write_units: 50,
+    currency: 'USD',
+  },
+  compare_kubernetes: {
+    region: 'us-east-1',
+    tier: 'standard',
+    cluster_topology: 'zonal',
+    currency: 'USD',
+  },
+  compare_serverless: {
+    region: 'us-east-1',
+    architecture: 'x86_64',
+    memory_mb: 512,
+    invocations_monthly: 1000000,
+    execution_duration_ms: 200,
+    currency: 'USD',
+  },
+  calculate_workload: {
+    region: 'us-east-1',
+    currency: 'USD',
+    compute: {
+      vcpu: 4,
+      ram_gb: 16,
+      family: 'general_purpose',
+    },
+    storage: {
+      size_gb: 500,
+      storage_class: 'standard',
+    },
+  },
+  get_provider_status: {
+    provider: 'aws',
+  },
+  get_compute_catalog: {
+    provider: 'aws',
+    region: 'us-east-1',
+    category: 'general_purpose',
+    limit: 10,
+  },
+};
+
+export const mcpApi = {
+  execute: <T = unknown>(body: McpJsonRpcRequest, options?: RequestOptions) =>
+    apiFetch<McpJsonRpcResponse<T>>('/mcp', {
+      ...options,
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        ...((options?.headers as Record<string, string>) || {}),
+      },
+    }),
+
+  listTools: (options?: RequestOptions) =>
+    mcpApi.execute<McpToolsListResult>(
+      {
+        jsonrpc: '2.0',
+        id: 'tools-list-' + Date.now(),
+        method: 'tools/list',
+      },
+      options
+    ),
+
+  callTool: (toolName: string, args: Record<string, unknown>, options?: RequestOptions) =>
+    mcpApi.execute<McpCallToolResult>(
+      {
+        jsonrpc: '2.0',
+        id: 'tool-call-' + Date.now(),
+        method: 'tools/call',
+        params: {
+          name: toolName,
+          arguments: args,
+        },
+      },
       options
     ),
 };

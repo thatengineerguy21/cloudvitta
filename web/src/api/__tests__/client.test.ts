@@ -5,6 +5,8 @@ import {
   providerApi,
   pricesApi,
   calculateApi,
+  mcpApi,
+  parseSseOrJson,
 } from '../client';
 import { setAuthTokenProvider } from '../refreshQueue';
 import { ApiError } from '../errors';
@@ -389,5 +391,94 @@ describe('apiFetch & client wrappers', () => {
       expect(apiErr.detail).not.toContain('<!DOCTYPE');
       expect(apiErr.detail).toBe('Server returned HTTP 404 (Not Found)');
     }
+  });
+
+  describe('parseSseOrJson & mcpApi', () => {
+    it('parses raw JSON string correctly', () => {
+      const obj = { jsonrpc: '2.0', id: 1, result: { status: 'ok' } };
+      expect(parseSseOrJson(JSON.stringify(obj))).toEqual(obj);
+    });
+
+    it('parses Server-Sent Events (SSE) data stream payload correctly', () => {
+      const sseText = `event: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"compare_compute"}]}}\n\n`;
+      const expected = {
+        jsonrpc: '2.0',
+        id: 1,
+        result: { tools: [{ name: 'compare_compute' }] },
+      };
+      expect(parseSseOrJson(sseText)).toEqual(expected);
+    });
+
+    it('parses multi-line SSE data payload correctly', () => {
+      const sseText = `event: message\ndata: {"jsonrpc":"2.0",\ndata: "id":2,\ndata: "result":{"answer":42}}\n\n`;
+      const expected = { jsonrpc: '2.0', id: 2, result: { answer: 42 } };
+      expect(parseSseOrJson(sseText)).toEqual(expected);
+    });
+
+    it('mcpApi.listTools calls /mcp with tools/list and Streamable HTTP headers', async () => {
+      const mockResult = {
+        jsonrpc: '2.0',
+        id: 'tools-list-test',
+        result: {
+          tools: [{ name: 'compare_compute', description: 'Compare virtual machines' }],
+        },
+      };
+
+      const globalFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/event-stream' }),
+        text: vi.fn().mockResolvedValue(`event: message\ndata: ${JSON.stringify(mockResult)}\n\n`),
+      });
+      vi.stubGlobal('fetch', globalFetch);
+
+      const res = await mcpApi.listTools();
+
+      expect(res).toEqual(mockResult);
+      expect(globalFetch).toHaveBeenCalledWith(
+        '/mcp',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+          }),
+        })
+      );
+    });
+
+    it('mcpApi.callTool calls /mcp with tool name and arguments', async () => {
+      const mockResult = {
+        jsonrpc: '2.0',
+        id: 'tool-call-test',
+        result: {
+          content: [{ type: 'text', text: '{"results":[]}' }],
+          isError: false,
+        },
+      };
+
+      const globalFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: vi.fn().mockResolvedValue(mockResult),
+      });
+      vi.stubGlobal('fetch', globalFetch);
+
+      const res = await mcpApi.callTool('compare_compute', {
+        region: 'us-east-1',
+        vcpu: 4,
+        ram_gb: 16,
+      });
+
+      expect(res).toEqual(mockResult);
+      expect(globalFetch).toHaveBeenCalledWith(
+        '/mcp',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"name":"compare_compute"'),
+        })
+      );
+    });
   });
 });

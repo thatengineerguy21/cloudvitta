@@ -30,6 +30,7 @@ export const Header: React.FC = () => {
     { label: 'Kubernetes', href: '/compare/kubernetes' },
     { label: 'Serverless', href: '/compare/serverless' },
     { label: 'Calculate', href: '/calculate' },
+    { label: 'Playground', href: '/playground' },
   ];
 
   return (

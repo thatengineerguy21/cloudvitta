@@ -63,4 +63,14 @@ describe('App application routing and layout', () => {
       screen.getByRole('heading', { level: 1, name: 'Composite Workload Calculator' })
     ).toBeInTheDocument();
   });
+
+  it('renders MCP playground page on /playground path', () => {
+    window.history.replaceState(null, '', '/playground');
+    render(<App />);
+
+    expect(screen.getByTestId('mcp-playground-page')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'MCP Playground & AI Agent Console' })
+    ).toBeInTheDocument();
+  });
 });

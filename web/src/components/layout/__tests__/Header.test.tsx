@@ -47,6 +47,7 @@ describe('Header Component', () => {
     expect(screen.getByText('Kubernetes')).toBeInTheDocument();
     expect(screen.getByText('Serverless')).toBeInTheDocument();
     expect(screen.getByText('Calculate')).toBeInTheDocument();
+    expect(screen.getByText('Playground')).toBeInTheDocument();
     expect(screen.getByText('Swagger')).toBeInTheDocument();
   });
 

@@ -2,6 +2,7 @@
 
 // Re-export all API schema types
 export * from './api';
+export * from './mcp';
 
 // UI Theme types
 export type Theme = 'light' | 'dark';

@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Github,
   Activity,
+  Bot,
 } from 'lucide-react';
 
 interface CategoryCardItem {
@@ -137,6 +138,13 @@ export const LandingPage: React.FC = () => {
               className={cn('w-3.5 h-3.5', HEALTH_BADGE_COLORS[summaryState])}
             />
             <span className={cn(isLoading && 'animate-pulse')}>{summaryLabel}</span>
+          </Link>
+          <Link
+            to="/playground"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold text-text-primary border border-border-default/80 bg-surface-raised hover:border-border-accent rounded-xl transition-all shadow-2xs"
+          >
+            <Bot className="w-3.5 h-3.5 text-border-accent" />
+            <span>MCP Playground</span>
           </Link>
         </div>
       </BentoCard>

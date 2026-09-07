@@ -572,7 +572,13 @@ cd web && npm run dev
 ```
 The Vite development server is pre-configured to proxy `/api` and `/mcp` requests directly to `http://localhost:8080`, providing zero-CORS local development with hot reloading.
 
-### 2. Frontend Unit and Component Tests (Vitest)
+### 2. Testing MCP via Frontend Playground (`/playground`)
+The web application provides an interactive testing console for Model Context Protocol (MCP) tools at `/playground`:
+- **Authentication**: Unauthenticated users see tool descriptions and a sign-in button. Authenticated users run requests using their active session JSON Web Token (JWT).
+- **Interactive Tool Runner**: Select any of the 10 MCP tools, edit JSON arguments with real-time syntax checking, and execute the request. View response latency, HTTP status code, warnings, and formatted or raw JSON-RPC output.
+- **Agent Setup & Configs**: Inspect the active JWT access token and copy ready-to-use configuration blocks for Claude Desktop (`claude_desktop_config.json`), Cursor, and `curl`.
+
+### 3. Frontend Unit and Component Tests (Vitest)
 Execute the complete component and utility test suite:
 ```bash
 task web:test
@@ -580,7 +586,7 @@ task web:test
 cd web && npm test
 ```
 
-### 3. End-to-End Smoke Tests (Playwright)
+### 4. End-to-End Smoke Tests (Playwright)
 Execute end-to-end smoke tests against Chromium:
 ```bash
 task web:test:e2e
@@ -592,7 +598,7 @@ cd web && npm run test:e2e
 cd web && npm run test:e2e:ui
 ```
 
-### 4. Production Build & Unified Containerization (Model B)
+### 5. Production Build & Unified Containerization (Model B)
 In production (Model B), the Go backend binary embeds the compiled `web/dist` frontend bundle via standard library `//go:embed all:dist` (in `internal/transport/spa`):
 
 To build frontend assets and compile static Go binaries locally:

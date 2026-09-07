@@ -96,7 +96,7 @@ Create directories only when their stage implementation requires them.
 │   │   ├── components/          # layout, bento grid, honesty badges, auth modals, compare template, calculate builder, and catalog autocomplete/summary
 │   │   ├── hooks/               # custom hooks (useUrlParams two-way query synchronization)
 │   │   ├── lib/                 # formatting, workload URL serialization, query client configuration, and class merging utils
-│   │   ├── pages/               # compare category views (compute, storage, network, db, k8s, serverless) and composite calculator
+│   │   ├── pages/               # compare category views, composite calculator, provider status, and MCP playground
 │   │   ├── router/              # HTML5 pushState/replaceState Router, Link, and location hooks
 │   │   └── types/               # generated OpenAPI types and domain honesty models
 │   ├── public/                  # Static assets (favicons, brand fonts, manifest)

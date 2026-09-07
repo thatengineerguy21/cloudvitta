@@ -21,6 +21,7 @@ import { ProviderStatusPage } from './pages/ProviderStatusPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { CheckEmailPage } from './pages/CheckEmailPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { MCPPlaygroundPage } from './pages/MCPPlaygroundPage';
 
 export const AppRoutes: React.FC = () => {
   const { pathname } = useLocation();
@@ -48,6 +49,8 @@ export const AppRoutes: React.FC = () => {
       return <CheckEmailPage />;
     case '/verify-email':
       return <VerifyEmailPage />;
+    case '/playground':
+      return <MCPPlaygroundPage />;
     case '/':
       return <LandingPage />;
     default:
