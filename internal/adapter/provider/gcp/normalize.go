@@ -201,16 +201,6 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 				}
 				obsCountBefore := len(observations)
 
-				// Network SKUs published under Compute Engine service display name must route to network
-				if isNetworkProduct(sku) {
-					skuObs, nErr := normalizeNetworkSKU(sku, "network", fetchedAt, sink)
-					if nErr != nil {
-						return domain.NormalizationResult{}, "", nErr
-					}
-					observations = append(observations, skuObs...)
-					continue
-				}
-
 				// Filter 1: Check service category mapping (fails loudly if unmapped)
 				serviceName := sku.Category.ServiceDisplayName
 				if serviceName == "" {
@@ -224,6 +214,16 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 						continue
 					}
 					return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+				}
+
+				// Network SKUs published under Compute Engine service display name must route to network
+				if category == "compute" && isNetworkProduct(sku) {
+					skuObs, nErr := normalizeNetworkSKU(sku, "network", fetchedAt, sink)
+					if nErr != nil {
+						return domain.NormalizationResult{}, "", nErr
+					}
+					observations = append(observations, skuObs...)
+					continue
 				}
 
 				var skuObs []domain.PriceObservation
@@ -943,7 +943,7 @@ func normalizeDatabaseSKU(sku gcpSKU, category string, fetchedAt time.Time, sink
 		strings.Contains(sku.PricingInfo[0].PricingExpression.UsageUnit, "mo")
 
 	vcpu, ram, tier := parseGCPDatabaseAttributes(sku.Description, sku.Name)
-	isInstance := vcpu > 0 || ram > 0 || strings.Contains(sku.Description, "Instance")
+	isInstance := !isStorage && (vcpu > 0 || ram > 0 || strings.Contains(sku.Description, "Instance"))
 
 	// If it is neither storage nor an instance (e.g. network egress, backups, PITR), it is out of scope.
 	if !isStorage && !isInstance {
