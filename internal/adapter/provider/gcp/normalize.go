@@ -142,6 +142,12 @@ type gcpComponentSpec struct {
 // Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
 func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, string, error) {
+	return NormalizeForCategory(r, fetchedAt, "", sinks...)
+}
+
+// NormalizeForCategory parses a GCP Cloud Billing Catalog API JSON stream scoped to a target service category.
+// When targetCategory is non-empty, items belonging to other categories are cleanly ignored without polluting quarantine.
+func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory string, sinks ...quarantine.Sink) (domain.NormalizationResult, string, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -216,8 +222,14 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 					return domain.NormalizationResult{}, "", fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 				}
 
-				// Network SKUs published under Compute Engine service display name must route to network
-				if category == "compute" && isNetworkProduct(sku) {
+				// Network SKUs published under Compute Engine service display name
+				isNetwork := isNetworkProduct(sku)
+				if category == "compute" && isNetwork {
+					if targetCategory == "compute" {
+						slog.Debug("gcp normalize: ignoring network SKU for compute adapter", "sku", sku.SkuID, "desc", sku.Description)
+						ignoredCount++
+						continue
+					}
 					skuObs, nErr := normalizeNetworkSKU(sku, "network", fetchedAt, sink)
 					if nErr != nil {
 						return domain.NormalizationResult{}, "", nErr
@@ -226,14 +238,23 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 					continue
 				}
 
+				// If targetCategory is set and this SKU belongs to a different category, ignore it cleanly.
+				if targetCategory != "" && targetCategory != category {
+					slog.Debug("gcp normalize: ignoring SKU outside target category", "sku", sku.SkuID, "sku_category", category, "target_category", targetCategory)
+					ignoredCount++
+					continue
+				}
+
 				var skuObs []domain.PriceObservation
 				switch category {
 				case "compute":
-					if isComputeInstance(sku) {
-						skuObs, err = normalizeComputeSKU(sku, category, fetchedAt, sink)
-					}
-					if isComputeComponent(sku) {
-						collectComponentPricing(sku, components)
+					if targetCategory == "" || targetCategory == "compute" {
+						if isComputeInstance(sku) {
+							skuObs, err = normalizeComputeSKU(sku, category, fetchedAt, sink)
+						}
+						if isComputeComponent(sku) {
+							collectComponentPricing(sku, components)
+						}
 					}
 				case "storage":
 					if isStorageProduct(sku) {
@@ -289,7 +310,7 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 	}
 
 	// Synthesize machine type pricing from collected compute component SKUs
-	if len(components) > 0 {
+	if len(components) > 0 && (targetCategory == "" || targetCategory == "compute") {
 		composedObs, err := composeMachineTypePricing(components, fetchedAt, sink)
 		if err != nil {
 			return domain.NormalizationResult{}, "", err
@@ -338,7 +359,7 @@ func normalizeComputeSKU(sku gcpSKU, category string, fetchedAt time.Time, sink 
 
 	attrs, ok := parseGCPAttributes(sku.Description, sku.Name)
 	if !ok {
-		slog.Warn("gcp normalize: skipping SKU due to unmapped machine type", "provider", "gcp", "sku", sku.SkuID, "description", sku.Description, "name", sku.Name)
+		slog.Debug("gcp normalize: skipping SKU due to unmapped machine type", "provider", "gcp", "sku", sku.SkuID, "description", sku.Description, "name", sku.Name)
 		return nil, nil
 	}
 
@@ -596,21 +617,43 @@ func isNetworkProduct(sku gcpSKU) bool {
 	desc := sku.Description
 	group := sku.Category.ResourceGroup
 
-	// Exclude non-egress/auxiliary networking lines (IP reservations, DNS, peering, internal Google service replication, CDN cache fill, storage cross-region transfer)
+	// Exclude non-egress/auxiliary networking lines (IP reservations, DNS, peering, internal Google service replication, CDN cache fill, storage cross-region transfer, load balancing, NAT, firewalls, armor, routers, interconnect ports, etc.)
 	if strings.Contains(desc, "IP address") || strings.Contains(desc, "to Google Services") ||
 		strings.Contains(desc, "Carrier Peering") || strings.Contains(desc, "Direct Peering") ||
 		strings.Contains(desc, "Replication Networking Traffic") || strings.Contains(desc, "Cloud CDN") ||
 		strings.Contains(desc, "CDN") || strings.Contains(desc, "Storage Data Transfer") ||
 		strings.Contains(desc, "Turbo Replication") || strings.Contains(desc, "Data Transfer between") ||
 		strings.Contains(desc, "peered/interconnect") || strings.Contains(desc, "Rapid Bucket") ||
-		strings.Contains(desc, "Multi-region within") || strings.Contains(desc, "Replication within") {
+		strings.Contains(desc, "Multi-region within") || strings.Contains(desc, "Replication within") ||
+		strings.Contains(desc, "Load Balancing") || strings.Contains(desc, "Load Balancer") ||
+		strings.Contains(desc, "Forwarding Rule") || strings.Contains(desc, "NAT") ||
+		strings.Contains(desc, "Cloud Router") || strings.Contains(desc, "Router") ||
+		strings.Contains(desc, "Cloud Armor") || strings.Contains(desc, "Security Policy") ||
+		strings.Contains(desc, "Firewall") || strings.Contains(desc, "Private Service Connect") ||
+		strings.Contains(desc, "Packet Mirroring") || strings.Contains(desc, "Connectivity Center") ||
+		strings.Contains(desc, "Network Intelligence") || strings.Contains(desc, "Topology") ||
+		strings.Contains(desc, "SSL Certificate") || strings.Contains(desc, "Certificate") ||
+		strings.Contains(desc, "VPN Gateway") || strings.Contains(desc, "VPN Tunnel") ||
+		strings.Contains(desc, "Port charge") || strings.Contains(desc, "VLAN Attachment") ||
+		strings.Contains(desc, "10Gbps Link") || strings.Contains(desc, "100Gbps Link") ||
+		strings.Contains(desc, "Dedicated Interconnect Connection") || strings.Contains(desc, "Partner Interconnect Connection") {
 		return false
 	}
 
-	if sku.Category.ResourceFamily == "Network" || strings.Contains(desc, "Network") || strings.Contains(desc, "Egress") || strings.Contains(desc, "Data Transfer") || strings.Contains(group, "Interconnect") || strings.Contains(group, "Egress") {
-		return true
+	// Non-data-volume units (hourly or monthly service charges) are auxiliary services, not data transfer
+	if len(sku.PricingInfo) > 0 {
+		u := sku.PricingInfo[0].PricingExpression.UsageUnit
+		if u == "h" || u == "hour" || u == "mo" || u == "month" || u == "d" || u == "count" {
+			return false
+		}
 	}
-	return false
+
+	// Must explicitly describe data transfer or egress
+	isEgress := strings.Contains(desc, "Egress") || strings.Contains(desc, "Data Transfer") ||
+		strings.Contains(group, "Egress") || strings.Contains(group, "DataTransfer") ||
+		strings.Contains(desc, "Internet") || strings.Contains(desc, "Inter-region") ||
+		strings.Contains(desc, "Intra-region") || strings.Contains(desc, "Inter-zone")
+	return isEgress
 }
 
 func isDatabaseProduct(sku gcpSKU) bool {
@@ -821,6 +864,11 @@ func composeMachineTypePricing(components map[gcpComponentKey]*gcpComponentSpec,
 func isComputeInstance(sku gcpSKU) bool {
 	// Must be OnDemand
 	if sku.Category.UsageType != "OnDemand" {
+		return false
+	}
+
+	// Must belong to Compute resource family if specified
+	if sku.Category.ResourceFamily != "" && sku.Category.ResourceFamily != "Compute" {
 		return false
 	}
 

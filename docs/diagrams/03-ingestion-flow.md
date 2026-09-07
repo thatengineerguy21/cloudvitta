@@ -155,6 +155,11 @@ ratio = unmapped_count / in_scope_total
 - If `ratio <= MaxUnmappedRatio`, valid observations proceed to database upsert and cache warming.
 - Quarantined records are flushed to GCS at `quarantine/<provider>/<category>/<date>/<fetchID>.jsonl` and digested with `cmd/quarantine-digest`.
 
+### GCP Shared Catalog Category Scoping & Network Triage
+GCP publishes Compute Engine virtual machines, RAM/CPU components, and Network services under one service catalog ID (`6F81-5844-456A`). To prevent cross-category contamination and false quarantine alerts:
+1. **Target Category Isolation**: The GCP normalizer evaluates the active ingestion job category (`compute` or `network`). When the job category is `compute`, network SKUs are ignored without quarantine. When the job category is `network`, compute SKUs and machine component compositions are ignored without quarantine.
+2. **Auxiliary Network Line Classification**: Auxiliary networking infrastructure items (such as Cloud Load Balancing, Cloud NAT, Cloud Armor, Firewalls, and Cloud Interconnect port charges) do not represent data transfer egress volume. The normalizer classifies these auxiliary lines as out-of-scope (`ItemClassificationIgnored`). This prevents unmapped transfer type errors and keeps the unmapped ratio below the 5% quarantine threshold.
+
 ---
 
 ## Ingestion Job Triggers (CD Post-Deploy Warmup & Cloud Scheduler)

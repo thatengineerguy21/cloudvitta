@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider/gcp"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
@@ -404,5 +405,199 @@ func TestAdapter_Fetch_CategoryFiltering_ExcludesOtherCategories(t *testing.T) {
 	// Should filter out all network observations because adapter is configured for "compute"
 	if len(result.Observations) != 0 {
 		t.Errorf("Fetch() returned %d observations, want 0 (network observations filtered from compute adapter)", len(result.Observations))
+	}
+}
+
+func TestAdapter_Fetch_ComputeJob_IgnoresAuxiliaryNetworkSKUsWithoutQuarantine(t *testing.T) {
+	// Mixed payload returned by GCP Compute Engine service endpoint:
+	// - 1 valid compute instance (n2-standard-4)
+	// - 1 auxiliary network SKU published under Compute Engine (e.g. Load Balancing Forwarding Rule)
+	jsonPayload := `{
+		"skus": [
+			{
+				"name": "services/6F81-5844-456A/skus/SKU-GCP-N2-STD-4",
+				"skuId": "SKU-GCP-N2-STD-4",
+				"description": "N2 Predefined Instance Core and Ram running in Virginia (n2-standard-4)",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"resourceFamily": "Compute",
+					"resourceGroup": "N2",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 194400000}}]
+						}
+					}
+				]
+			},
+			{
+				"name": "services/6F81-5844-456A/skus/SKU-GCP-NET-LB-FORWARDING-RULE",
+				"skuId": "SKU-GCP-NET-LB-FORWARDING-RULE",
+				"description": "Network Load Balancing: Forwarding Rule",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"resourceFamily": "Network",
+					"resourceGroup": "LoadBalancing",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 25000000}}]
+						}
+					}
+				]
+			}
+		]
+	}`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(jsonPayload))
+	}))
+	defer ts.Close()
+
+	client := gcp.NewClient(gcp.WithURL(ts.URL), gcp.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := gcp.NewAdapter(client, memStorage, gcp.WithCategory("compute"))
+
+	f := provider.NewFactory()
+	f.Register(provider.ProviderConfig{
+		Provider:         "gcp",
+		Category:         "compute",
+		MaxUnmappedRatio: 0.05,
+	}, adapter)
+
+	jobs := f.BuildJobs()
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
+
+	result, err := jobs[0].Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() failed due to unmapped threshold: %v", err)
+	}
+
+	if result.UnmappedCount != 0 {
+		t.Errorf("expected 0 unmapped items for compute job, got %d", result.UnmappedCount)
+	}
+	if len(result.Observations) != 1 {
+		t.Errorf("expected 1 compute observation, got %d", len(result.Observations))
+	}
+}
+
+func TestAdapter_Fetch_NetworkJob_IgnoresAuxiliaryNetworkAndComputeSKUsWithoutQuarantine(t *testing.T) {
+	// Mixed payload returned by GCP Compute Engine service endpoint:
+	// - 1 compute instance (n2-standard-4)
+	// - 1 auxiliary network SKU (Load Balancing Forwarding Rule)
+	// - 1 valid network internet egress SKU
+	jsonPayload := `{
+		"skus": [
+			{
+				"name": "services/6F81-5844-456A/skus/SKU-GCP-N2-STD-4",
+				"skuId": "SKU-GCP-N2-STD-4",
+				"description": "N2 Predefined Instance Core and Ram running in Virginia (n2-standard-4)",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"resourceFamily": "Compute",
+					"resourceGroup": "N2",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 194400000}}]
+						}
+					}
+				]
+			},
+			{
+				"name": "services/6F81-5844-456A/skus/SKU-GCP-NET-LB-FORWARDING-RULE",
+				"skuId": "SKU-GCP-NET-LB-FORWARDING-RULE",
+				"description": "Network Load Balancing: Forwarding Rule",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"resourceFamily": "Network",
+					"resourceGroup": "LoadBalancing",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 25000000}}]
+						}
+					}
+				]
+			},
+			{
+				"name": "services/6F81-5844-456A/skus/SKU-GCP-NET-FLAT",
+				"skuId": "SKU-GCP-NET-FLAT",
+				"description": "Network Internet Egress from US to Americas",
+				"category": {
+					"serviceDisplayName": "Compute Engine",
+					"resourceFamily": "Network",
+					"resourceGroup": "Interconnect",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "GiBy",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 85000000}}]
+						}
+					}
+				]
+			}
+		]
+	}`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(jsonPayload))
+	}))
+	defer ts.Close()
+
+	client := gcp.NewClient(gcp.WithURL(ts.URL), gcp.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := gcp.NewAdapter(client, memStorage, gcp.WithCategory("network"))
+
+	f := provider.NewFactory()
+	f.Register(provider.ProviderConfig{
+		Provider:         "gcp",
+		Category:         "network",
+		MaxUnmappedRatio: 0.05,
+	}, adapter)
+
+	jobs := f.BuildJobs()
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
+
+	result, err := jobs[0].Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() failed due to unmapped threshold: %v", err)
+	}
+
+	if result.UnmappedCount != 0 {
+		t.Errorf("expected 0 unmapped items for network job, got %d", result.UnmappedCount)
+	}
+	if len(result.Observations) != 1 {
+		t.Errorf("expected 1 network observation, got %d", len(result.Observations))
+	}
+	if len(result.Observations) > 0 && result.Observations[0].SkuID != "SKU-GCP-NET-FLAT" {
+		t.Errorf("expected SKU-GCP-NET-FLAT, got %s", result.Observations[0].SkuID)
 	}
 }

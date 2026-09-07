@@ -160,7 +160,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 				}
 			}()
 			var normErr error
-			pageResult, pageNextToken, normErr = Normalize(pr, fetchedAt, qSink)
+			pageResult, pageNextToken, normErr = NormalizeForCategory(pr, fetchedAt, a.category, qSink)
 			if normErr != nil {
 				_ = pr.CloseWithError(normErr)
 				return fmt.Errorf("gcp adapter: normalize page %d: %w", pageIdx, normErr)
