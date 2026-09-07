@@ -42,7 +42,7 @@ func run() error {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Minute)
 	defer cancel()
 
 	serviceName := "cloudvitta-ingest"

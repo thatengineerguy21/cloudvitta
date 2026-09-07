@@ -28,10 +28,31 @@ const DefaultKubernetesRetailPricesURL = "https://prices.azure.com/api/retail/pr
 // DefaultFunctionsRetailPricesURL is the standard Azure Retail Prices API URL for Azure Functions in eastus.
 const DefaultFunctionsRetailPricesURL = "https://prices.azure.com/api/retail/prices?$filter=(serviceName%20eq%20'Azure%20Functions'%20or%20serviceName%20eq%20'Functions')%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
 
+// BuildRegionalRetailPricesURL constructs a Retail Prices API URL for a service category and regional hub.
+func BuildRegionalRetailPricesURL(category, region string) string {
+	switch category {
+	case "storage":
+		return fmt.Sprintf("https://prices.azure.com/api/retail/prices?$filter=serviceName%%20eq%%20'Storage'%%20and%%20armRegionName%%20eq%%20'%s'%%20and%%20priceType%%20eq%%20'Consumption'", region)
+	case "network":
+		return DefaultNetworkRetailPricesURL
+	case "database_rdbms":
+		return fmt.Sprintf("https://prices.azure.com/api/retail/prices?$filter=(serviceName%%20eq%%20'Azure%%20Database%%20for%%20PostgreSQL'%%20or%%20serviceName%%20eq%%20'Azure%%20Database%%20for%%20MySQL'%%20or%%20serviceName%%20eq%%20'SQL%%20Database')%%20and%%20armRegionName%%20eq%%20'%s'%%20and%%20priceType%%20eq%%20'Consumption'", region)
+	case "database_nosql":
+		return fmt.Sprintf("https://prices.azure.com/api/retail/prices?$filter=serviceName%%20eq%%20'Azure%%20Cosmos%%20DB'%%20and%%20armRegionName%%20eq%%20'%s'%%20and%%20priceType%%20eq%%20'Consumption'", region)
+	case "kubernetes":
+		return fmt.Sprintf("https://prices.azure.com/api/retail/prices?$filter=serviceName%%20eq%%20'Azure%%20Kubernetes%%20Service'%%20and%%20armRegionName%%20eq%%20'%s'%%20and%%20priceType%%20eq%%20'Consumption'", region)
+	case "serverless":
+		return fmt.Sprintf("https://prices.azure.com/api/retail/prices?$filter=(serviceName%%20eq%%20'Azure%%20Functions'%%20or%%20serviceName%%20eq%%20'Functions')%%20and%%20armRegionName%%20eq%%20'%s'%%20and%%20priceType%%20eq%%20'Consumption'", region)
+	default:
+		return fmt.Sprintf("https://prices.azure.com/api/retail/prices?$filter=serviceName%%20eq%%20'Virtual%%20Machines'%%20and%%20armRegionName%%20eq%%20'%s'%%20and%%20priceType%%20eq%%20'Consumption'", region)
+	}
+}
+
 // Client is an HTTP client for fetching Azure Retail Prices API data.
 type Client struct {
-	httpClient *http.Client
-	url        string
+	httpClient   *http.Client
+	url          string
+	hasCustomURL bool
 }
 
 // Option allows customizing the Azure client.
@@ -48,7 +69,18 @@ func WithHTTPClient(hc *http.Client) Option {
 func WithURL(url string) Option {
 	return func(c *Client) {
 		c.url = url
+		c.hasCustomURL = true
 	}
+}
+
+// HasCustomURL reports whether a custom endpoint URL was set on the client.
+func (c *Client) HasCustomURL() bool {
+	return c.hasCustomURL
+}
+
+// URL returns the base endpoint URL.
+func (c *Client) URL() string {
+	return c.url
 }
 
 // NewClient constructs a new Azure client.

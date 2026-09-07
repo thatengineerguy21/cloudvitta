@@ -52,3 +52,5 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0042-soft-warm-modern-and-obsidian-terracotta-bento-redesign.md](0042-soft-warm-modern-and-obsidian-terracotta-bento-redesign.md): Soft Warm Modern and Obsidian Terracotta Bento Redesign
 - [0043-email-verification-resend-and-login-gate.md](0043-email-verification-resend-and-login-gate.md): Email Verification with Resend and Strict Login Gate
 - [0044-defense-in-depth-ingestion-category-isolation-and-zero-dollar-deduplication.md](0044-defense-in-depth-ingestion-category-isolation-and-zero-dollar-deduplication.md): Defense-in-Depth Ingestion Category Isolation and Zero-Dollar Deduplication
+- [0045-big-3-multi-region-ingestion-and-capacity-management.md](0045-big-3-multi-region-ingestion-and-capacity-management.md): Big 3 Multi-Region Ingestion and Capacity Management
+

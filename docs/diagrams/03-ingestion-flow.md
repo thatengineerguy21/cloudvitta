@@ -175,3 +175,25 @@ CloudVitta supports two automated execution pathways and one manual trigger path
      ```bash
      gcloud run jobs execute cloudvitta-ingest --region asia-southeast1 --wait
      ```
+
+---
+
+## Multi-Region Ingestion Architecture (8 Strategic Global Hubs)
+
+To supply accurate global cost calculations while preventing memory exhaustion on Cloud Run, the ingestion pipeline uses bounded parallelism:
+- **Global Concurrency Semaphore**: Capped at `MaxConcurrency = 3` worker goroutines via `errgroup.SetLimit(3)`.
+- **Sequential Regional Ingestion**: Within regional adapters (such as AWS and Azure), regional price lists for the 8 global hubs (`us-east-1`, `us-west-2`, `eu-central-1`, `eu-west-2`, `ap-southeast-1`, `ap-northeast-1`, `ap-south-1`, and `ap-southeast-2`) are streamed sequentially.
+- **Run Timeout**: The Cloud Run job timeout and context deadline are set to 35 minutes (`35m`), which allows sufficient time for regional iteration with network retry buffers.
+- **Cache Warming**: On successful completion of an ingestion job, `Orchestrator.warmCache` groups observations by region and writes cache keys (`v1:{provider}:{category}:{region}`) across all 8 hubs.
+
+---
+
+## Raw Payload Storage Lifecycle Management (GCS)
+
+Per PRD §15.2 and ADR 0012, raw provider API streams are written to Google Cloud Storage (`raw/{provider}/{category}/{date}/...`) before normalization. To control storage growth and cost over time:
+- **Automation Script**: [`scripts/setup-gcs-lifecycle.sh`](file:///D:/02-code/cloudvitta/scripts/setup-gcs-lifecycle.sh) applies bucket lifecycle rules.
+- **30-Day Transition**: Objects with prefix `raw/` move to `NEARLINE` storage class after 30 days.
+- **90-Day Transition**: Objects with prefix `raw/` move to `COLDLINE` storage class after 90 days.
+- **180-Day Deletion**: Objects with prefix `raw/` expire and are permanently deleted after 180 days.
+- **Cost Envelope**: A 26-week rolling window maintains ~3.4 GB of compressed raw data, keeping monthly GCS storage expenditure below $0.08 / month.
+

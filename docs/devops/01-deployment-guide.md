@@ -44,6 +44,27 @@ gcloud artifacts repositories create ${REPO_NAME} \
   --project="${PROJECT_ID}"
 ```
 
+### 4. Create the Storage Bucket and Apply Lifecycle Rules
+Create the Google Cloud Storage bucket for raw provider payloads:
+```bash
+export GCS_BUCKET_NAME="cloudvitta-raw-fixtures"
+
+gcloud storage buckets create "gs://${GCS_BUCKET_NAME}" \
+  --location="${REGION}" \
+  --project="${PROJECT_ID}" \
+  --uniform-bucket-level-access
+```
+
+Apply the automated storage lifecycle rules:
+```bash
+bash scripts/setup-gcs-lifecycle.sh "${GCS_BUCKET_NAME}"
+```
+
+This script configures three lifecycle rules for raw provider response files (`raw/*`):
+- Move objects to `NEARLINE` storage class after 30 days.
+- Move objects to `COLDLINE` storage class after 90 days.
+- Delete objects permanently after 180 days.
+
 ---
 
 ## Phase 2: Workload Identity Federation (WIF) Setup
@@ -278,7 +299,7 @@ Go to GitHub -> **Settings** -> **Secrets and variables** -> **Actions** -> **Va
 1. **Build & Push**: The Go application is packaged into a minimal distroless container image containing both `/api` and `/ingest` statically compiled binaries, and pushed to Google Artifact Registry.
 2. **Database Migrations**: `tern` connects to your Neon production database and applies any new forward migrations (`0001_initial_schema.sql` through `0005_add_email_verification.sql`). Since we enforce forward-only migrations (ADR 0028), this executes safely on every deploy.
 3. **Deploy API Service**: Cloud Run updates the `cloudvitta-api` service with the new image revision. Traffic shifts automatically once the instance passes readiness probes.
-4. **Deploy Ingest Job**: The pipeline executes `gcloud run jobs deploy` to configure the `cloudvitta-ingest` Cloud Run Job with `--command /ingest`, resource limits (2 CPU, 2Gi RAM, 20m timeout), and matching production environment secrets.
+4. **Deploy Ingest Job**: The pipeline executes `gcloud run jobs deploy` to configure the `cloudvitta-ingest` Cloud Run Job with `--command /ingest`, resource limits (2 CPU, 2Gi RAM, 35m timeout), and matching production environment secrets.
 5. **Execute Post-Deploy Warmup**: The pipeline triggers immediate job execution (`gcloud run jobs execute --wait`) to validate provider ingestion against the new schema and refresh the Redis cache.
 
 ### Manual Ingestion Job Trigger

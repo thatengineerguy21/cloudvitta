@@ -84,6 +84,10 @@ func normalizeKubernetesSKU(sku gcpSKU, category string, fetchedAt time.Time, si
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 		}
 
+		if !regionmap.IsTargetRegion("gcp", region) {
+			continue
+		}
+
 		results = append(results, domain.PriceObservation{
 			Provider:        "gcp",
 			ServiceCategory: category,

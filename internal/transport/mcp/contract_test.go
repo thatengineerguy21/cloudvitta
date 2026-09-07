@@ -4172,3 +4172,283 @@ func TestContractParity_SevenProviders_FullFanout(t *testing.T) {
 		assertCalculateParity(t, restResp, mcpResp)
 	})
 }
+
+// seedContractHubObservations populates Redis cache observations for all 8 strategic hubs across Big 3.
+func seedContractHubObservations(ctx context.Context, t *testing.T, rdb *redis.Client, baseTime time.Time) {
+	t.Helper()
+	hubs := regionmap.TargetHubs()
+
+	for _, hub := range hubs {
+		// Compute observations
+		awsCompute := []domain.PriceObservation{
+			{
+				Provider:        "aws",
+				ServiceCategory: "compute",
+				SkuID:           "SKU-AWS-T3-MED-" + hub.AWSRegion,
+				DisplayName:     "t3.medium",
+				Region:          hub.AWSRegion,
+				RegionGroup:     hub.RegionGroup,
+				Unit:            "hour",
+				PriceAmount:     decimal.RequireFromString("0.0416"),
+				PriceCurrency:   "USD",
+				PricingModel:    "OnDemand",
+				Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+				FetchedAt:       baseTime.Add(-1 * time.Hour),
+			},
+		}
+		azureCompute := []domain.PriceObservation{
+			{
+				Provider:        "azure",
+				ServiceCategory: "compute",
+				SkuID:           "SKU-AZ-D2S-V5-" + hub.AzureRegion,
+				DisplayName:     "Standard_D2s_v5",
+				Region:          hub.AzureRegion,
+				RegionGroup:     hub.RegionGroup,
+				Unit:            "hour",
+				PriceAmount:     decimal.RequireFromString("0.0480"),
+				PriceCurrency:   "USD",
+				PricingModel:    "OnDemand",
+				Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+				FetchedAt:       baseTime.Add(-1 * time.Hour),
+			},
+		}
+		gcpCompute := []domain.PriceObservation{
+			{
+				Provider:        "gcp",
+				ServiceCategory: "compute",
+				SkuID:           "SKU-GCP-E2-STD-2-" + hub.GCPRegion,
+				DisplayName:     "e2-standard-2",
+				Region:          hub.GCPRegion,
+				RegionGroup:     hub.RegionGroup,
+				Unit:            "hour",
+				PriceAmount:     decimal.RequireFromString("0.0670"),
+				PriceCurrency:   "USD",
+				PricingModel:    "OnDemand",
+				Attributes:      domain.ComputeAttributes{VCPU: 2, RAMGB: 4, Family: "general_purpose"},
+				FetchedAt:       baseTime.Add(-1 * time.Hour),
+			},
+		}
+
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "compute", hub.AWSRegion), awsCompute, cache.DefaultTTL)
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "compute", hub.AzureRegion), azureCompute, cache.DefaultTTL)
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "compute", hub.GCPRegion), gcpCompute, cache.DefaultTTL)
+
+		// Storage observations
+		awsStorage := []domain.PriceObservation{
+			{
+				Provider:          "aws",
+				ServiceCategory:   "storage",
+				SkuID:             "SKU-AWS-S3-STD-" + hub.AWSRegion,
+				DisplayName:       "S3 Standard",
+				Region:            hub.AWSRegion,
+				RegionGroup:       hub.RegionGroup,
+				Unit:              "GB-Mo",
+				PriceAmount:       decimal.RequireFromString("0.0230"),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard", StorageGroup: "object"},
+				FetchedAt:         baseTime.Add(-1 * time.Hour),
+			},
+		}
+		azureStorage := []domain.PriceObservation{
+			{
+				Provider:          "azure",
+				ServiceCategory:   "storage",
+				SkuID:             "SKU-AZ-BLOB-HOT-" + hub.AzureRegion,
+				DisplayName:       "Blob Hot",
+				Region:            hub.AzureRegion,
+				RegionGroup:       hub.RegionGroup,
+				Unit:              "GB-Mo",
+				PriceAmount:       decimal.RequireFromString("0.0200"),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard", StorageGroup: "object"},
+				FetchedAt:         baseTime.Add(-1 * time.Hour),
+			},
+		}
+		gcpStorage := []domain.PriceObservation{
+			{
+				Provider:          "gcp",
+				ServiceCategory:   "storage",
+				SkuID:             "SKU-GCP-GCS-STD-" + hub.GCPRegion,
+				DisplayName:       "Standard Storage",
+				Region:            hub.GCPRegion,
+				RegionGroup:       hub.RegionGroup,
+				Unit:              "GB-Mo",
+				PriceAmount:       decimal.RequireFromString("0.0200"),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				StorageAttributes: domain.StorageAttributes{SizeGB: 100, StorageClass: "standard", StorageGroup: "object"},
+				FetchedAt:         baseTime.Add(-1 * time.Hour),
+			},
+		}
+
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "storage", hub.AWSRegion), awsStorage, cache.DefaultTTL)
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "storage", hub.AzureRegion), azureStorage, cache.DefaultTTL)
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "storage", hub.GCPRegion), gcpStorage, cache.DefaultTTL)
+
+		// Network observations
+		awsNetwork := []domain.PriceObservation{
+			{
+				Provider:          "aws",
+				ServiceCategory:   "network",
+				SkuID:             "SKU-AWS-NET-EGRESS-" + hub.AWSRegion,
+				DisplayName:       "AWS Data Transfer Out",
+				Region:            hub.AWSRegion,
+				RegionGroup:       hub.RegionGroup,
+				Unit:              "GB",
+				PriceAmount:       decimal.RequireFromString("0.0900"),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				NetworkAttributes: domain.NetworkAttributes{TransferType: "internet_egress", NetworkGroup: "internet_egress"},
+				FetchedAt:         baseTime.Add(-1 * time.Hour),
+			},
+		}
+		azureNetwork := []domain.PriceObservation{
+			{
+				Provider:          "azure",
+				ServiceCategory:   "network",
+				SkuID:             "SKU-AZ-NET-EGRESS-" + hub.AzureRegion,
+				DisplayName:       "Azure Bandwidth Out",
+				Region:            hub.AzureRegion,
+				RegionGroup:       hub.RegionGroup,
+				Unit:              "GB",
+				PriceAmount:       decimal.RequireFromString("0.0870"),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				NetworkAttributes: domain.NetworkAttributes{TransferType: "internet_egress", NetworkGroup: "internet_egress"},
+				FetchedAt:         baseTime.Add(-1 * time.Hour),
+			},
+		}
+		gcpNetwork := []domain.PriceObservation{
+			{
+				Provider:          "gcp",
+				ServiceCategory:   "network",
+				SkuID:             "SKU-GCP-NET-EGRESS-" + hub.GCPRegion,
+				DisplayName:       "GCP Internet Egress",
+				Region:            hub.GCPRegion,
+				RegionGroup:       hub.RegionGroup,
+				Unit:              "GB",
+				PriceAmount:       decimal.RequireFromString("0.0850"),
+				PriceCurrency:     "USD",
+				PricingModel:      "OnDemand",
+				NetworkAttributes: domain.NetworkAttributes{TransferType: "internet_egress", NetworkGroup: "internet_egress"},
+				FetchedAt:         baseTime.Add(-1 * time.Hour),
+			},
+		}
+
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", hub.AWSRegion), awsNetwork, cache.DefaultTTL)
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", hub.AzureRegion), azureNetwork, cache.DefaultTTL)
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", hub.GCPRegion), gcpNetwork, cache.DefaultTTL)
+	}
+}
+
+// 12. Multi-Region 8 Strategic Hubs Parity Suite
+func TestContractParity_MultiRegionAllHubs(t *testing.T) {
+	harness := setupContractParityTest(t)
+	defer harness.Close()
+
+	ctx := context.Background()
+	seedContractHubObservations(ctx, t, harness.rdb, harness.fixedNow)
+
+	// Generate a fresh standard-tier token evaluated against router's time.Now()
+	validToken, err := auth.GenerateAccessToken(uuid.New(), "standard", []byte("super-secret-jwt-signing-key-32b-length!"), time.Now(), 15*time.Minute)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken failed: %v", err)
+	}
+
+	hubs := regionmap.TargetHubs()
+	for _, hub := range hubs {
+		hub := hub
+		t.Run(hub.HubID, func(t *testing.T) {
+			// Test Compute Parity for this hub
+			t.Run("Compute", func(t *testing.T) {
+				vcpu := 2.0
+				ramGB := 4.0
+				family := "general_purpose"
+
+				restResp, code, body := invokeREST[rest.ComputeComparisonResponse](
+					t, harness.restRouter, http.MethodGet,
+					fmt.Sprintf("/api/v1/prices/compute?vcpu=%.0f&ram_gb=%.0f&family=%s&region=%s", vcpu, ramGB, family, hub.HubID),
+					nil, validToken,
+				)
+				if code != http.StatusOK {
+					t.Fatalf("REST returned status %d: %s", code, body)
+				}
+
+				mcpResp, err := invokeMCP[mcp.ComputeComparisonResponse](
+					ctx, t, harness.mcpClient, "compare_compute",
+					mcp.CompareComputeInput{
+						VCPU:   &vcpu,
+						RAMGB:  &ramGB,
+						Family: family,
+						Region: hub.HubID,
+					},
+				)
+				if err != nil {
+					t.Fatalf("MCP invoke failed: %v", err)
+				}
+
+				assertComputeParity(t, restResp, mcpResp)
+			})
+
+			// Test Storage Parity for this hub
+			t.Run("Storage", func(t *testing.T) {
+				sizeGB := 100.0
+				storageClass := "standard"
+
+				restResp, code, body := invokeREST[rest.StorageComparisonResponse](
+					t, harness.restRouter, http.MethodGet,
+					fmt.Sprintf("/api/v1/prices/storage?size_gb=%.0f&storage_class=%s&region=%s", sizeGB, storageClass, hub.HubID),
+					nil, validToken,
+				)
+				if code != http.StatusOK {
+					t.Fatalf("REST returned status %d: %s", code, body)
+				}
+
+				mcpResp, err := invokeMCP[mcp.StorageComparisonResponse](
+					ctx, t, harness.mcpClient, "compare_storage",
+					mcp.CompareStorageInput{
+						SizeGB:       &sizeGB,
+						StorageClass: storageClass,
+						Region:       hub.HubID,
+					},
+				)
+				if err != nil {
+					t.Fatalf("MCP invoke failed: %v", err)
+				}
+
+				assertStorageParity(t, restResp, mcpResp)
+			})
+
+			// Test Network Parity for this hub
+			t.Run("Network", func(t *testing.T) {
+				egressGB := 50.0
+				transferType := "internet_egress"
+
+				restResp, code, body := invokeREST[rest.NetworkComparisonResponse](
+					t, harness.restRouter, http.MethodGet,
+					fmt.Sprintf("/api/v1/prices/network?egress_gb=%.0f&transfer_type=%s&region=%s", egressGB, transferType, hub.HubID),
+					nil, validToken,
+				)
+				if code != http.StatusOK {
+					t.Fatalf("REST returned status %d: %s", code, body)
+				}
+
+				mcpResp, err := invokeMCP[mcp.NetworkComparisonResponse](
+					ctx, t, harness.mcpClient, "compare_network",
+					mcp.CompareNetworkInput{
+						EgressGB:     &egressGB,
+						TransferType: transferType,
+						Region:       hub.HubID,
+					},
+				)
+				if err != nil {
+					t.Fatalf("MCP invoke failed: %v", err)
+				}
+
+				assertNetworkParity(t, restResp, mcpResp)
+			})
+		})
+	}
+}

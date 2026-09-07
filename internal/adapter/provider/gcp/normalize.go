@@ -372,6 +372,10 @@ func normalizeComputeSKU(sku gcpSKU, category string, fetchedAt time.Time, sink 
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 		}
 
+		if !regionmap.IsTargetRegion("gcp", region) {
+			continue
+		}
+
 		results = append(results, domain.PriceObservation{
 			Provider:        "gcp",
 			ServiceCategory: category,
@@ -455,6 +459,10 @@ func normalizeStorageSKU(sku gcpSKU, category string, fetchedAt time.Time, sink 
 				continue
 			}
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+		}
+
+		if !regionmap.IsTargetRegion("gcp", region) {
+			continue
 		}
 
 		results = append(results, domain.PriceObservation{
@@ -785,6 +793,10 @@ func composeMachineTypePricing(components map[string]*gcpComponentSpec, fetchedA
 					return nil, fmt.Errorf("gcp compose region %s: %w", region, err)
 				}
 
+				if !regionmap.IsTargetRegion("gcp", region) {
+					continue
+				}
+
 				observations = append(observations, domain.PriceObservation{
 					Provider:        "gcp",
 					ServiceCategory: "compute",
@@ -983,6 +995,10 @@ func normalizeDatabaseSKU(sku gcpSKU, category string, fetchedAt time.Time, sink
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
 		}
 
+		if !regionmap.IsTargetRegion("gcp", region) {
+			continue
+		}
+
 		if isStorage {
 			storageFamily := "ssd"
 			if strings.Contains(sku.Description, "HDD") || strings.Contains(sku.Category.ResourceGroup, "PDStandard") {
@@ -1152,6 +1168,10 @@ func normalizeDatabaseNoSQLSKU(sku gcpSKU, category string, fetchedAt time.Time,
 				continue
 			}
 			return nil, fmt.Errorf("gcp normalize sku %s: %w", sku.SkuID, err)
+		}
+
+		if !regionmap.IsTargetRegion("gcp", region) {
+			continue
 		}
 
 		if isStorage {

@@ -421,3 +421,16 @@ func TestAdapter_Fetch_Network_HappyPath(t *testing.T) {
 		t.Errorf("NetworkAttributes.EgressGB = %v, want 1", obs.NetworkAttributes.EgressGB)
 	}
 }
+
+func TestBuildRegionalRetailPricesURL(t *testing.T) {
+	u := azure.BuildRegionalRetailPricesURL("compute", "germanywestcentral")
+	expected := "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Virtual%20Machines'%20and%20armRegionName%20eq%20'germanywestcentral'%20and%20priceType%20eq%20'Consumption'"
+	if u != expected {
+		t.Errorf("BuildRegionalRetailPricesURL() = %q, want %q", u, expected)
+	}
+
+	uNet := azure.BuildRegionalRetailPricesURL("network", "germanywestcentral")
+	if uNet != azure.DefaultNetworkRetailPricesURL {
+		t.Errorf("BuildRegionalRetailPricesURL(network) = %q, want %q", uNet, azure.DefaultNetworkRetailPricesURL)
+	}
+}

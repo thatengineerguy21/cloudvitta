@@ -233,4 +233,16 @@ test.describe('Compare Views & Honesty Elements E2E', () => {
     await expect(page.getByTestId('compute-vcpu-input')).toHaveValue('2');
     await expect(page.getByTestId('compute-ram-input')).toHaveValue('4');
   });
+
+  test('should support multi-region global hubs via region parameter', async ({ page }) => {
+    // Navigate with Tokyo hub
+    await page.goto('/compare/compute?vcpu=4&ram_gb=16&region=ap-northeast');
+    await expect(page).toHaveURL(/region=ap-northeast/);
+
+    // Navigate with Frankfurt hub
+    await page.goto('/compare/storage?size_gb=200&region=eu-central');
+    await expect(page).toHaveURL(/region=eu-central/);
+    await expect(page.getByRole('heading', { level: 1, name: /Storage Pricing Comparison/i })).toBeVisible();
+  });
 });
+

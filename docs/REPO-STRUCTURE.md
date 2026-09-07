@@ -72,6 +72,8 @@ Create directories only when their stage implementation requires them.
 │
 ├── migrations/                  # Tern forward-only SQL migration files
 │
+├── scripts/                     # operational automation and maintenance scripts (setup-gcs-lifecycle.sh)
+│
 ├── docs/
 │   ├── REPO-STRUCTURE.md     # repository structure reference
 │   ├── DEVELOPMENT_GUIDE.md     # step-by-step setup and local development guide

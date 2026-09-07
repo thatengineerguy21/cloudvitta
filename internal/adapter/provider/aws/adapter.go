@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
 	"go.opentelemetry.io/otel"
@@ -110,59 +111,93 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 	fetchedAt := time.Now().UTC()
 	fetchID := uuid.New().String()
 	dateStr := fetchedAt.Format("2006-01-02")
-	gcsPath := fmt.Sprintf("raw/aws/%s/%s/%s.json", category, dateStr, fetchID)
 
-	body, err := a.client.FetchPriceList(ctx)
-	if err != nil {
-		if a.fetchCounter != nil {
-			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
-		}
-		return domain.FetchResult{}, fmt.Errorf("aws adapter: fetch price list: %w", err)
+	targetRegions := []string{""}
+	if !a.client.HasCustomURL() && category != "network" {
+		targetRegions = regionmap.TargetAWSRegions()
 	}
-	defer func() { _ = body.Close() }()
 
-	cr := provider.NewCountingReader(body)
-	pr, pw := io.Pipe()
-	tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
+	var allObservations []domain.PriceObservation
+	var totalIgnoredCount int
+	var totalBytes int64
+	var firstGCSPath string
+	offerCode := OfferCodeForCategory(category)
 
 	qSink := quarantine.NewStorageSink(a.storage, "aws", category, fetchID, fetchedAt)
-	var normResult domain.NormalizationResult
-	g, _ := errgroup.WithContext(ctx)
 
-	// Goroutine 1: Normalize reads from pr
-	g.Go(func() error {
-		var normErr error
-		normResult, normErr = Normalize(pr, fetchedAt, qSink)
-		if normErr != nil {
-			_ = pr.CloseWithError(normErr)
-			return fmt.Errorf("aws adapter: normalize: %w", normErr)
+	for _, region := range targetRegions {
+		fetchURL := a.client.URL()
+		gcsPath := fmt.Sprintf("raw/aws/%s/%s/%s.json", category, dateStr, fetchID)
+		if region != "" {
+			fetchURL = BuildRegionalURL(offerCode, region)
+			gcsPath = fmt.Sprintf("raw/aws/%s/%s/%s-%s.json", category, dateStr, region, fetchID)
 		}
-		_ = pr.Close()
-		return nil
-	})
-
-	// Goroutine 2: GCS reads from tee
-	g.Go(func() error {
-		defer func() { _ = pw.Close() }()
-		if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
-			_ = pw.CloseWithError(err)
-			return fmt.Errorf("aws adapter: storage write: %w", err)
+		if firstGCSPath == "" {
+			firstGCSPath = gcsPath
 		}
-		return nil
-	})
 
-	if err = g.Wait(); err != nil {
-		if a.fetchCounter != nil {
-			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
+		if limiter != nil {
+			if err = limiter.Wait(ctx); err != nil {
+				return domain.FetchResult{}, fmt.Errorf("aws adapter: rate limit wait: %w", err)
+			}
 		}
-		return domain.FetchResult{}, err
-	}
 
-	if a.bytesCounter != nil {
-		a.bytesCounter.Add(ctx, cr.BytesRead(), metric.WithAttributes(
-			attribute.String("provider", "aws"),
-			attribute.String("category", category),
-		))
+		var body io.ReadCloser
+		body, err = a.client.FetchPriceListURL(ctx, fetchURL)
+		if err != nil {
+			if len(targetRegions) > 1 {
+				continue
+			}
+			if a.fetchCounter != nil {
+				a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
+			}
+			return domain.FetchResult{}, fmt.Errorf("aws adapter: fetch price list: %w", err)
+		}
+
+		cr := provider.NewCountingReader(body)
+		pr, pw := io.Pipe()
+		tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
+
+		var normResult domain.NormalizationResult
+		g, _ := errgroup.WithContext(ctx)
+
+		// Goroutine 1: Normalize reads from pr
+		g.Go(func() error {
+			var normErr error
+			normResult, normErr = Normalize(pr, fetchedAt, qSink)
+			if normErr != nil {
+				_ = pr.CloseWithError(normErr)
+				return fmt.Errorf("aws adapter: normalize: %w", normErr)
+			}
+			_ = pr.Close()
+			return nil
+		})
+
+		// Goroutine 2: GCS reads from tee
+		g.Go(func() error {
+			defer func() { _ = pw.Close() }()
+			if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
+				_ = pw.CloseWithError(err)
+				return fmt.Errorf("aws adapter: storage write: %w", err)
+			}
+			return nil
+		})
+
+		if err = g.Wait(); err != nil {
+			_ = body.Close()
+			if len(targetRegions) > 1 {
+				continue
+			}
+			if a.fetchCounter != nil {
+				a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
+			}
+			return domain.FetchResult{}, err
+		}
+		_ = body.Close()
+
+		totalBytes += cr.BytesRead()
+		allObservations = append(allObservations, normResult.Observations...)
+		totalIgnoredCount += normResult.IgnoredCount
 	}
 
 	// Flush quarantined unmapped items to storage
@@ -180,7 +215,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 		a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
 	}
 
-	obsList := normResult.Observations
+	obsList := allObservations
 	if a.category != "" {
 		filtered := make([]domain.PriceObservation, 0, len(obsList))
 		for _, obs := range obsList {
@@ -193,8 +228,8 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 
 	return domain.FetchResult{
 		Observations:  obsList,
-		RawGCSPath:    gcsPath,
+		RawGCSPath:    firstGCSPath,
 		UnmappedCount: qSink.Count(),
-		IgnoredCount:  normResult.IgnoredCount,
+		IgnoredCount:  totalIgnoredCount,
 	}, nil
 }

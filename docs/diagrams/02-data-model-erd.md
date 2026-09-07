@@ -131,27 +131,36 @@ flowchart LR
   "ram_gb": 16.0,
   "family": "general_purpose",
   "gpu_count": 0,
+  "gpu_type": "",
+  "is_burstable": false,
   "storage_type": "ebs_only"
 }
 ```
+*Workload families:* `general_purpose`, `compute_optimized`, `memory_optimized`, `storage_optimized`, `gpu_accelerated`, `hpc`, `network_optimized`, `burstable`.
 
 ### 2. Storage (`StorageAttributes`)
 ```json
 {
   "storage_class": "standard",
+  "storage_group": "object",
+  "size_gb": 100,
+  "throughput_mbps": 250.0,
   "min_duration_days": 0,
   "redundancy": "regional"
 }
 ```
+*Storage groups:* `object`, `block`, `file`, `archive`, `backup_dr`, `hybrid`, `migration`, `specialized_hpc`.
 
 ### 3. Network (`NetworkAttributes`)
 ```json
 {
   "transfer_type": "internet_egress",
+  "network_group": "internet_egress",
   "tier_min_gb": 0,
   "tier_max_gb": 10000
 }
 ```
+*Network groups (14 canonical service groups):* `internet_egress`, `internet_ingress`, `cross_region`, `cross_zone`, `intra_zone`, `cdn_egress`, `cdn_edge`, `direct_connect`, `nat_gateway`, `load_balancer`, `vpc_peering`, `vpn_gateway`, `network_security`, `dns_queries`.
 
 ### 4. Managed Relational Databases (`DatabaseRDBMSAttributes` - ADR 0030)
 - **Instance Component Row (`component_type = "instance"`):**
@@ -260,3 +269,43 @@ The `verification_tokens` table stores single-use cryptographic tokens for accou
 - **`expires_at`**: Expiration timestamp (30 minutes after creation).
 - **`consumed_at`**: Timestamp when the token was successfully verified (NULL until consumed).
 - **`created_at`**: Token creation timestamp.
+
+---
+
+## 6. Database Index Architecture & Maintenance Hygiene Runbook
+
+### B-Tree Index Layout & Read-Path Coverage
+
+The database tables use focused B-tree indexes designed for high-throughput reads and zero-dollar deduplication upserts:
+
+1. **`price_observations` Table**:
+   - `PRIMARY KEY (id)`: Supports row updates and internal references (~2.05 MB).
+   - `UNIQUE (provider, sku_id, region, fetched_at)`: Enforces point-in-time observation uniqueness (~5.64 MB).
+   - `idx_price_lookup (provider, service_category, region_group, fetched_at DESC)`: Covers calculator read path queries (~6.15 MB).
+   - Total table footprint over ~51,272 active snapshot rows: ~30.9 MB data + ~13.8 MB index storage (~44.7 MB total).
+
+2. **`compute_instance_catalog` Table**:
+   - `PRIMARY KEY (id)` & `UNIQUE (provider, instance_type_id)`: Enforces machine type uniqueness.
+   - `idx_compute_catalog_provider_cat (provider, category)`: Fast provider family filtering.
+   - `idx_compute_catalog_specs (vcpu, memory_gib)`: Accelerates hardware spec range lookups.
+   - `idx_compute_catalog_family (provider, instance_family)`: Accelerates family-level aggregation.
+
+### Operational Post-Ingestion Maintenance Runbook
+
+After weekly bulk ingestion runs across the Big 3 and 8 global hubs:
+1. Connect to the Neon PostgreSQL instance using `psql` or database console.
+2. Update query planner statistics and reclaim dead tuple space:
+   ```sql
+   -- Refresh optimizer statistics on the observation store
+   VACUUM ANALYZE price_observations;
+
+   -- Refresh optimizer statistics on the hardware catalog
+   VACUUM ANALYZE compute_instance_catalog;
+
+   -- Optional full verification of table and index bloat
+   SELECT relname, n_dead_tup, last_vacuum, last_analyze
+   FROM pg_stat_user_tables
+   WHERE relname IN ('price_observations', 'compute_instance_catalog');
+   ```
+3. Confirm that `n_dead_tup` remains low and query plans for `GetPriceObservations` use index scans via `idx_price_lookup`.
+

@@ -17,17 +17,18 @@ type ComputeAttributes struct {
 
 // StorageAttributes holds normalized attributes for storage resources.
 type StorageAttributes struct {
-	SizeGB       float64 `json:"size_gb"`
-	StorageClass string  `json:"storage_class"`
-	// IOPS holds provisioned IOPS where reported (e.g. block storage EBS gp3/io2).
-	// Currently unpopulated for S3/Blob/GCS object storage in stage 1.4.
-	IOPS *int `json:"iops,omitempty"`
+	SizeGB         float64  `json:"size_gb"`
+	StorageClass   string   `json:"storage_class"`
+	StorageGroup   string   `json:"storage_group,omitempty"`
+	IOPS           *int     `json:"iops,omitempty"`
+	ThroughputMBps *float64 `json:"throughput_mbps,omitempty"`
 }
 
 // NetworkAttributes holds normalized attributes for networking / data transfer resources.
 type NetworkAttributes struct {
 	EgressGB     float64 `json:"egress_gb"`
 	TransferType string  `json:"transfer_type,omitempty"`
+	NetworkGroup string  `json:"network_group,omitempty"`
 }
 
 // PriceObservation represents a single normalized cloud pricing observation.

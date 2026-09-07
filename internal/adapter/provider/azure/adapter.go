@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/thatengineerguy21/CloudVitta/internal/adapter/provider"
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/regionmap"
 	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 	"github.com/thatengineerguy21/CloudVitta/internal/storage"
 	"go.opentelemetry.io/otel"
@@ -114,82 +115,106 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 	var totalBytes int64
 	var firstGCSPath string
 
-	qSink := quarantine.NewStorageSink(a.storage, "azure", category, fetchID, fetchedAt)
-	nextLink := ""
-	pageIdx := 1
+	targetRegions := []string{""}
+	if !a.client.HasCustomURL() && category != "network" {
+		targetRegions = regionmap.TargetAzureRegions()
+	}
 
-	for {
-		if limiter != nil {
-			if err = limiter.Wait(ctx); err != nil {
+	qSink := quarantine.NewStorageSink(a.storage, "azure", category, fetchID, fetchedAt)
+
+	var totalPages int
+	for _, region := range targetRegions {
+		nextLink := a.client.URL()
+		if region != "" {
+			nextLink = BuildRegionalRetailPricesURL(category, region)
+		}
+		pageIdx := 1
+
+		for {
+			totalPages++
+			if limiter != nil {
+				if err = limiter.Wait(ctx); err != nil {
+					span.RecordError(err)
+					span.SetStatus(codes.Error, err.Error())
+					return domain.FetchResult{}, fmt.Errorf("azure adapter: rate limit wait page %d: %w", pageIdx, err)
+				}
+			}
+
+			gcsPath := fmt.Sprintf("raw/azure/%s/%s/%s-page%d.json", category, dateStr, fetchID, pageIdx)
+			if region != "" {
+				gcsPath = fmt.Sprintf("raw/azure/%s/%s/%s-%s-page%d.json", category, dateStr, region, fetchID, pageIdx)
+			}
+			if firstGCSPath == "" {
+				firstGCSPath = gcsPath
+			}
+
+			var body io.ReadCloser
+			body, err = a.client.FetchPriceList(ctx, nextLink)
+			if err != nil {
+				if len(targetRegions) > 1 {
+					slog.WarnContext(ctx, "azure adapter: regional fetch failed, continuing with other regions", "region", region, "page", pageIdx, "error", err)
+					break
+				}
 				span.RecordError(err)
 				span.SetStatus(codes.Error, err.Error())
-				return domain.FetchResult{}, fmt.Errorf("azure adapter: rate limit wait page %d: %w", pageIdx, err)
+				a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
+				return domain.FetchResult{}, fmt.Errorf("azure adapter: fetch price list page %d: %w", pageIdx, err)
 			}
-		}
 
-		gcsPath := fmt.Sprintf("raw/azure/%s/%s/%s-page%d.json", category, dateStr, fetchID, pageIdx)
-		if firstGCSPath == "" {
-			firstGCSPath = gcsPath
-		}
+			cr := provider.NewCountingReader(body)
+			pr, pw := io.Pipe()
+			tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
 
-		var body io.ReadCloser
-		body, err = a.client.FetchPriceList(ctx, nextLink)
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
-			return domain.FetchResult{}, fmt.Errorf("azure adapter: fetch price list page %d: %w", pageIdx, err)
-		}
+			var pageResult domain.NormalizationResult
+			var pageNextLink string
+			g, _ := errgroup.WithContext(ctx)
 
-		cr := provider.NewCountingReader(body)
-		pr, pw := io.Pipe()
-		tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
+			// Goroutine 1: Normalize reads from pr
+			g.Go(func() error {
+				var normErr error
+				pageResult, pageNextLink, normErr = Normalize(pr, fetchedAt, qSink)
+				if normErr != nil {
+					_ = pr.CloseWithError(normErr)
+					return fmt.Errorf("azure adapter: normalize page %d: %w", pageIdx, normErr)
+				}
+				_ = pr.Close()
+				return nil
+			})
 
-		var pageResult domain.NormalizationResult
-		var pageNextLink string
-		g, _ := errgroup.WithContext(ctx)
+			// Goroutine 2: GCS reads from tee
+			g.Go(func() error {
+				defer func() { _ = pw.Close() }()
+				if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
+					_ = pw.CloseWithError(err)
+					return fmt.Errorf("azure adapter: storage write page %d: %w", pageIdx, err)
+				}
+				return nil
+			})
 
-		// Goroutine 1: Normalize reads from pr
-		g.Go(func() error {
-			var normErr error
-			pageResult, pageNextLink, normErr = Normalize(pr, fetchedAt, qSink)
-			if normErr != nil {
-				_ = pr.CloseWithError(normErr)
-				return fmt.Errorf("azure adapter: normalize page %d: %w", pageIdx, normErr)
+			if err = g.Wait(); err != nil {
+				_ = body.Close()
+				if len(targetRegions) > 1 {
+					slog.WarnContext(ctx, "azure adapter: regional stream processing failed", "region", region, "page", pageIdx, "error", err)
+					break
+				}
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
+				slog.ErrorContext(ctx, "azure fetch failed during stream processing", "error", err, "page", pageIdx)
+				return domain.FetchResult{}, err
 			}
-			_ = pr.Close()
-			return nil
-		})
-
-		// Goroutine 2: GCS reads from tee
-		g.Go(func() error {
-			defer func() { _ = pw.Close() }()
-			if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
-				_ = pw.CloseWithError(err)
-				return fmt.Errorf("azure adapter: storage write page %d: %w", pageIdx, err)
-			}
-			return nil
-		})
-
-		if err = g.Wait(); err != nil {
 			_ = body.Close()
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
-			slog.ErrorContext(ctx, "azure fetch failed during stream processing", "error", err, "page", pageIdx)
-			return domain.FetchResult{}, err
-		}
-		_ = body.Close()
 
-		totalBytes += cr.BytesRead()
-		allObservations = append(allObservations, pageResult.Observations...)
-		totalIgnoredCount += pageResult.IgnoredCount
+			totalBytes += cr.BytesRead()
+			allObservations = append(allObservations, pageResult.Observations...)
+			totalIgnoredCount += pageResult.IgnoredCount
 
-		if pageNextLink == "" {
-			break
+			if pageNextLink == "" {
+				break
+			}
+			nextLink = pageNextLink
+			pageIdx++
 		}
-		nextLink = pageNextLink
-		pageIdx++
 	}
 
 	if a.bytesCounter != nil {
@@ -224,7 +249,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 	span.SetStatus(codes.Ok, "")
 	span.SetAttributes(attribute.Int("observations.count", len(obsList)))
 	a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
-	slog.InfoContext(ctx, "azure fetch completed", "observations", len(obsList), "pages", pageIdx, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
+	slog.InfoContext(ctx, "azure fetch completed", "observations", len(obsList), "pages", totalPages, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
 
 	return domain.FetchResult{
 		Observations:  obsList,

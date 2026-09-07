@@ -44,8 +44,8 @@ type OrchestratorConfig struct {
 // DefaultOrchestratorConfig returns sensible defaults.
 func DefaultOrchestratorConfig() OrchestratorConfig {
 	return OrchestratorConfig{
-		MaxConcurrency: 5,
-		LockTTL:        15 * time.Minute,
+		MaxConcurrency: 3,
+		LockTTL:        35 * time.Minute,
 	}
 }
 

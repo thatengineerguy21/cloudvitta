@@ -523,3 +523,34 @@ func TestAdapter_Fetch_CategoryFiltering_ExcludesOtherCategories(t *testing.T) {
 		t.Errorf("Fetch() returned %d observations, want 0 (network observations filtered from compute adapter)", len(result.Observations))
 	}
 }
+
+func TestBuildRegionalURL(t *testing.T) {
+	url := BuildRegionalURL("AmazonEC2", "ap-southeast-1")
+	expected := "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-1/index.json"
+	if url != expected {
+		t.Errorf("BuildRegionalURL() = %q, want %q", url, expected)
+	}
+}
+
+func TestOfferCodeForCategory(t *testing.T) {
+	tests := []struct {
+		category string
+		expected string
+	}{
+		{"compute", "AmazonEC2"},
+		{"storage", "AmazonS3"},
+		{"network", "AWSDataTransfer"},
+		{"database_rdbms", "AmazonRDS"},
+		{"database_nosql", "AmazonDynamoDB"},
+		{"kubernetes", "AmazonEKS"},
+		{"serverless", "AWSLambda"},
+		{"unknown", "AmazonEC2"},
+	}
+
+	for _, tt := range tests {
+		got := OfferCodeForCategory(tt.category)
+		if got != tt.expected {
+			t.Errorf("OfferCodeForCategory(%q) = %q, want %q", tt.category, got, tt.expected)
+		}
+	}
+}

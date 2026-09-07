@@ -246,3 +246,5 @@ sequenceDiagram
 5. **Strict MCP Authentication**: MCP tool access requires a valid JWT Bearer token and enforces the 120 req/min Standard Tier quota keyed by `user_id`.
 6. **Extensible Registries**: Category serialization, calculate dispatch, and pricing arithmetic use strategy registries, eliminating monolithic switch blocks (ADR 0031).
 7. **Alias Conflict Resolution**: Conflicting specifications between alias and canonical request parameters are rejected with HTTP 400 (ADR 0032).
+8. **Multi-Region Hub Resolution**: Regional queries accept canonical region groups (`us-east`, `eu-central`), strategic hub identifiers (`europe-frankfurt`, `asia-tokyo`), or native provider codes (`us-west-2`, `germanywestcentral`). `PricingService.GetPrices` resolves inputs to native provider regions via `regionmap.ResolveNativeRegion`, guaranteeing exact Redis cache hits (`v1:{provider}:{category}:{nativeRegion}`) across the 8 global hubs (ADR 0045).
+
