@@ -94,7 +94,7 @@ sequenceDiagram
                 end
                 
                 Orch->>DLQ: Clear entry on success (span: dlq.clear, metric: dlq_operations_total)
-                Orch->>Redis: Event-driven cache warm (spans: redisotel)
+                Orch->>Redis: Event-driven cache warm (Redis tracing disabled via cache.WithoutTracer)
                 Orch->>Lock: Release lock (Lua script, token-safe)
             end
             

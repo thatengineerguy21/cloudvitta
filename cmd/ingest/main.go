@@ -101,9 +101,11 @@ func run() error {
 	}
 
 	// --- Redis ---
+	// Disable Redis command tracing for ingestion to prevent multi-megabyte cache warming
+	// payloads from exceeding OpenTelemetry trace payload limits.
 	var redisClient redis.Cmdable
 	if cfg.Redis.URL != "" {
-		rc, err := cache.NewClient(cfg.Redis.URL)
+		rc, err := cache.NewClient(cfg.Redis.URL, cache.WithoutTracer())
 		if err != nil {
 			safeURL := "<invalid-url>"
 			if parsed, pErr := url.Parse(cfg.Redis.URL); pErr == nil {

@@ -82,7 +82,7 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 		tp = sdktrace.NewTracerProvider(
 			sdktrace.WithBatcher(
 				traceExporter,
-				sdktrace.WithMaxExportBatchSize(512),
+				sdktrace.WithMaxExportBatchSize(128),
 				sdktrace.WithMaxQueueSize(2048),
 			),
 			sdktrace.WithResource(res),

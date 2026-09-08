@@ -83,6 +83,7 @@ var gcpRegionMap = map[string]string{
 	"asia-southeast1":      "ap-southeast",
 	"asia-southeast2":      "ap-southeast",
 	"asia-southeast3":      "ap-southeast",
+	"asia-southeast4":      "ap-southeast",
 	"australia-southeast1": "ap-southeast",
 	"australia-southeast2": "ap-southeast",
 	"australia-central1":   "ap-southeast",

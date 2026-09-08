@@ -1056,10 +1056,22 @@ func isOutOfScopeDatabaseSKU(sku gcpSKU) bool {
 		return true
 	}
 
-	// 7. Legacy generation / shared-core instances (e.g. "g1-small", "f1-micro", "db-n1-", "n1-standard-", "n1-highmem-")
+	// 7. Legacy generation / shared-core instances (e.g. "g1-small", "f1-micro", "Micro instance", "Small instance")
 	if strings.Contains(descLower, "g1-small") || strings.Contains(descLower, "f1-micro") ||
 		strings.Contains(descLower, "db-n1-") || strings.Contains(descLower, "n1-standard-") ||
-		strings.Contains(descLower, "n1-highmem-") {
+		strings.Contains(descLower, "n1-highmem-") ||
+		strings.Contains(descLower, "micro instance") || strings.Contains(descLower, "small instance") ||
+		group == "SQLGen2InstancesF1Micro" || group == "SQLGen2InstancesG1Small" {
+		return true
+	}
+
+	// 8. Auxiliary serverless exports and database utilities
+	if strings.Contains(descLower, "serverless export") || strings.Contains(groupLower, "serverlessexport") {
+		return true
+	}
+
+	// 9. Obsolete first-generation Cloud SQL tiers (e.g. "D0", "D1", "D2", "D4", "D8", "D16", "D32", or "D2 usage - hour")
+	if group == "SQLGen1Instances" || strings.Contains(descLower, "usage - hour") || (strings.HasPrefix(desc, "D") && len(desc) <= 4) {
 		return true
 	}
 

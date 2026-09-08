@@ -25,7 +25,7 @@ The table below defines all custom and auto-instrumented spans:
 | `store` | `pgx.Connect`, `pgx.Query`, `pgx.Exec`, `pgx.Batch` | Client | `db.system=postgresql`, `db.statement` | Auto-instrumented by `otelpgx` in API server. Disabled in bulk ingestion via `store.WithoutTracer()` to prevent trace size limit rejections (`TRACE_TOO_LARGE`). |
 | `service` | `ingest.job` | Internal | `provider`, `category` | Ingestion job lifecycle execution |
 | `service` | `ingest.persist` | Internal | `provider`, `category`, `observations.count`, `observations.inserted`, `observations.updated`, `observations.anomalies` | Bulk database upsert execution during ingestion |
-| `cache` | `redis.{command}` | Client | `db.system=redis`, `db.operation` | Auto-instrumented by `redisotel` |
+| `cache` | `redis.{command}` | Client | `db.system=redis`, `db.operation` | Auto-instrumented by `redisotel` with `WithDBStatement(false)`. Disabled in bulk ingestion via `cache.WithoutTracer()` to prevent multi-megabyte cache payloads on trace spans. |
 | `storage` | `gcs.write` | Client | `gcs.bucket`, `gcs.path` | GCS object stream upload |
 | `storage` | `gcs.read` | Client | `gcs.bucket`, `gcs.path` | GCS object stream read |
 | `storage` | `gcs.list` | Client | `gcs.bucket`, `gcs.prefix` | GCS bucket object listing |

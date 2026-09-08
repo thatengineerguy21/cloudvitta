@@ -317,6 +317,31 @@ func TestGCPNormalize_Database_OutOfScopeIgnoredWithoutQuarantine(t *testing.T) 
 			description: "Cloud SQL for MySQL: db-f1-micro shared-core in Iowa",
 			group:       "MySQL",
 		},
+		{
+			name:        "serverless export",
+			description: "Cloud SQL for PostgreSQL: Zonal - Serverless Exports in Mexico",
+			group:       "ServerlessExport",
+		},
+		{
+			name:        "micro instance",
+			description: "Cloud SQL for MySQL: Regional - Micro instance in Milan",
+			group:       "SQLGen2InstancesF1Micro",
+		},
+		{
+			name:        "small instance",
+			description: "Cloud SQL for MySQL: Regional - Small instance in Dallas",
+			group:       "SQLGen2InstancesG1Small",
+		},
+		{
+			name:        "legacy Gen1 tier D32",
+			description: "D32",
+			group:       "SQLGen1Instances",
+		},
+		{
+			name:        "legacy Gen1 tier D2 usage - hour",
+			description: "D2 usage - hour",
+			group:       "SQLGen1Instances",
+		},
 	}
 
 	for _, tc := range outOfScopeSamples {

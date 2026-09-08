@@ -38,3 +38,18 @@ func TestInstrumentClient_Nil(t *testing.T) {
 		t.Errorf("expected nil error for nil client, got %v", err)
 	}
 }
+
+func TestInstrumentClient_WithoutTracer(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = client.Close() }()
+
+	if err := cache.InstrumentClient(client, cache.WithoutTracer()); err != nil {
+		t.Fatalf("InstrumentClient with WithoutTracer failed: %v", err)
+	}
+
+	ctx := context.Background()
+	if err := client.Set(ctx, "no-trace-key", "no-trace-val", 0).Err(); err != nil {
+		t.Fatalf("SET failed: %v", err)
+	}
+}

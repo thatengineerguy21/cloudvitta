@@ -79,6 +79,12 @@ func TestMapGCPRegion(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name:      "valid region asia-southeast4",
+			region:    "asia-southeast4",
+			wantGroup: "ap-southeast",
+			wantErr:   nil,
+		},
+		{
 			name:      "unmapped region fails loudly",
 			region:    "unknown-gcp-region-99",
 			wantGroup: "",
