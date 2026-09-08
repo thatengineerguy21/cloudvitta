@@ -122,6 +122,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 	const maxPages = 500
 
 	qSink := quarantine.NewStorageSink(a.storage, "gcp", category, fetchID, fetchedAt)
+	normState := NewNormalizationState()
 
 	for epIdx, endpointURL := range endpoints {
 		pageToken := ""
@@ -176,7 +177,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 					}
 				}()
 				var normErr error
-				pageResult, pageNextToken, normErr = NormalizeForCategory(pr, fetchedAt, a.category, qSink)
+				pageResult, pageNextToken, normErr = NormalizeForCategoryWithState(pr, fetchedAt, a.category, normState, qSink)
 				if normErr != nil {
 					_ = pr.CloseWithError(normErr)
 					return fmt.Errorf("gcp adapter: normalize endpoint %d page %d: %w", epIdx, pageIdx, normErr)
@@ -241,6 +242,13 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 			))
 		}
 	}
+
+	// Synthesize multi-meter instance observations across all accumulated pages and endpoints
+	composedObs, err := normState.FinalizeComposedObservations(fetchedAt, category, qSink)
+	if err != nil {
+		return domain.FetchResult{}, fmt.Errorf("gcp adapter: finalize composed observations: %w", err)
+	}
+	allObservations = append(allObservations, composedObs...)
 
 	obsList := allObservations
 	if a.category != "" {

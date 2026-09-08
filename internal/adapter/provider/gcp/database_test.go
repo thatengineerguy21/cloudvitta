@@ -216,32 +216,13 @@ func TestGCPNormalize_Database_GenericStorageAndNonInstanceIgnored(t *testing.T)
 func TestNormalize_GCPAlloyDB(t *testing.T) {
 	fixedTime := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
 
-	jsonBody := `{
-		"skus": [
-			{
-				"name": "services/C49F-B7F2-7416/skus/SKU-GCP-ALLOYDB-8VCPU",
-				"skuId": "SKU-GCP-ALLOYDB-8VCPU",
-				"description": "AlloyDB for PostgreSQL: Instance 8 vCPU, 64 GB in Virginia",
-				"category": {
-					"serviceDisplayName": "AlloyDB for PostgreSQL",
-					"resourceFamily": "ApplicationServices",
-					"resourceGroup": "AlloyDB",
-					"usageType": "OnDemand"
-				},
-				"serviceRegions": ["us-east4"],
-				"pricingInfo": [
-					{
-						"pricingExpression": {
-							"usageUnit": "h",
-							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 780000000}}]
-						}
-					}
-				]
-			}
-		]
-	}`
+	f, err := os.Open("../../../../testdata/golden/gcp/alloydb.json")
+	if err != nil {
+		t.Fatalf("failed to open alloydb golden file: %v", err)
+	}
+	defer func() { _ = f.Close() }()
 
-	res, _, err := Normalize(strings.NewReader(jsonBody), fixedTime)
+	res, _, err := Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() error = %v", err)
 	}

@@ -40,7 +40,7 @@ func TestNetworkCacheVersionIsolation(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Simulate legacy v1 network cache entry with old attribute format
-	v1Key := cache.BuildKey("v1", "aws", "network", "us-east-1")
+	v1Key := cache.BuildKeyRaw("v1", "aws", "network", "us-east-1")
 	v1Observations := []domain.PriceObservation{
 		{
 			Provider:          "aws",

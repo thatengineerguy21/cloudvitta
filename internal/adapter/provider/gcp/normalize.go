@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -181,6 +182,49 @@ type gcpDatabaseComponentSpec struct {
 	currency  string
 }
 
+// NormalizationState maintains component pricing across multiple paginated responses so that
+// multi-meter instance synthesis (e.g. Cloud SQL CPU + RAM, Compute Engine cores + memory)
+// can be composed across page boundaries after the entire stream ends.
+type NormalizationState struct {
+	mu                sync.Mutex
+	computeComponents map[gcpComponentKey]*gcpComponentSpec
+	dbComponents      map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec
+}
+
+// NewNormalizationState creates an empty component state accumulator for paginated stream ingestion.
+func NewNormalizationState() *NormalizationState {
+	return &NormalizationState{
+		computeComponents: make(map[gcpComponentKey]*gcpComponentSpec),
+		dbComponents:      make(map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec),
+	}
+}
+
+// FinalizeComposedObservations synthesizes instance price observations from all accumulated components.
+func (s *NormalizationState) FinalizeComposedObservations(fetchedAt time.Time, targetCategory string, sink quarantine.Sink) ([]domain.PriceObservation, error) {
+	if s == nil {
+		return nil, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var observations []domain.PriceObservation
+	if len(s.computeComponents) > 0 && (targetCategory == "" || targetCategory == "compute") {
+		composed, err := composeMachineTypePricing(s.computeComponents, fetchedAt, sink)
+		if err != nil {
+			return nil, err
+		}
+		observations = append(observations, composed...)
+	}
+	if len(s.dbComponents) > 0 && (targetCategory == "" || targetCategory == "database_rdbms") {
+		composedDB, err := composeCloudSQLInstancePricing(s.dbComponents, fetchedAt, sink)
+		if err != nil {
+			return nil, err
+		}
+		observations = append(observations, composedDB...)
+	}
+	return observations, nil
+}
+
 // Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
 // Unmapped taxonomy values are recorded to the optional quarantine sink and skipped without aborting the page.
 func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (domain.NormalizationResult, string, error) {
@@ -190,6 +234,11 @@ func Normalize(r io.Reader, fetchedAt time.Time, sinks ...quarantine.Sink) (doma
 // NormalizeForCategory parses a GCP Cloud Billing Catalog API JSON stream scoped to a target service category.
 // When targetCategory is non-empty, items belonging to other categories are cleanly ignored without polluting quarantine.
 func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory string, sinks ...quarantine.Sink) (domain.NormalizationResult, string, error) {
+	return NormalizeForCategoryWithState(r, fetchedAt, targetCategory, nil, sinks...)
+}
+
+// NormalizeForCategoryWithState parses a page of the GCP catalog stream and accumulates components into state if provided.
+func NormalizeForCategoryWithState(r io.Reader, fetchedAt time.Time, targetCategory string, state *NormalizationState, sinks ...quarantine.Sink) (domain.NormalizationResult, string, error) {
 	var sink quarantine.Sink
 	if len(sinks) > 0 {
 		sink = sinks[0]
@@ -200,8 +249,19 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 	var observations []domain.PriceObservation
 	var nextPageToken string
 	var ignoredCount int
-	components := make(map[gcpComponentKey]*gcpComponentSpec)
-	dbComponents := make(map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec)
+
+	var components map[gcpComponentKey]*gcpComponentSpec
+	var dbComponents map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec
+
+	if state != nil {
+		state.mu.Lock()
+		components = state.computeComponents
+		dbComponents = state.dbComponents
+		state.mu.Unlock()
+	} else {
+		components = make(map[gcpComponentKey]*gcpComponentSpec)
+		dbComponents = make(map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec)
+	}
 
 	// Advance to the first token
 	t, err := dec.Token()
@@ -305,7 +365,13 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 							skuObs, err = normalizeComputeSKU(sku, category, fetchedAt, sink)
 						}
 						if isComputeComponent(sku) {
+							if state != nil {
+								state.mu.Lock()
+							}
 							collectComponentPricing(sku, components)
+							if state != nil {
+								state.mu.Unlock()
+							}
 						}
 					}
 				case "storage":
@@ -317,7 +383,13 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 				case "database_rdbms":
 					if isDatabaseProduct(sku) {
 						if isDatabaseComponent(sku) {
+							if state != nil {
+								state.mu.Lock()
+							}
 							collectDatabaseComponentPricing(sku, dbComponents)
+							if state != nil {
+								state.mu.Unlock()
+							}
 						} else {
 							skuObs, err = normalizeDatabaseSKU(sku, category, fetchedAt, sink)
 						}
@@ -365,8 +437,8 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 		}
 	}
 
-	// Synthesize machine type pricing from collected compute component SKUs
-	if len(components) > 0 && (targetCategory == "" || targetCategory == "compute") {
+	// Synthesize machine type pricing from collected compute component SKUs only when unmanaged by stream state
+	if state == nil && len(components) > 0 && (targetCategory == "" || targetCategory == "compute") {
 		composedObs, err := composeMachineTypePricing(components, fetchedAt, sink)
 		if err != nil {
 			return domain.NormalizationResult{}, "", err
@@ -374,8 +446,8 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 		observations = append(observations, composedObs...)
 	}
 
-	// Synthesize Cloud SQL instance pricing from collected database component SKUs
-	if len(dbComponents) > 0 && (targetCategory == "" || targetCategory == "database_rdbms") {
+	// Synthesize Cloud SQL instance pricing from collected database component SKUs only when unmanaged by stream state
+	if state == nil && len(dbComponents) > 0 && (targetCategory == "" || targetCategory == "database_rdbms") {
 		composedDBObs, err := composeCloudSQLInstancePricing(dbComponents, fetchedAt, sink)
 		if err != nil {
 			return domain.NormalizationResult{}, "", err
@@ -936,6 +1008,14 @@ func isStorageDatabaseSKU(sku gcpSKU) bool {
 	return strings.Contains(sku.Description, "Storage") || strings.Contains(sku.Category.ResourceGroup, "PD")
 }
 
+func isCPUMeter(desc, group string) bool {
+	return strings.Contains(desc, "vCPU") || strings.Contains(desc, "Core") || strings.EqualFold(group, "CPU")
+}
+
+func isRAMMeter(desc, group string) bool {
+	return strings.Contains(desc, "RAM") || strings.Contains(desc, "Memory") || strings.EqualFold(group, "RAM")
+}
+
 func isDatabaseComponent(sku gcpSKU) bool {
 	if sku.Category.UsageType != "OnDemand" {
 		return false
@@ -954,10 +1034,7 @@ func isDatabaseComponent(sku gcpSKU) bool {
 	if _, _, _, ok := parseGCPDatabaseAttributes(desc, sku.Name); ok {
 		return false
 	}
-	group := sku.Category.ResourceGroup
-	isCPU := strings.Contains(desc, "vCPU") || strings.Contains(desc, "Core") || strings.EqualFold(group, "CPU")
-	isRAM := strings.Contains(desc, "RAM") || strings.Contains(desc, "Memory") || strings.EqualFold(group, "RAM")
-	return isCPU || isRAM
+	return isCPUMeter(desc, sku.Category.ResourceGroup) || isRAMMeter(desc, sku.Category.ResourceGroup)
 }
 
 func collectDatabaseComponentPricing(sku gcpSKU, dbComponents map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec) {
@@ -993,8 +1070,8 @@ func collectDatabaseComponentPricing(sku gcpSKU, dbComponents map[gcpDatabaseCom
 		currency = "USD"
 	}
 
-	isCore := strings.Contains(sku.Description, "vCPU") || strings.Contains(sku.Description, "Core") || strings.EqualFold(sku.Category.ResourceGroup, "CPU")
-	isRAM := strings.Contains(sku.Description, "RAM") || strings.Contains(sku.Description, "Memory") || strings.EqualFold(sku.Category.ResourceGroup, "RAM")
+	isCore := isCPUMeter(sku.Description, sku.Category.ResourceGroup)
+	isRAM := isRAMMeter(sku.Description, sku.Category.ResourceGroup)
 
 	for _, region := range regions {
 		if !regionmap.IsTargetRegion("gcp", region) {

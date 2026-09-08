@@ -239,3 +239,109 @@ func TestGCPNormalize_Database_ComponentComposition(t *testing.T) {
 		t.Errorf("missing synthesized observation SKU-GCP-CLOUDSQL-POSTGRESQL-STANDARD-4VCPU-16GB")
 	}
 }
+
+func TestGCPNormalize_Database_PaginationComponentComposition(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
+
+	// Page 1: only vCPU meter
+	page1JSON := `{
+		"skus": [
+			{
+				"skuId": "SKU-PAGE1-VCPU",
+				"description": "Cloud SQL for PostgreSQL: Zonal - Enterprise vCPU in Northern Virginia",
+				"category": {
+					"serviceDisplayName": "Cloud SQL",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "CPU",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 50000000}}]
+						}
+					}
+				]
+			}
+		],
+		"nextPageToken": "token-page-2"
+	}`
+
+	// Page 2: only RAM meter
+	page2JSON := `{
+		"skus": [
+			{
+				"skuId": "SKU-PAGE2-RAM",
+				"description": "Cloud SQL for PostgreSQL: Zonal - Enterprise RAM in Northern Virginia",
+				"category": {
+					"serviceDisplayName": "Cloud SQL",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "RAM",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "GiBy.h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 7000000}}]
+						}
+					}
+				]
+			}
+		]
+	}`
+
+	state := NewNormalizationState()
+	memSink := quarantine.NewMemorySink()
+
+	// Process Page 1: should accumulate vCPU but yield zero synthesized instances
+	res1, nextToken, err := NormalizeForCategoryWithState(strings.NewReader(page1JSON), fixedTime, "database_rdbms", state, memSink)
+	if err != nil {
+		t.Fatalf("Normalize page 1 error: %v", err)
+	}
+	if nextToken != "token-page-2" {
+		t.Errorf("expected nextPageToken token-page-2, got %q", nextToken)
+	}
+	if len(res1.Observations) != 0 {
+		t.Errorf("expected 0 synthesized observations on page 1 alone, got %d", len(res1.Observations))
+	}
+
+	// Process Page 2: should accumulate RAM but yield zero synthesized instances before stream finalize
+	res2, nextToken2, err := NormalizeForCategoryWithState(strings.NewReader(page2JSON), fixedTime, "database_rdbms", state, memSink)
+	if err != nil {
+		t.Fatalf("Normalize page 2 error: %v", err)
+	}
+	if nextToken2 != "" {
+		t.Errorf("expected empty nextPageToken on final page, got %q", nextToken2)
+	}
+	if len(res2.Observations) != 0 {
+		t.Errorf("expected 0 synthesized observations on page 2 alone before finalize, got %d", len(res2.Observations))
+	}
+
+	// Finalize stream: should combine Page 1 vCPU and Page 2 RAM across pagination boundaries
+	composedObs, err := state.FinalizeComposedObservations(fixedTime, "database_rdbms", memSink)
+	if err != nil {
+		t.Fatalf("FinalizeComposedObservations error: %v", err)
+	}
+
+	if len(composedObs) != len(knownGCPCloudSQLSpecs) {
+		t.Fatalf("expected %d composed observations across pagination boundaries, got %d", len(knownGCPCloudSQLSpecs), len(composedObs))
+	}
+
+	var found16GB bool
+	for _, obs := range composedObs {
+		if obs.SkuID == "SKU-GCP-CLOUDSQL-POSTGRESQL-STANDARD-4VCPU-16GB" {
+			found16GB = true
+			expectedPrice := "0.312" // 4 * 0.05 + 16 * 0.007 = 0.312
+			if obs.PriceAmount.String() != expectedPrice {
+				t.Errorf("expected PriceAmount %s, got %s", expectedPrice, obs.PriceAmount.String())
+			}
+		}
+	}
+	if !found16GB {
+		t.Errorf("missing synthesized instance across pagination boundaries")
+	}
+}

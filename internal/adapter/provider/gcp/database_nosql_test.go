@@ -2,7 +2,6 @@ package gcp_test
 
 import (
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -46,66 +45,14 @@ func TestNormalize_GCPDatabaseNoSQLGolden(t *testing.T) {
 
 func TestNormalize_GCPBigtable(t *testing.T) {
 	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
-	jsonInput := `{
-		"skus": [
-			{
-				"name": "services/C802-861C-2155/skus/SKU-BIGTABLE-NODE",
-				"skuId": "SKU-BIGTABLE-NODE",
-				"description": "Cloud Bigtable: Node in Virginia",
-				"category": {
-					"serviceDisplayName": "Cloud Bigtable",
-					"resourceFamily": "ApplicationServices",
-					"resourceGroup": "Node",
-					"usageType": "OnDemand"
-				},
-				"serviceRegions": ["us-east4"],
-				"pricingInfo": [{
-					"pricingExpression": {
-						"usageUnit": "h",
-						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 650000000}}]
-					}
-				}]
-			},
-			{
-				"name": "services/C802-861C-2155/skus/SKU-BIGTABLE-SSD",
-				"skuId": "SKU-BIGTABLE-SSD",
-				"description": "Cloud Bigtable: SSD Storage in Virginia",
-				"category": {
-					"serviceDisplayName": "Cloud Bigtable",
-					"resourceFamily": "ApplicationServices",
-					"resourceGroup": "SSD",
-					"usageType": "OnDemand"
-				},
-				"serviceRegions": ["us-east4"],
-				"pricingInfo": [{
-					"pricingExpression": {
-						"usageUnit": "GiBy.mo",
-						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 170000000}}]
-					}
-				}]
-			},
-			{
-				"name": "services/C802-861C-2155/skus/SKU-BIGTABLE-HDD",
-				"skuId": "SKU-BIGTABLE-HDD",
-				"description": "Cloud Bigtable: HDD Storage in Virginia",
-				"category": {
-					"serviceDisplayName": "Cloud Bigtable",
-					"resourceFamily": "ApplicationServices",
-					"resourceGroup": "HDD",
-					"usageType": "OnDemand"
-				},
-				"serviceRegions": ["us-east4"],
-				"pricingInfo": [{
-					"pricingExpression": {
-						"usageUnit": "GiBy.mo",
-						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 26000000}}]
-					}
-				}]
-			}
-		]
-	}`
 
-	res, _, err := gcp.Normalize(strings.NewReader(jsonInput), fixedTime)
+	f, err := os.Open("../../../../testdata/golden/gcp/bigtable.json")
+	if err != nil {
+		t.Fatalf("failed to open bigtable golden file: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	res, _, err := gcp.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}

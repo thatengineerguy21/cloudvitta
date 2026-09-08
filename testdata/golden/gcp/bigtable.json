@@ -1,0 +1,88 @@
+{
+  "skus": [
+    {
+      "name": "services/C802-861C-2155/skus/SKU-BIGTABLE-NODE",
+      "skuId": "SKU-BIGTABLE-NODE",
+      "description": "Cloud Bigtable: Node in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud Bigtable",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Nodes",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-east4"],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "tieredRates": [
+              {
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 650000000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "services/C802-861C-2155/skus/SKU-BIGTABLE-SSD",
+      "skuId": "SKU-BIGTABLE-SSD",
+      "description": "Cloud Bigtable: SSD Storage in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud Bigtable",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "SSD",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-east4"],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.mo",
+            "tieredRates": [
+              {
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 170000000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "services/C802-861C-2155/skus/SKU-BIGTABLE-HDD",
+      "skuId": "SKU-BIGTABLE-HDD",
+      "description": "Cloud Bigtable: HDD Storage in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud Bigtable",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "HDD",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-east4"],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.mo",
+            "tieredRates": [
+              {
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 26000000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

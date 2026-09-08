@@ -62,66 +62,14 @@ func TestNormalize_GCPServerlessGolden(t *testing.T) {
 
 func TestNormalize_GCPCloudRun(t *testing.T) {
 	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
-	jsonInput := `{
-		"skus": [
-			{
-				"name": "services/152E-C115-5142/skus/SKU-CR-REQUESTS",
-				"skuId": "SKU-CR-REQUESTS",
-				"description": "Cloud Run: Requests",
-				"category": {
-					"serviceDisplayName": "Cloud Run",
-					"resourceFamily": "ApplicationServices",
-					"resourceGroup": "Requests",
-					"usageType": "OnDemand"
-				},
-				"serviceRegions": ["us-central1"],
-				"pricingInfo": [{
-					"pricingExpression": {
-						"usageUnit": "requests",
-						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 400000}}]
-					}
-				}]
-			},
-			{
-				"name": "services/152E-C115-5142/skus/SKU-CR-CPU",
-				"skuId": "SKU-CR-CPU",
-				"description": "Cloud Run: CPU Allocation Time",
-				"category": {
-					"serviceDisplayName": "Cloud Run",
-					"resourceFamily": "ApplicationServices",
-					"resourceGroup": "CPU",
-					"usageType": "OnDemand"
-				},
-				"serviceRegions": ["us-central1"],
-				"pricingInfo": [{
-					"pricingExpression": {
-						"usageUnit": "vcpu.s",
-						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 24000}}]
-					}
-				}]
-			},
-			{
-				"name": "services/152E-C115-5142/skus/SKU-CR-MEM",
-				"skuId": "SKU-CR-MEM",
-				"description": "Cloud Run: Memory Allocation Time",
-				"category": {
-					"serviceDisplayName": "Cloud Run",
-					"resourceFamily": "ApplicationServices",
-					"resourceGroup": "Memory",
-					"usageType": "OnDemand"
-				},
-				"serviceRegions": ["us-central1"],
-				"pricingInfo": [{
-					"pricingExpression": {
-						"usageUnit": "giby.s",
-						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 2500}}]
-					}
-				}]
-			}
-		]
-	}`
 
-	res, _, err := gcp.Normalize(strings.NewReader(jsonInput), fixedTime)
+	f, err := os.Open("../../../../testdata/golden/gcp/cloud_run.json")
+	if err != nil {
+		t.Fatalf("failed to open cloud_run golden file: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	res, _, err := gcp.Normalize(f, fixedTime)
 	if err != nil {
 		t.Fatalf("Normalize() unexpected error: %v", err)
 	}
