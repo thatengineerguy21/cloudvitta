@@ -110,100 +110,119 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 	dateStr := fetchedAt.Format("2006-01-02")
 	firstGCSPath := fmt.Sprintf("raw/gcp/%s/%s/%s-page0.json", category, dateStr, fetchID)
 
+	endpoints := a.client.URLs()
+	if len(endpoints) == 0 {
+		endpoints = []string{DefaultBillingCatalogURL}
+	}
+
 	var allObservations []domain.PriceObservation
 	var totalIgnoredCount int
 	var totalBytes int64
-	var pageToken string
-	pageIdx := 0
+	var totalPages int
 	const maxPages = 500
 
 	qSink := quarantine.NewStorageSink(a.storage, "gcp", category, fetchID, fetchedAt)
+	normState := NewNormalizationState()
 
-	for {
-		if pageIdx >= maxPages {
-			slog.WarnContext(ctx, "gcp fetch hit max pages limit", "limit", maxPages)
-			break
-		}
+	for epIdx, endpointURL := range endpoints {
+		pageToken := ""
+		pageIdx := 0
 
-		if limiter != nil {
-			if err = limiter.Wait(ctx); err != nil {
+		for {
+			if totalPages >= maxPages {
+				slog.WarnContext(ctx, "gcp fetch hit max pages limit", "limit", maxPages)
+				break
+			}
+
+			if limiter != nil {
+				if err = limiter.Wait(ctx); err != nil {
+					span.RecordError(err)
+					span.SetStatus(codes.Error, err.Error())
+					return domain.FetchResult{}, fmt.Errorf("gcp adapter: rate limit wait: %w", err)
+				}
+			}
+
+			var gcsPath string
+			if len(endpoints) == 1 {
+				gcsPath = fmt.Sprintf("raw/gcp/%s/%s/%s-page%d.json", category, dateStr, fetchID, pageIdx)
+			} else {
+				gcsPath = fmt.Sprintf("raw/gcp/%s/%s/%s-ep%d-page%d.json", category, dateStr, fetchID, epIdx, pageIdx)
+			}
+			if totalPages == 0 {
+				firstGCSPath = gcsPath
+			}
+
+			var body io.ReadCloser
+			body, err = a.client.FetchPriceListURL(ctx, endpointURL, pageToken)
+			if err != nil {
 				span.RecordError(err)
 				span.SetStatus(codes.Error, err.Error())
-				return domain.FetchResult{}, fmt.Errorf("gcp adapter: rate limit wait: %w", err)
+				a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
+				return domain.FetchResult{}, fmt.Errorf("gcp adapter: fetch price list endpoint %d page %d: %w", epIdx, pageIdx, err)
 			}
-		}
 
-		gcsPath := fmt.Sprintf("raw/gcp/%s/%s/%s-page%d.json", category, dateStr, fetchID, pageIdx)
+			cr := provider.NewCountingReader(body)
+			pr, pw := io.Pipe()
+			tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
 
-		var body io.ReadCloser
-		body, err = a.client.FetchPriceList(ctx, pageToken)
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
-			return domain.FetchResult{}, fmt.Errorf("gcp adapter: fetch price list page %d: %w", pageIdx, err)
-		}
+			var pageResult domain.NormalizationResult
+			var pageNextToken string
+			g, _ := errgroup.WithContext(ctx)
 
-		cr := provider.NewCountingReader(body)
-		pr, pw := io.Pipe()
-		tee := io.TeeReader(cr, provider.IgnoreErrorWriter{W: pw})
-
-		var pageResult domain.NormalizationResult
-		var pageNextToken string
-		g, _ := errgroup.WithContext(ctx)
-
-		// Goroutine 1: Normalize reads from pr
-		g.Go(func() error {
-			defer func() {
-				if r := recover(); r != nil {
-					_ = pr.CloseWithError(fmt.Errorf("panic in normalize: %v", r))
+			// Goroutine 1: Normalize reads from pr
+			g.Go(func() error {
+				defer func() {
+					if r := recover(); r != nil {
+						_ = pr.CloseWithError(fmt.Errorf("panic in normalize: %v", r))
+					}
+				}()
+				var normErr error
+				pageResult, pageNextToken, normErr = NormalizeForCategoryWithState(pr, fetchedAt, a.category, normState, qSink)
+				if normErr != nil {
+					_ = pr.CloseWithError(normErr)
+					return fmt.Errorf("gcp adapter: normalize endpoint %d page %d: %w", epIdx, pageIdx, normErr)
 				}
-			}()
-			var normErr error
-			pageResult, pageNextToken, normErr = Normalize(pr, fetchedAt, qSink)
-			if normErr != nil {
-				_ = pr.CloseWithError(normErr)
-				return fmt.Errorf("gcp adapter: normalize page %d: %w", pageIdx, normErr)
-			}
-			_ = pr.Close()
-			return nil
-		})
+				_ = pr.Close()
+				return nil
+			})
 
-		// Goroutine 2: GCS reads from tee
-		g.Go(func() error {
-			defer func() {
-				if r := recover(); r != nil {
-					_ = pw.CloseWithError(fmt.Errorf("panic in storage write: %v", r))
+			// Goroutine 2: GCS reads from tee
+			g.Go(func() error {
+				defer func() {
+					if r := recover(); r != nil {
+						_ = pw.CloseWithError(fmt.Errorf("panic in storage write: %v", r))
+					}
+				}()
+				defer func() { _ = pw.Close() }()
+				// Must use parent ctx, not gctx, to ensure durability if normalize fails
+				if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
+					_ = pw.CloseWithError(err)
+					return fmt.Errorf("gcp adapter: storage write endpoint %d page %d: %w", epIdx, pageIdx, err)
 				}
-			}()
-			defer func() { _ = pw.Close() }()
-			// Must use parent ctx, not gctx, to ensure durability if normalize fails
-			if err := a.storage.WriteStream(ctx, gcsPath, tee); err != nil {
-				_ = pw.CloseWithError(err)
-				return fmt.Errorf("gcp adapter: storage write page %d: %w", pageIdx, err)
-			}
-			return nil
-		})
+				return nil
+			})
 
-		if err = g.Wait(); err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-			a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
-			slog.ErrorContext(ctx, "gcp fetch failed during stream processing", "error", err, "page", pageIdx)
+			if err = g.Wait(); err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "error"), attribute.String("category", category)))
+				slog.ErrorContext(ctx, "gcp fetch failed during stream processing", "error", err, "endpoint", epIdx, "page", pageIdx)
+				_ = body.Close()
+				return domain.FetchResult{}, err
+			}
 			_ = body.Close()
-			return domain.FetchResult{}, err
-		}
-		_ = body.Close()
 
-		totalBytes += cr.BytesRead()
-		allObservations = append(allObservations, pageResult.Observations...)
-		totalIgnoredCount += pageResult.IgnoredCount
+			totalBytes += cr.BytesRead()
+			allObservations = append(allObservations, pageResult.Observations...)
+			totalIgnoredCount += pageResult.IgnoredCount
+			totalPages++
 
-		if pageNextToken == "" {
-			break
+			if pageNextToken == "" {
+				break
+			}
+			pageToken = pageNextToken
+			pageIdx++
 		}
-		pageToken = pageNextToken
-		pageIdx++
 	}
 
 	if a.bytesCounter != nil {
@@ -224,6 +243,13 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 		}
 	}
 
+	// Synthesize multi-meter instance observations across all accumulated pages and endpoints
+	composedObs, err := normState.FinalizeComposedObservations(fetchedAt, category, qSink)
+	if err != nil {
+		return domain.FetchResult{}, fmt.Errorf("gcp adapter: finalize composed observations: %w", err)
+	}
+	allObservations = append(allObservations, composedObs...)
+
 	obsList := allObservations
 	if a.category != "" {
 		filtered := make([]domain.PriceObservation, 0, len(obsList))
@@ -238,7 +264,7 @@ func (a *Adapter) Fetch(ctx context.Context, limiter *rate.Limiter) (res domain.
 	span.SetStatus(codes.Ok, "")
 	span.SetAttributes(attribute.Int("observations.count", len(obsList)))
 	a.fetchCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success"), attribute.String("category", category)))
-	slog.InfoContext(ctx, "gcp fetch completed", "observations", len(obsList), "pages", pageIdx+1, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
+	slog.InfoContext(ctx, "gcp fetch completed", "observations", len(obsList), "pages", totalPages, "unmapped", qSink.Count(), "ignored", totalIgnoredCount)
 
 	return domain.FetchResult{
 		Observations:  obsList,

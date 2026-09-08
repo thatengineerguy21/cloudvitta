@@ -4,6 +4,40 @@ import (
 	"fmt"
 )
 
+// Canonical network transfer types across cloud providers.
+const (
+	TransferTypeInternetEgress      = "internet_egress"
+	TransferTypeInterRegion         = "inter_region"
+	TransferTypeIntraRegion         = "intra_region"
+	TransferTypeDirectConnectEgress = "direct_connect_egress"
+	TransferTypeVPNEgress           = "vpn_egress"
+)
+
+// SupportedTransferTypes returns the list of all canonical network transfer types.
+func SupportedTransferTypes() []string {
+	return []string{
+		TransferTypeInternetEgress,
+		TransferTypeInterRegion,
+		TransferTypeIntraRegion,
+		TransferTypeDirectConnectEgress,
+		TransferTypeVPNEgress,
+	}
+}
+
+// IsValidTransferType reports whether the specified transfer type is a recognized canonical type.
+func IsValidTransferType(transferType string) bool {
+	switch transferType {
+	case TransferTypeInternetEgress,
+		TransferTypeInterRegion,
+		TransferTypeIntraRegion,
+		TransferTypeDirectConnectEgress,
+		TransferTypeVPNEgress:
+		return true
+	default:
+		return false
+	}
+}
+
 var providerResolvers = map[string]func(string) (string, error){
 	"aws":          MapAWSTransferType,
 	"azure":        MapAzureTransferType,

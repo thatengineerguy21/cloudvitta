@@ -26,10 +26,10 @@ var gcpTransferTypeMap = map[string]string{
 	"Intra Region Egress":         "intra_region",
 
 	// Interconnect/VPN
-	"Cloud Interconnect Egress": "internet_egress",
-	"Interconnect Egress":       "internet_egress",
-	"Cloud VPN Egress":          "internet_egress",
-	"VPN Egress":                "internet_egress",
+	"Cloud Interconnect Egress": TransferTypeDirectConnectEgress,
+	"Interconnect Egress":       TransferTypeDirectConnectEgress,
+	"Cloud VPN Egress":          TransferTypeVPNEgress,
+	"VPN Egress":                TransferTypeVPNEgress,
 
 	// Inter-zone
 	"Network Inter-zone Egress": "intra_region",

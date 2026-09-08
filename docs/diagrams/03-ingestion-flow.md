@@ -121,19 +121,21 @@ To guarantee memory safety in resource-constrained environments (Cloud Run 512Mi
 
 To prevent Cartesian explosion in the database, multi-meter services are ingested as distinct component rows in `price_observations` with `service_category` and `attributes.component_type`:
 
-1. **Relational Databases (`database_rdbms` - ADR 0030)**:
-   - Compute instances: `component_type = "instance"` (hourly rate).
+1. **Relational Databases (`database_rdbms` - ADR 0030, ADR 0046)**:
+   - Compute instances: `component_type = "instance"` (hourly rate). Synthesized from vCPU and RAM component meters for Cloud SQL, and ingested as bundled instances for AlloyDB.
    - Storage capacity: `component_type = "storage"` (monthly rate per GB, joined at query time).
+   - Ingestion Endpoints (GCP): Multi-endpoint fetch combining Cloud SQL (`9662-B51E-5089`) and AlloyDB (`C49F-B7F2-7416`).
 2. **NoSQL Databases (`database_nosql` - ADR 0033)**:
-   - Operational throughput: `component_type = "throughput"` (provisioned RCU/WCU/RU or on-demand operations).
+   - Operational throughput: `component_type = "throughput"` (provisioned RCU/WCU/RU, Bigtable provisioned nodes, or on-demand operations).
    - Storage capacity: `component_type = "storage"` (monthly rate per GB, joined at query time).
+   - Ingestion Endpoints (GCP): Multi-endpoint fetch combining Cloud Firestore (`EE2C-7FAC-5E08`) and Cloud Bigtable (`C802-861C-2155`).
 3. **Serverless Compute (`serverless`)**:
-   - Request fees: `rate_component = "request_fee"` (rate per 1M requests).
+   - Request fees: `rate_component = "request_fee"` (rate per 1M requests or per request).
    - Duration fees: `rate_component = "duration_fee"` (rate per GB-second) or split `duration_fee_cpu` and `duration_fee_memory` (GCP).
    - Ingestion Endpoints:
      - AWS: AWS Price List API for AWS Lambda (`DefaultLambdaPriceListURL`).
      - Azure: Azure Retail Prices API for Azure Functions (`DefaultFunctionsRetailPricesURL`).
-     - GCP: Cloud Billing Catalog API for Cloud Functions service ID `29E7-DA93-CA13` (`DefaultServerlessBillingCatalogURL`).
+     - GCP: Multi-endpoint fetch combining Cloud Functions (`29E7-DA93-CA13`) and Cloud Run container services (`152E-C115-5142`).
    - Registration Parity: Factory constructor registers all seven declared categories for AWS, Azure, and GCP. Automated parity tests verify that declared categories match factory jobs.
 
 ---
@@ -154,6 +156,11 @@ ratio = unmapped_count / in_scope_total
 - If `ratio > MaxUnmappedRatio` (default 5%), the job fails with `ErrPermanentFailure` and logs a blocked incident to Redis DLQ to alert engineers of breaking upstream API taxonomy changes.
 - If `ratio <= MaxUnmappedRatio`, valid observations proceed to database upsert and cache warming.
 - Quarantined records are flushed to GCS at `quarantine/<provider>/<category>/<date>/<fetchID>.jsonl` and digested with `cmd/quarantine-digest`.
+
+### GCP Shared Catalog Category Scoping & Network Triage
+GCP publishes Compute Engine virtual machines, RAM/CPU components, and Network services under one service catalog ID (`6F81-5844-456A`). To prevent cross-category contamination and false quarantine alerts:
+1. **Target Category Isolation**: The GCP normalizer evaluates the active ingestion job category (`compute` or `network`). When the job category is `compute`, network SKUs are ignored without quarantine. When the job category is `network`, compute SKUs and machine component compositions are ignored without quarantine.
+2. **Auxiliary Network Line Classification**: Auxiliary networking infrastructure items (such as Cloud Load Balancing, Cloud NAT, Cloud Armor, Firewalls, and Cloud Interconnect port charges) do not represent data transfer egress volume. The normalizer classifies these auxiliary lines as out-of-scope (`ItemClassificationIgnored`). This prevents unmapped transfer type errors and keeps the unmapped ratio below the 5% quarantine threshold.
 
 ---
 

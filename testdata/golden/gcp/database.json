@@ -1,13 +1,13 @@
 {
   "skus": [
     {
-      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-4VCORE",
-      "skuId": "SKU-GCP-CLOUDSQL-PG-4VCORE",
-      "description": "Cloud SQL for PostgreSQL: DB instance - db-custom-4-15360 running in Virginia",
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-VCPU",
+      "skuId": "SKU-GCP-CLOUDSQL-PG-VCPU",
+      "description": "Cloud SQL for PostgreSQL: Zonal - Enterprise vCPU in Virginia",
       "category": {
         "serviceDisplayName": "Cloud SQL",
         "resourceFamily": "ApplicationServices",
-        "resourceGroup": "SQLServer",
+        "resourceGroup": "CPU",
         "usageType": "OnDemand"
       },
       "serviceRegions": [
@@ -24,7 +24,7 @@
                 "unitPrice": {
                   "currencyCode": "USD",
                   "units": "0",
-                  "nanos": 230000000
+                  "nanos": 50000000
                 }
               }
             ]
@@ -34,13 +34,46 @@
       "serviceProviderName": "Google"
     },
     {
-      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-4VCORE-HA",
-      "skuId": "SKU-GCP-CLOUDSQL-PG-4VCORE-HA",
-      "description": "Cloud SQL for PostgreSQL: DB instance - db-custom-4-15360 (Regional HA) running in Virginia",
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-RAM",
+      "skuId": "SKU-GCP-CLOUDSQL-PG-RAM",
+      "description": "Cloud SQL for PostgreSQL: Zonal - Enterprise RAM in Virginia",
       "category": {
         "serviceDisplayName": "Cloud SQL",
         "resourceFamily": "ApplicationServices",
-        "resourceGroup": "SQLServer",
+        "resourceGroup": "RAM",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.h",
+            "usageUnitDescription": "gigabyte hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 7000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-VCPU-HA",
+      "skuId": "SKU-GCP-CLOUDSQL-PG-VCPU-HA",
+      "description": "Cloud SQL for PostgreSQL: Regional - Enterprise vCPU in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud SQL",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "CPU",
         "usageType": "OnDemand"
       },
       "serviceRegions": [
@@ -57,7 +90,40 @@
                 "unitPrice": {
                   "currencyCode": "USD",
                   "units": "0",
-                  "nanos": 460000000
+                  "nanos": 100000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    },
+    {
+      "name": "services/9662-B51E-5089/skus/SKU-GCP-CLOUDSQL-PG-RAM-HA",
+      "skuId": "SKU-GCP-CLOUDSQL-PG-RAM-HA",
+      "description": "Cloud SQL for PostgreSQL: Regional - Enterprise RAM in Virginia",
+      "category": {
+        "serviceDisplayName": "Cloud SQL",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "RAM",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": [
+        "us-east4"
+      ],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "GiBy.h",
+            "usageUnitDescription": "gigabyte hour",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 14000000
                 }
               }
             ]

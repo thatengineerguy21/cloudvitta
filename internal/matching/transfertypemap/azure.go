@@ -23,7 +23,13 @@ var azureTransferTypeMap = map[string]string{
 	"Routing Preference: Transit / ISP":            "internet_egress",
 	"Routing Preference: Transit":                  "internet_egress",
 	"Routing Preference: ISP":                      "internet_egress",
-	"ExpressRoute":                                 "internet_egress",
+	"ExpressRoute":                                 TransferTypeDirectConnectEgress,
+	"ExpressRoute Egress":                          TransferTypeDirectConnectEgress,
+	"ExpressRoute Data Transfer Out":               TransferTypeDirectConnectEgress,
+	"VPN Gateway":                                  TransferTypeVPNEgress,
+	"VPN Gateway Egress":                           TransferTypeVPNEgress,
+	"VPN Data Transfer Out":                        TransferTypeVPNEgress,
+	"VPN Egress":                                   TransferTypeVPNEgress,
 	"Global":                                       "internet_egress",
 }
 

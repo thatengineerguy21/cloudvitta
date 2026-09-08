@@ -298,7 +298,7 @@ func TestRouter_Integration_TieredRateLimitingAndCORS(t *testing.T) {
 				FetchedAt:         time.Now().UTC(),
 			},
 		}
-		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), obs, time.Hour)
+		_ = cache.Warm(context.Background(), rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), "aws", "network", "us-east-1"), obs, time.Hour)
 
 		req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/prices/network?egress_gb=100&region=us-east", nil)
 		if err != nil {

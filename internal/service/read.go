@@ -86,7 +86,7 @@ func (s *PricingService) GetPrices(ctx context.Context, provider, category, regi
 		nativeRegion = regionGroup
 	}
 
-	cacheKey := cache.BuildKey(cache.SchemaVersion, provider, category, nativeRegion)
+	cacheKey := cache.BuildKey(cache.CategorySchemaVersion(category), provider, category, nativeRegion)
 
 	// 1. Try Cache-Aside Read from Redis
 	if s.redisClient != nil {

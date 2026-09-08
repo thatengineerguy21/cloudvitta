@@ -439,7 +439,7 @@ func (o *Orchestrator) warmCache(ctx context.Context, prov, category string, obs
 	}
 
 	for region, obsList := range byRegion {
-		key := cache.BuildKey(cache.SchemaVersion, prov, category, region)
+		key := cache.BuildKey(cache.CategorySchemaVersion(category), prov, category, region)
 		warmCtx, warmCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if warmErr := cache.Warm(warmCtx, o.redisClient, key, obsList, cache.DefaultTTL); warmErr != nil {
 			slog.Warn("failed to warm redis cache after ingestion", "key", key, "error", warmErr)

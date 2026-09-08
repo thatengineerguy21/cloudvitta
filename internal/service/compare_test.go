@@ -155,7 +155,7 @@ func TestPricingService_Compare_Network(t *testing.T) {
 			FetchedAt: time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsNetwork, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), "aws", "network", "us-east-1"), awsNetwork, cache.DefaultTTL)
 
 	svc := service.NewPricingService(nil, rdb)
 

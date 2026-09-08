@@ -557,6 +557,13 @@ func TestMatchObservations_NetworkTier(t *testing.T) {
 		{"exact (same type)", "internet_egress", "internet_egress", "exact"},
 		{"approximate (one tier apart)", "inter_region", "internet_egress", "approximate"}, // 50% delta <= 50%
 		{"none (two tiers apart)", "intra_region", "internet_egress", ""},                  // 100% delta > 50% → nil
+		{"exact (direct_connect_egress)", "direct_connect_egress", "direct_connect_egress", "exact"},
+		{"exact (vpn_egress)", "vpn_egress", "vpn_egress", "exact"},
+		{"guard: direct_connect_egress never matches internet_egress", "internet_egress", "direct_connect_egress", ""},
+		{"guard: internet_egress never matches direct_connect_egress", "direct_connect_egress", "internet_egress", ""},
+		{"guard: vpn_egress never matches internet_egress", "internet_egress", "vpn_egress", ""},
+		{"guard: direct_connect_egress never matches vpn_egress", "vpn_egress", "direct_connect_egress", ""},
+		{"guard: unspecified target never matches direct_connect_egress", "direct_connect_egress", "", ""},
 	}
 
 	for _, tt := range tests {

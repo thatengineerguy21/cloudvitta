@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/thatengineerguy21/CloudVitta/internal/domain"
+	"github.com/thatengineerguy21/CloudVitta/internal/matching/transfertypemap"
 )
 
 // --- Storage class ordinal map ---
@@ -148,6 +149,19 @@ func (s NetworkScorer) Score(candidate domain.PriceObservation, target MatchTarg
 	// Network observations represent unit rates ($/GB) with EgressGB=1.
 	// The requested volume is applied as a cost multiplier in pricing_calc.go,
 	// not as a distance term. Matching evaluates transfer_type compatibility only.
+
+	// Scoring guard: private/dedicated and VPN egress types are isolated from general cloud egress.
+	// A request for direct_connect_egress or vpn_egress must strictly match candidates of the identical type,
+	// and general/unspecified requests must never match dedicated or VPN candidates.
+	isDedicatedOrVPN := func(tt string) bool {
+		return tt == transfertypemap.TransferTypeDirectConnectEgress || tt == transfertypemap.TransferTypeVPNEgress
+	}
+	if isDedicatedOrVPN(target.TransferType) || isDedicatedOrVPN(candidate.NetworkAttributes.TransferType) {
+		if target.TransferType != candidate.NetworkAttributes.TransferType {
+			return 0, nil, false
+		}
+		return 0, nil, true
+	}
 
 	// Transfer type term (optional, weight=1.0).
 	if target.TransferType != "" {

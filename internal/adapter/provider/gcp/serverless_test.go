@@ -60,6 +60,64 @@ func TestNormalize_GCPServerlessGolden(t *testing.T) {
 	}
 }
 
+func TestNormalize_GCPCloudRun(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
+
+	f, err := os.Open("../../../../testdata/golden/gcp/cloud_run.json")
+	if err != nil {
+		t.Fatalf("failed to open cloud_run golden file: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	res, _, err := gcp.Normalize(f, fixedTime)
+	if err != nil {
+		t.Fatalf("Normalize() unexpected error: %v", err)
+	}
+	obs := res.Observations
+	if len(obs) != 3 {
+		t.Fatalf("expected 3 observations, got %d", len(obs))
+	}
+
+	for _, o := range obs {
+		if o.Provider != "gcp" {
+			t.Errorf("expected Provider gcp, got %s", o.Provider)
+		}
+		if o.ServiceCategory != "serverless" {
+			t.Errorf("expected ServiceCategory serverless, got %s", o.ServiceCategory)
+		}
+		if o.ServerlessRateAttributes.Architecture != domain.ArchitectureX86_64 {
+			t.Errorf("expected Architecture x86_64, got %s", o.ServerlessRateAttributes.Architecture)
+		}
+	}
+
+	// Requests
+	reqObs := obs[0]
+	if reqObs.ServerlessRateAttributes.ComponentType != domain.ComponentTypeRequestFee {
+		t.Errorf("expected ComponentType request_fee, got %s", reqObs.ServerlessRateAttributes.ComponentType)
+	}
+	if reqObs.ServerlessRateAttributes.Unit != domain.UnitPerRequest {
+		t.Errorf("expected Unit per_request, got %s", reqObs.ServerlessRateAttributes.Unit)
+	}
+
+	// CPU
+	cpuObs := obs[1]
+	if cpuObs.ServerlessRateAttributes.ComponentType != domain.ComponentTypeDurationFeeCPU {
+		t.Errorf("expected ComponentType duration_fee_cpu, got %s", cpuObs.ServerlessRateAttributes.ComponentType)
+	}
+	if cpuObs.ServerlessRateAttributes.Unit != domain.UnitPerVCPUSecond {
+		t.Errorf("expected Unit per_vcpu_second, got %s", cpuObs.ServerlessRateAttributes.Unit)
+	}
+
+	// Memory
+	memObs := obs[2]
+	if memObs.ServerlessRateAttributes.ComponentType != domain.ComponentTypeDurationFeeMemory {
+		t.Errorf("expected ComponentType duration_fee_memory, got %s", memObs.ServerlessRateAttributes.ComponentType)
+	}
+	if memObs.ServerlessRateAttributes.Unit != domain.UnitPerGBSecond {
+		t.Errorf("expected Unit per_gb_second, got %s", memObs.ServerlessRateAttributes.Unit)
+	}
+}
+
 func TestNormalize_GCPServerless_UnmappedArchQuarantine(t *testing.T) {
 	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
 	rawJSON := `{

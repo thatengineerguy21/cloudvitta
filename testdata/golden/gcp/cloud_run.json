@@ -1,0 +1,88 @@
+{
+  "skus": [
+    {
+      "name": "services/152E-C115-5142/skus/SKU-CR-REQ",
+      "skuId": "SKU-CR-REQ",
+      "description": "Cloud Run: Request Count",
+      "category": {
+        "serviceDisplayName": "Cloud Run",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Requests",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-central1"],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "requests",
+            "tieredRates": [
+              {
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 400000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "services/152E-C115-5142/skus/SKU-CR-CPU",
+      "skuId": "SKU-CR-CPU",
+      "description": "Cloud Run: CPU Allocation Time",
+      "category": {
+        "serviceDisplayName": "Cloud Run",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "CPU",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-central1"],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "vcpu.s",
+            "tieredRates": [
+              {
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 24000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "services/152E-C115-5142/skus/SKU-CR-MEM",
+      "skuId": "SKU-CR-MEM",
+      "description": "Cloud Run: Memory Allocation Time",
+      "category": {
+        "serviceDisplayName": "Cloud Run",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "Memory",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-central1"],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "giby.s",
+            "tieredRates": [
+              {
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 2500
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -42,3 +42,70 @@ func TestNormalize_GCPDatabaseNoSQLGolden(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalize_GCPBigtable(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
+
+	f, err := os.Open("../../../../testdata/golden/gcp/bigtable.json")
+	if err != nil {
+		t.Fatalf("failed to open bigtable golden file: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	res, _, err := gcp.Normalize(f, fixedTime)
+	if err != nil {
+		t.Fatalf("Normalize() unexpected error: %v", err)
+	}
+	obs := res.Observations
+	if len(obs) != 3 {
+		t.Fatalf("expected 3 observations, got %d", len(obs))
+	}
+
+	for _, o := range obs {
+		if o.Provider != "gcp" {
+			t.Errorf("expected Provider gcp, got %s", o.Provider)
+		}
+		if o.ServiceCategory != "database_nosql" {
+			t.Errorf("expected ServiceCategory database_nosql, got %s", o.ServiceCategory)
+		}
+		if o.DatabaseNoSQLAttributes.DataModel != "wide_column" {
+			t.Errorf("expected DataModel wide_column, got %s", o.DatabaseNoSQLAttributes.DataModel)
+		}
+		if o.RegionGroup != "us-east" {
+			t.Errorf("expected RegionGroup us-east, got %s", o.RegionGroup)
+		}
+	}
+
+	// Verify node observation
+	nodeObs := obs[0]
+	if nodeObs.SkuID != "SKU-BIGTABLE-NODE" {
+		t.Errorf("expected SkuID SKU-BIGTABLE-NODE, got %s", nodeObs.SkuID)
+	}
+	if nodeObs.DatabaseNoSQLAttributes.ComponentType != "throughput" {
+		t.Errorf("expected ComponentType throughput, got %s", nodeObs.DatabaseNoSQLAttributes.ComponentType)
+	}
+	if nodeObs.DatabaseNoSQLAttributes.PricingMode != "provisioned" {
+		t.Errorf("expected PricingMode provisioned, got %s", nodeObs.DatabaseNoSQLAttributes.PricingMode)
+	}
+	if nodeObs.Unit != "Hrs" {
+		t.Errorf("expected Unit Hrs, got %s", nodeObs.Unit)
+	}
+
+	// Verify SSD storage observation
+	ssdObs := obs[1]
+	if ssdObs.DatabaseNoSQLAttributes.ComponentType != "storage" {
+		t.Errorf("expected ComponentType storage, got %s", ssdObs.DatabaseNoSQLAttributes.ComponentType)
+	}
+	if ssdObs.DatabaseNoSQLAttributes.StorageClass != "standard" {
+		t.Errorf("expected StorageClass standard, got %s", ssdObs.DatabaseNoSQLAttributes.StorageClass)
+	}
+
+	// Verify HDD storage observation
+	hddObs := obs[2]
+	if hddObs.DatabaseNoSQLAttributes.ComponentType != "storage" {
+		t.Errorf("expected ComponentType storage, got %s", hddObs.DatabaseNoSQLAttributes.ComponentType)
+	}
+	if hddObs.DatabaseNoSQLAttributes.StorageClass != "infrequent_access" {
+		t.Errorf("expected StorageClass infrequent_access, got %s", hddObs.DatabaseNoSQLAttributes.StorageClass)
+	}
+}

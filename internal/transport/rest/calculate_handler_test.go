@@ -459,7 +459,7 @@ func TestCalculateHandler_AllSevenCategories_Success(t *testing.T) {
 	}, cache.DefaultTTL)
 
 	// 3. Network
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), []domain.PriceObservation{
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), "aws", "network", "us-east-1"), []domain.PriceObservation{
 		{
 			Provider:          "aws",
 			ServiceCategory:   "network",

@@ -1,0 +1,32 @@
+{
+  "skus": [
+    {
+      "name": "services/C49F-B7F2-7416/skus/SKU-GCP-ALLOYDB-8VCPU",
+      "skuId": "SKU-GCP-ALLOYDB-8VCPU",
+      "description": "AlloyDB for PostgreSQL: Instance 8 vCPU, 64 GB in Virginia",
+      "category": {
+        "serviceDisplayName": "AlloyDB for PostgreSQL",
+        "resourceFamily": "ApplicationServices",
+        "resourceGroup": "AlloyDB",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-east4"],
+      "pricingInfo": [
+        {
+          "pricingExpression": {
+            "usageUnit": "h",
+            "tieredRates": [
+              {
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 780000000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

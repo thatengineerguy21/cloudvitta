@@ -96,7 +96,7 @@ func TestPricingService_GetPrices_AllCategories_CacheHit(t *testing.T) {
 	for _, cat := range categories {
 		t.Run(cat, func(t *testing.T) {
 			skuID := "SKU-" + strings.ToUpper(cat) + "-1"
-			key := cache.BuildKey(cache.SchemaVersion, "aws", cat, "us-east-1")
+			key := cache.BuildKey(cache.CategorySchemaVersion(cat), "aws", cat, "us-east-1")
 
 			cachedObs := []domain.PriceObservation{
 				{

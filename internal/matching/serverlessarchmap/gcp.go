@@ -15,10 +15,13 @@ var gcpArchMap = map[string]string{
 	"intel":                domain.ArchitectureX86_64,
 	"cloud functions":      domain.ArchitectureX86_64,
 	"cloud run functions":  domain.ArchitectureX86_64,
+	"cloud run":            domain.ArchitectureX86_64,
 	"1st_gen":              domain.ArchitectureX86_64,
 	"2nd_gen":              domain.ArchitectureX86_64,
 	"invocations":          domain.ArchitectureX86_64,
 	"function invocations": domain.ArchitectureX86_64,
+	"requests":             domain.ArchitectureX86_64,
+	"request":              domain.ArchitectureX86_64,
 	"execution time":       domain.ArchitectureX86_64,
 	"memory time":          domain.ArchitectureX86_64,
 	"cpu time":             domain.ArchitectureX86_64,
@@ -40,7 +43,7 @@ func MapGCPArchitecture(rawArch string) (string, error) {
 		return "", fmt.Errorf("%w: gcp does not support ARM architecture for serverless: %q", ErrUnmappedArchitecture, rawArch)
 	}
 
-	if strings.Contains(key, "function") || strings.Contains(key, "invocation") || strings.Contains(key, "time") || strings.Contains(key, "second") {
+	if strings.Contains(key, "function") || strings.Contains(key, "invocation") || strings.Contains(key, "request") || strings.Contains(key, "time") || strings.Contains(key, "second") || strings.Contains(key, "cloud run") {
 		return domain.ArchitectureX86_64, nil
 	}
 
