@@ -243,13 +243,14 @@ func TestNetworkHandler_HappyPath_CalculatesMonthlyCosts(t *testing.T) {
 		},
 	}
 
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "eastus"), azureObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east4"), gcpObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "oracle", "network", "us-ashburn-1"), oracleObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "ibm", "network", "us-east"), ibmObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "alibaba", "network", "us-east-1"), aliObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "digitalocean", "network", "nyc3"), doObs, cache.DefaultTTL)
+	netSchema := cache.CategorySchemaVersion("network")
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "azure", "network", "eastus"), azureObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "gcp", "network", "us-east4"), gcpObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "oracle", "network", "us-ashburn-1"), oracleObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "ibm", "network", "us-east"), ibmObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "alibaba", "network", "us-east-1"), aliObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "digitalocean", "network", "nyc3"), doObs, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewNetworkHandler(pricingSvc)
@@ -343,7 +344,7 @@ func TestNetworkHandler_PartialProviderFailure_Returns200WithWarning(t *testing.
 			FetchedAt:         time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
 
 	failingQueries := store.New(&failingDBTX{})
 	pricingSvc := service.NewPricingService(failingQueries, rdb)
@@ -401,9 +402,10 @@ func TestNetworkHandler_EmptyProviderResults_AddsWarning(t *testing.T) {
 			NetworkAttributes: domain.NetworkAttributes{EgressGB: 100},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "eastus"), []domain.PriceObservation{}, cache.DefaultTTL)
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "gcp", "network", "us-east4"), []domain.PriceObservation{}, cache.DefaultTTL)
+	netSchema := cache.CategorySchemaVersion("network")
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "azure", "network", "eastus"), []domain.PriceObservation{}, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "gcp", "network", "us-east4"), []domain.PriceObservation{}, cache.DefaultTTL)
 
 	pricingSvc := service.NewPricingService(nil, rdb)
 	handler := rest.NewNetworkHandler(pricingSvc)
@@ -465,5 +467,104 @@ func TestNetworkHandler_AllProvidersFail_Returns502(t *testing.T) {
 	}
 	if rfcErr.Status != 502 {
 		t.Errorf("Status = %d, want 502", rfcErr.Status)
+	}
+}
+
+func TestNetworkHandler_DirectConnectAndVPNEgress_Accepted(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() failed: %v", err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer func() { _ = rdb.Close() }()
+
+	ctx := context.Background()
+	awsObs := []domain.PriceObservation{
+		{
+			Provider:          "aws",
+			ServiceCategory:   "network",
+			SkuID:             "SKU-AWS-DC-OUT",
+			DisplayName:       "Direct Connect Data Transfer Out",
+			Region:            "us-east-1",
+			RegionGroup:       "us-east",
+			Unit:              "GB",
+			PriceAmount:       decimal.RequireFromString("0.020"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1, TransferType: "direct_connect_egress"},
+			FetchedAt:         time.Now().UTC(),
+		},
+		{
+			Provider:          "aws",
+			ServiceCategory:   "network",
+			SkuID:             "SKU-AWS-VPN-OUT",
+			DisplayName:       "VPN Data Transfer Out",
+			Region:            "us-east-1",
+			RegionGroup:       "us-east",
+			Unit:              "GB",
+			PriceAmount:       decimal.RequireFromString("0.050"),
+			PriceCurrency:     "USD",
+			PricingModel:      "OnDemand",
+			NetworkAttributes: domain.NetworkAttributes{EgressGB: 1, TransferType: "vpn_egress"},
+			FetchedAt:         time.Now().UTC(),
+		},
+	}
+
+	netSchema := cache.CategorySchemaVersion("network")
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(netSchema, "aws", "network", "us-east-1"), awsObs, cache.DefaultTTL)
+
+	pricingSvc := service.NewPricingService(nil, rdb)
+	handler := rest.NewNetworkHandler(pricingSvc)
+
+	// Test 1: Direct Connect
+	reqDC := httptest.NewRequest(http.MethodGet, "/api/v1/prices/network?egress_gb=1000&transfer_type=direct_connect_egress&region=us-east", nil)
+	recDC := httptest.NewRecorder()
+	handler.ServeHTTP(recDC, reqDC)
+
+	if recDC.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 OK. Body: %s", recDC.Code, recDC.Body.String())
+	}
+	var respDC rest.NetworkComparisonResponse
+	if err := json.NewDecoder(recDC.Body).Decode(&respDC); err != nil {
+		t.Fatalf("failed to decode respDC: %v", err)
+	}
+	var foundAWS_DC bool
+	for _, res := range respDC.Results {
+		if res.Provider == "aws" && res.SkuID == "SKU-AWS-DC-OUT" {
+			foundAWS_DC = true
+			if res.MatchedSpec.TransferType != "direct_connect_egress" {
+				t.Errorf("expected matched transfer_type direct_connect_egress, got %s", res.MatchedSpec.TransferType)
+			}
+		}
+	}
+	if !foundAWS_DC {
+		t.Errorf("expected AWS direct_connect_egress result, got results: %+v", respDC.Results)
+	}
+
+	// Test 2: VPN
+	reqVPN := httptest.NewRequest(http.MethodGet, "/api/v1/prices/network?egress_gb=1000&transfer_type=vpn_egress&region=us-east", nil)
+	recVPN := httptest.NewRecorder()
+	handler.ServeHTTP(recVPN, reqVPN)
+
+	if recVPN.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 OK. Body: %s", recVPN.Code, recVPN.Body.String())
+	}
+	var respVPN rest.NetworkComparisonResponse
+	if err := json.NewDecoder(recVPN.Body).Decode(&respVPN); err != nil {
+		t.Fatalf("failed to decode respVPN: %v", err)
+	}
+	var foundAWS_VPN bool
+	for _, res := range respVPN.Results {
+		if res.Provider == "aws" && res.SkuID == "SKU-AWS-VPN-OUT" {
+			foundAWS_VPN = true
+			if res.MatchedSpec.TransferType != "vpn_egress" {
+				t.Errorf("expected matched transfer_type vpn_egress, got %s", res.MatchedSpec.TransferType)
+			}
+		}
+	}
+	if !foundAWS_VPN {
+		t.Errorf("expected AWS vpn_egress result, got results: %+v", respVPN.Results)
 	}
 }

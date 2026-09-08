@@ -126,7 +126,36 @@ var knownGCPVMSpecs = map[string]domain.ComputeAttributes{
 	"t2a-standard-8": {VCPU: 8, RAMGB: 32, Family: "t2a"},
 }
 
-// Normalize parses a GCP Cloud Billing Catalog API JSON stream and returns normalized domain observations and the next page token.
+type gcpCloudSQLShape struct {
+	Name  string
+	VCPU  float64
+	RAMGB float64
+}
+
+var knownGCPCloudSQLSpecs = []gcpCloudSQLShape{
+	// Standard Cloud SQL instance ratios (1:3.75)
+	{Name: "db-custom-1-3840", VCPU: 1, RAMGB: 3.75},
+	{Name: "db-custom-2-7680", VCPU: 2, RAMGB: 7.5},
+	{Name: "db-custom-4-15360", VCPU: 4, RAMGB: 15},
+	{Name: "db-custom-8-30720", VCPU: 8, RAMGB: 30},
+	{Name: "db-custom-16-61440", VCPU: 16, RAMGB: 60},
+	{Name: "db-custom-32-122880", VCPU: 32, RAMGB: 120},
+	{Name: "db-custom-64-245760", VCPU: 64, RAMGB: 240},
+
+	// Standard 1:4 shapes
+	{Name: "db-custom-1-4096", VCPU: 1, RAMGB: 4},
+	{Name: "db-custom-2-8192", VCPU: 2, RAMGB: 8},
+	{Name: "db-custom-4-16384", VCPU: 4, RAMGB: 16},
+	{Name: "db-custom-8-32768", VCPU: 8, RAMGB: 32},
+	{Name: "db-custom-16-65536", VCPU: 16, RAMGB: 64},
+
+	// Standard 1:8 shapes
+	{Name: "db-custom-2-16384", VCPU: 2, RAMGB: 16},
+	{Name: "db-custom-4-32768", VCPU: 4, RAMGB: 32},
+	{Name: "db-custom-8-65536", VCPU: 8, RAMGB: 64},
+	{Name: "db-custom-16-131072", VCPU: 16, RAMGB: 128},
+}
+
 type gcpComponentKey struct {
 	family string
 	region string
@@ -136,6 +165,19 @@ type gcpComponentSpec struct {
 	corePrice decimal.Decimal
 	ramPrice  decimal.Decimal
 	unit      string
+	currency  string
+}
+
+type gcpDatabaseComponentKey struct {
+	engine  string // postgresql, mysql, sqlserver
+	tier    string // standard, enterprise_plus
+	multiAZ bool   // false = zonal, true = regional HA
+	region  string // us-east4, etc.
+}
+
+type gcpDatabaseComponentSpec struct {
+	corePrice decimal.Decimal
+	ramPrice  decimal.Decimal
 	currency  string
 }
 
@@ -159,6 +201,7 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 	var nextPageToken string
 	var ignoredCount int
 	components := make(map[gcpComponentKey]*gcpComponentSpec)
+	dbComponents := make(map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec)
 
 	// Advance to the first token
 	t, err := dec.Token()
@@ -214,6 +257,15 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 				}
 				category, err := catalogmap.MapGCPProduct(serviceName)
 				if err != nil {
+					// Fallback: Check service ID embedded in sku.Name (e.g. services/C49F-B7F2-7416/skus/...)
+					if parts := strings.Split(sku.Name, "/"); len(parts) >= 2 && parts[0] == "services" {
+						if cat, idErr := catalogmap.MapGCPProduct(parts[1]); idErr == nil {
+							category = cat
+							err = nil
+						}
+					}
+				}
+				if err != nil {
 					if errors.Is(err, catalogmap.ErrUnmappedProduct) {
 						slog.Debug("gcp normalize: ignoring out-of-scope product", "sku", sku.SkuID, "product", serviceName)
 						ignoredCount++
@@ -264,7 +316,11 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 					skuObs, err = normalizeNetworkSKU(sku, category, fetchedAt, sink)
 				case "database_rdbms":
 					if isDatabaseProduct(sku) {
-						skuObs, err = normalizeDatabaseSKU(sku, category, fetchedAt, sink)
+						if isDatabaseComponent(sku) {
+							collectDatabaseComponentPricing(sku, dbComponents)
+						} else {
+							skuObs, err = normalizeDatabaseSKU(sku, category, fetchedAt, sink)
+						}
 					}
 				case "database_nosql":
 					skuObs, err = normalizeDatabaseNoSQLSKU(sku, category, fetchedAt, sink)
@@ -280,7 +336,7 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 				}
 				observations = append(observations, skuObs...)
 
-				if len(observations) == obsCountBefore && !isComputeComponent(sku) {
+				if len(observations) == obsCountBefore && !isComputeComponent(sku) && !isDatabaseComponent(sku) {
 					sinkCountAfter := 0
 					if sink != nil {
 						if counter, ok := sink.(interface{ Count() int }); ok {
@@ -316,6 +372,15 @@ func NormalizeForCategory(r io.Reader, fetchedAt time.Time, targetCategory strin
 			return domain.NormalizationResult{}, "", err
 		}
 		observations = append(observations, composedObs...)
+	}
+
+	// Synthesize Cloud SQL instance pricing from collected database component SKUs
+	if len(dbComponents) > 0 && (targetCategory == "" || targetCategory == "database_rdbms") {
+		composedDBObs, err := composeCloudSQLInstancePricing(dbComponents, fetchedAt, sink)
+		if err != nil {
+			return domain.NormalizationResult{}, "", err
+		}
+		observations = append(observations, composedDBObs...)
 	}
 
 	return domain.NormalizationResult{
@@ -861,6 +926,178 @@ func composeMachineTypePricing(components map[gcpComponentKey]*gcpComponentSpec,
 	return observations, nil
 }
 
+func isStorageDatabaseSKU(sku gcpSKU) bool {
+	if len(sku.PricingInfo) > 0 {
+		expr := sku.PricingInfo[0].PricingExpression
+		if strings.Contains(expr.UsageUnitDescription, "month") || strings.Contains(expr.UsageUnit, "mo") {
+			return true
+		}
+	}
+	return strings.Contains(sku.Description, "Storage") || strings.Contains(sku.Category.ResourceGroup, "PD")
+}
+
+func isDatabaseComponent(sku gcpSKU) bool {
+	if sku.Category.UsageType != "OnDemand" {
+		return false
+	}
+	if isStorageDatabaseSKU(sku) {
+		return false
+	}
+	desc := sku.Description
+	if strings.Contains(desc, "Extended support") || strings.Contains(desc, "Extended Support") {
+		return false
+	}
+	if strings.Contains(desc, "Commitment") || strings.Contains(desc, "Discount") || strings.Contains(desc, "License") {
+		return false
+	}
+	// Bundled monolithic instance SKUs (e.g. AlloyDB) are not components
+	if _, _, _, ok := parseGCPDatabaseAttributes(desc, sku.Name); ok {
+		return false
+	}
+	group := sku.Category.ResourceGroup
+	isCPU := strings.Contains(desc, "vCPU") || strings.Contains(desc, "Core") || strings.EqualFold(group, "CPU")
+	isRAM := strings.Contains(desc, "RAM") || strings.Contains(desc, "Memory") || strings.EqualFold(group, "RAM")
+	return isCPU || isRAM
+}
+
+func collectDatabaseComponentPricing(sku gcpSKU, dbComponents map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec) {
+	if len(sku.PricingInfo) == 0 || len(sku.PricingInfo[0].PricingExpression.TieredRates) == 0 {
+		return
+	}
+	unitPrice := sku.PricingInfo[0].PricingExpression.TieredRates[0].UnitPrice
+	priceAmount, err := extractUnitPrice(unitPrice)
+	if err != nil || priceAmount.IsZero() {
+		return
+	}
+
+	engine, err := parseGCPDatabaseEngine(sku)
+	if err != nil {
+		return
+	}
+
+	tier := "standard"
+	if strings.Contains(sku.Description, "Enterprise Plus") || strings.Contains(sku.Category.ResourceGroup, "Enterprise Plus") {
+		tier = "enterprise_plus"
+	}
+
+	multiAZ := strings.Contains(sku.Description, "Regional") ||
+		strings.Contains(sku.Description, "HA") ||
+		strings.Contains(sku.Category.ResourceGroup, "Regional")
+
+	regions := sku.ServiceRegions
+	if len(regions) == 0 {
+		regions = []string{"global"}
+	}
+	currency := unitPrice.CurrencyCode
+	if currency == "" {
+		currency = "USD"
+	}
+
+	isCore := strings.Contains(sku.Description, "vCPU") || strings.Contains(sku.Description, "Core") || strings.EqualFold(sku.Category.ResourceGroup, "CPU")
+	isRAM := strings.Contains(sku.Description, "RAM") || strings.Contains(sku.Description, "Memory") || strings.EqualFold(sku.Category.ResourceGroup, "RAM")
+
+	for _, region := range regions {
+		if !regionmap.IsTargetRegion("gcp", region) {
+			continue
+		}
+		key := gcpDatabaseComponentKey{
+			engine:  engine,
+			tier:    tier,
+			multiAZ: multiAZ,
+			region:  region,
+		}
+		comp, ok := dbComponents[key]
+		if !ok {
+			comp = &gcpDatabaseComponentSpec{
+				currency: currency,
+			}
+			dbComponents[key] = comp
+		}
+		if isCore {
+			comp.corePrice = priceAmount
+		}
+		if isRAM {
+			comp.ramPrice = priceAmount
+		}
+	}
+}
+
+func composeCloudSQLInstancePricing(components map[gcpDatabaseComponentKey]*gcpDatabaseComponentSpec, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
+	var observations []domain.PriceObservation
+	for key, comp := range components {
+		if comp.corePrice.IsZero() || comp.ramPrice.IsZero() {
+			continue
+		}
+		regionGroup, err := regionmap.MapGCPRegion(key.region)
+		if err != nil {
+			if errors.Is(err, regionmap.ErrUnmappedRegion) {
+				if sink != nil {
+					_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+						Provider:   "gcp",
+						Category:   "database_rdbms",
+						Kind:       "region",
+						RawValue:   key.region,
+						SkuID:      fmt.Sprintf("SKU-GCP-CLOUDSQL-%s-%s", strings.ToUpper(key.engine), strings.ToUpper(key.tier)),
+						ObservedAt: fetchedAt,
+					})
+				}
+				continue
+			}
+			return nil, fmt.Errorf("gcp compose database region %s: %w", key.region, err)
+		}
+
+		engineDisplay := key.engine
+		switch strings.ToLower(key.engine) {
+		case "postgresql":
+			engineDisplay = "PostgreSQL"
+		case "mysql":
+			engineDisplay = "MySQL"
+		case "sqlserver":
+			engineDisplay = "SQL Server"
+		}
+
+		for _, shape := range knownGCPCloudSQLSpecs {
+			hourlyPrice := comp.corePrice.Mul(decimal.NewFromFloat(shape.VCPU)).Add(comp.ramPrice.Mul(decimal.NewFromFloat(shape.RAMGB)))
+
+			haSuffix := ""
+			if key.multiAZ {
+				haSuffix = "-HA"
+			}
+			skuID := fmt.Sprintf("SKU-GCP-CLOUDSQL-%s-%s-%sVCPU-%sGB%s",
+				strings.ToUpper(key.engine),
+				strings.ToUpper(key.tier),
+				strconv.FormatFloat(shape.VCPU, 'f', -1, 64),
+				strconv.FormatFloat(shape.RAMGB, 'f', -1, 64),
+				haSuffix,
+			)
+
+			observations = append(observations, domain.PriceObservation{
+				Provider:        "gcp",
+				ServiceCategory: "database_rdbms",
+				SkuID:           skuID,
+				DisplayName:     fmt.Sprintf("Cloud SQL for %s: %s (%.2g vCPU, %.2g GB RAM)", engineDisplay, shape.Name, shape.VCPU, shape.RAMGB),
+				Region:          key.region,
+				RegionGroup:     regionGroup,
+				Unit:            "Hrs",
+				PriceAmount:     hourlyPrice,
+				PriceCurrency:   comp.currency,
+				PricingModel:    "OnDemand",
+				DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+					Engine:         key.engine,
+					VCPU:           shape.VCPU,
+					RAMGB:          shape.RAMGB,
+					StorageGB:      0,
+					MultiAZ:        key.multiAZ,
+					DeploymentTier: key.tier,
+					ComponentType:  "instance",
+				},
+				FetchedAt: fetchedAt,
+			})
+		}
+	}
+	return observations, nil
+}
+
 func isComputeInstance(sku gcpSKU) bool {
 	// Must be OnDemand
 	if sku.Category.UsageType != "OnDemand" {
@@ -985,17 +1222,30 @@ func normalizeDatabaseSKU(sku gcpSKU, category string, fetchedAt time.Time, sink
 		return nil, nil
 	}
 
-	isStorage := strings.Contains(sku.Description, "Storage") ||
-		strings.Contains(sku.Category.ResourceGroup, "PD") ||
-		strings.Contains(sku.PricingInfo[0].PricingExpression.UsageUnitDescription, "month") ||
-		strings.Contains(sku.PricingInfo[0].PricingExpression.UsageUnit, "mo")
+	isStorage := isStorageDatabaseSKU(sku)
 
-	vcpu, ram, tier := parseGCPDatabaseAttributes(sku.Description, sku.Name)
-	isInstance := !isStorage && (vcpu > 0 || ram > 0 || strings.Contains(sku.Description, "Instance"))
+	var vcpu, ram float64
+	var tier string
+	var isInstance bool
 
-	// If it is neither storage nor an instance (e.g. network egress, backups, PITR), it is out of scope.
-	if !isStorage && !isInstance {
-		return nil, nil
+	if !isStorage {
+		var ok bool
+		vcpu, ram, tier, ok = parseGCPDatabaseAttributes(sku.Description, sku.Name)
+		if !ok {
+			if sink != nil {
+				_ = sink.Record(context.Background(), quarantine.UnmappedItem{
+					Provider:   "gcp",
+					Category:   category,
+					Kind:       "database_attributes",
+					RawValue:   sku.Description,
+					SkuID:      sku.SkuID,
+					ObservedAt: fetchedAt,
+				})
+			}
+			slog.Warn("gcp normalize: skipping SKU due to unparseable database attributes", "sku", sku.SkuID, "desc", sku.Description)
+			return nil, nil
+		}
+		isInstance = true
 	}
 
 	var engine string
@@ -1140,7 +1390,7 @@ func parseGCPDatabaseEngine(sku gcpSKU) (string, error) {
 var gcpDBCustomRegex = regexp.MustCompile(`(?i)db-custom-(\d+)-(\d+)`)
 var gcpDBVCPURegex = regexp.MustCompile(`(?i)(\d+)\s*vCPU[,\s]+(\d+)\s*GB`)
 
-func parseGCPDatabaseAttributes(description, name string) (float64, float64, string) {
+func parseGCPDatabaseAttributes(description, name string) (float64, float64, string, bool) {
 	tier := "standard"
 	if strings.Contains(description, "AlloyDB") || strings.Contains(name, "AlloyDB") {
 		tier = "alloydb"
@@ -1150,20 +1400,20 @@ func parseGCPDatabaseAttributes(description, name string) (float64, float64, str
 	if m := gcpDBCustomRegex.FindStringSubmatch(fullText); len(m) >= 3 {
 		vcpu, _ := strconv.ParseFloat(m[1], 64)
 		ramMB, _ := strconv.ParseFloat(m[2], 64)
-		return vcpu, ramMB / 1024.0, tier
+		return vcpu, ramMB / 1024.0, tier, true
 	}
 
 	if m := gcpDBVCPURegex.FindStringSubmatch(fullText); len(m) >= 3 {
 		vcpu, _ := strconv.ParseFloat(m[1], 64)
 		ram, _ := strconv.ParseFloat(m[2], 64)
-		return vcpu, ram, tier
+		return vcpu, ram, tier, true
 	}
 
 	if attrs, ok := parseGCPAttributes(description, name); ok {
-		return attrs.VCPU, attrs.RAMGB, tier
+		return attrs.VCPU, attrs.RAMGB, tier, true
 	}
 
-	return 2, 8, tier
+	return 0, 0, tier, false
 }
 
 func normalizeDatabaseNoSQLSKU(sku gcpSKU, category string, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
@@ -1239,6 +1489,10 @@ func normalizeDatabaseNoSQLSKU(sku gcpSKU, category string, fetchedAt time.Time,
 		}
 
 		if isStorage {
+			storageClass := "standard"
+			if strings.Contains(sku.Description, "HDD") || strings.Contains(sku.Category.ResourceGroup, "HDD") {
+				storageClass = "infrequent_access"
+			}
 			results = append(results, domain.PriceObservation{
 				Provider:        "gcp",
 				ServiceCategory: category,
@@ -1256,15 +1510,16 @@ func normalizeDatabaseNoSQLSKU(sku gcpSKU, category string, fetchedAt time.Time,
 					ReadUnits:     0,
 					WriteUnits:    0,
 					StorageGB:     1,
-					StorageClass:  "standard",
+					StorageClass:  storageClass,
 					MultiRegion:   multiRegion,
 					ComponentType: "storage",
 				},
 				FetchedAt: fetchedAt,
 			})
 		} else {
-			var pricingMode = "on_demand"
-			var componentType = "request_operations"
+			var pricingMode string
+			var componentType string
+			var unit string
 			var readUnits float64
 			var writeUnits float64
 
@@ -1272,12 +1527,23 @@ func normalizeDatabaseNoSQLSKU(sku gcpSKU, category string, fetchedAt time.Time,
 			resGroup := sku.Category.ResourceGroup
 
 			switch {
+			case strings.Contains(desc, "Node") || strings.Contains(resGroup, "Node"):
+				pricingMode = "provisioned"
+				componentType = "throughput"
+				unit = "Hrs"
 			case strings.Contains(desc, "Read") || strings.Contains(resGroup, "Reads") || strings.Contains(resGroup, "Read"):
+				pricingMode = "on_demand"
+				componentType = "request_operations"
+				unit = "100k-ops"
 				readUnits = 100000
 			case strings.Contains(desc, "Write") || strings.Contains(resGroup, "Writes") || strings.Contains(resGroup, "Write"):
+				pricingMode = "on_demand"
+				componentType = "request_operations"
+				unit = "100k-ops"
 				writeUnits = 100000
 			case strings.Contains(desc, "Delete") || strings.Contains(resGroup, "Deletes") || strings.Contains(resGroup, "Delete"):
 				// Delete operations
+				continue
 			default:
 				continue
 			}
@@ -1289,7 +1555,7 @@ func normalizeDatabaseNoSQLSKU(sku gcpSKU, category string, fetchedAt time.Time,
 				DisplayName:     sku.Description,
 				Region:          region,
 				RegionGroup:     regionGroup,
-				Unit:            "100k-ops",
+				Unit:            unit,
 				PriceAmount:     priceAmount,
 				PriceCurrency:   currency,
 				PricingModel:    "OnDemand",

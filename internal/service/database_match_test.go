@@ -478,3 +478,82 @@ func TestMatchDatabaseObservations_EngineMismatchExcluded(t *testing.T) {
 		t.Fatalf("expected ErrEngineMismatch, got %v", err)
 	}
 }
+
+// TestMatchDatabaseObservations_GCPCloudSQL_SynthesizedInstance_ExactMatch verifies
+// that synthesized GCP Cloud SQL observations (4 vCPU / 16 GB shape from Task 2)
+// match exact specifications within acceptable thresholds instead of returning ErrNoMatchFound (Research Finding 1).
+func TestMatchDatabaseObservations_GCPCloudSQL_SynthesizedInstance_ExactMatch(t *testing.T) {
+	now := time.Now().UTC()
+	thresholds := ThresholdsForCategory("database_rdbms")
+
+	obsList := []domain.PriceObservation{
+		// Synthesized GCP Cloud SQL instance observation (4 vCPU, 16 GB, PostgreSQL, us-east4 / us-east)
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-GCP-CLOUDSQL-POSTGRESQL-STANDARD-4VCPU-16GB",
+			DisplayName:     "Cloud SQL for PostgreSQL: db-custom-4-16384 (4 vCPU, 16 GB RAM)",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.312"),
+			Unit:            "Hrs",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:         "postgresql",
+				VCPU:           4,
+				RAMGB:          16,
+				StorageGB:      0,
+				MultiAZ:        false,
+				DeploymentTier: "standard",
+				ComponentType:  "instance",
+			},
+			FetchedAt: now,
+		},
+		// GCP Cloud SQL storage observation (SSD, us-east4 / us-east)
+		{
+			Provider:        "gcp",
+			ServiceCategory: "database_rdbms",
+			SkuID:           "SKU-GCP-CLOUDSQL-STORAGE-SSD",
+			DisplayName:     "Cloud SQL for PostgreSQL: Storage PD SSD in Virginia",
+			Region:          "us-east4",
+			RegionGroup:     "us-east",
+			PriceAmount:     decimal.RequireFromString("0.170"),
+			Unit:            "GB-Mo",
+			DatabaseRDBMSAttributes: domain.DatabaseRDBMSAttributes{
+				Engine:        "postgresql",
+				VCPU:          0,
+				RAMGB:         0,
+				StorageGB:     1,
+				MultiAZ:       false,
+				StorageFamily: "ssd",
+				ComponentType: "storage",
+			},
+			FetchedAt: now,
+		},
+	}
+
+	target := MatchTarget{
+		Engine:            "postgresql",
+		VCPU:              4,
+		RAMGB:             16,
+		DatabaseStorageGB: 100,
+		MultiAZ:           false,
+		Category:          "database_rdbms",
+	}
+
+	res, err := MatchDatabaseObservations(obsList, target, thresholds)
+	if err != nil {
+		t.Fatalf("expected successful match for GCP Cloud SQL, got error: %v", err)
+	}
+	if res == nil {
+		t.Fatalf("expected non-nil match result")
+	}
+	if res.Observation.Provider != "gcp" {
+		t.Errorf("expected provider gcp, got %s", res.Observation.Provider)
+	}
+	if res.MatchQuality != "exact" {
+		t.Errorf("expected match_quality exact, got %s (delta_pct=%f)", res.MatchQuality, res.MatchDeltaPct)
+	}
+	if res.Observation.SkuID != "SKU-GCP-CLOUDSQL-POSTGRESQL-STANDARD-4VCPU-16GB" {
+		t.Errorf("expected SkuID SKU-GCP-CLOUDSQL-POSTGRESQL-STANDARD-4VCPU-16GB, got %s", res.Observation.SkuID)
+	}
+}

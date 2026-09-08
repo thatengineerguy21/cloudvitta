@@ -408,7 +408,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	if cfg.GCP.APIKey != "" {
 		gcpDBOpts = append(gcpDBOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
 	}
-	gcpDBOpts = append(gcpDBOpts, gcp.WithURL(gcp.DefaultDatabaseBillingCatalogURL))
+	gcpDBOpts = append(gcpDBOpts, gcp.WithURLs(gcp.CategoryBillingCatalogURLs("database_rdbms")...))
 	gcpDBClient := gcp.NewClient(gcpDBOpts...)
 	gcpDBAdapter := gcp.NewAdapter(gcpDBClient, rawStorage, gcp.WithCategory("database_rdbms"))
 	factory.Register(provider.ProviderConfig{
@@ -424,7 +424,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	if cfg.GCP.APIKey != "" {
 		gcpNoSQLDBOpts = append(gcpNoSQLDBOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
 	}
-	gcpNoSQLDBOpts = append(gcpNoSQLDBOpts, gcp.WithURL(gcp.DefaultNoSQLDatabaseBillingCatalogURL))
+	gcpNoSQLDBOpts = append(gcpNoSQLDBOpts, gcp.WithURLs(gcp.CategoryBillingCatalogURLs("database_nosql")...))
 	gcpNoSQLDBClient := gcp.NewClient(gcpNoSQLDBOpts...)
 	gcpNoSQLDBAdapter := gcp.NewAdapter(gcpNoSQLDBClient, rawStorage, gcp.WithCategory("database_nosql"))
 	factory.Register(provider.ProviderConfig{
@@ -456,7 +456,7 @@ func buildProviderFactory(cfg *config.Config, rawStorage storage.RawStorage, ctx
 	if cfg.GCP.APIKey != "" {
 		gcpServerlessOpts = append(gcpServerlessOpts, gcp.WithAPIKey(cfg.GCP.APIKey))
 	}
-	gcpServerlessOpts = append(gcpServerlessOpts, gcp.WithURL(gcp.DefaultServerlessBillingCatalogURL))
+	gcpServerlessOpts = append(gcpServerlessOpts, gcp.WithURLs(gcp.CategoryBillingCatalogURLs("serverless")...))
 	gcpServerlessClient := gcp.NewClient(gcpServerlessOpts...)
 	gcpServerlessAdapter := gcp.NewAdapter(gcpServerlessClient, rawStorage, gcp.WithCategory("serverless"))
 	factory.Register(provider.ProviderConfig{

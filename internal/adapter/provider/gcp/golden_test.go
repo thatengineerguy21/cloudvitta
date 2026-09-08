@@ -37,8 +37,14 @@ func TestGCPNormalize_GoldenCorpus(t *testing.T) {
 		{
 			name:         "GCP Database Golden",
 			goldenFile:   "../../../../testdata/golden/gcp/database.json",
-			wantObsCount: 5, // Cloud SQL PG 4vCore (single & HA), Storage (single & HA), AlloyDB PG 8vCore
-			expectedSKUs: []string{"SKU-GCP-CLOUDSQL-PG-4VCORE", "SKU-GCP-CLOUDSQL-PG-4VCORE-HA", "SKU-GCP-CLOUDSQL-STORAGE-SSD", "SKU-GCP-CLOUDSQL-STORAGE-SSD-HA", "SKU-GCP-ALLOYDB-PG-8VCORE"},
+			wantObsCount: len(knownGCPCloudSQLSpecs)*2 + 3, // 16 shapes * 2 (Zonal + Regional HA), Storage (single & HA), AlloyDB PG 8vCore
+			expectedSKUs: []string{
+				"SKU-GCP-CLOUDSQL-POSTGRESQL-STANDARD-4VCPU-15GB",
+				"SKU-GCP-CLOUDSQL-POSTGRESQL-STANDARD-4VCPU-16GB-HA",
+				"SKU-GCP-CLOUDSQL-STORAGE-SSD",
+				"SKU-GCP-CLOUDSQL-STORAGE-SSD-HA",
+				"SKU-GCP-ALLOYDB-PG-8VCORE",
+			},
 		},
 		{
 			name:         "GCP NoSQL Database Golden",

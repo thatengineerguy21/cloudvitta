@@ -80,7 +80,7 @@ func TestPricingService_Calculate_CompleteAllCategories(t *testing.T) {
 			FetchedAt: time.Now().UTC(),
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), awsNetwork, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), "aws", "network", "us-east-1"), awsNetwork, cache.DefaultTTL)
 
 	svc := service.NewPricingService(nil, rdb)
 
@@ -247,7 +247,7 @@ func TestPricingService_Calculate_PartialProvider_ADR0022(t *testing.T) {
 			},
 		},
 	}
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "azure", "network", "eastus"), azureNetwork, cache.DefaultTTL)
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), "azure", "network", "eastus"), azureNetwork, cache.DefaultTTL)
 
 	svc := service.NewPricingService(nil, rdb)
 
@@ -458,7 +458,7 @@ func TestPricingService_Calculate_SevenCategories(t *testing.T) {
 	}, cache.DefaultTTL)
 
 	// 3. AWS Network
-	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, "aws", "network", "us-east-1"), []domain.PriceObservation{
+	_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), "aws", "network", "us-east-1"), []domain.PriceObservation{
 		{
 			Provider:        "aws",
 			ServiceCategory: "network",
@@ -899,7 +899,7 @@ func TestPricingService_MatchAndCalculate_4NewProviders_StorageAndNetwork(t *tes
 				FetchedAt:         time.Now().UTC(),
 			},
 		}
-		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.SchemaVersion, p.provider, "network", p.region), networkObs, cache.DefaultTTL)
+		_ = cache.Warm(ctx, rdb, cache.BuildKey(cache.CategorySchemaVersion("network"), p.provider, "network", p.region), networkObs, cache.DefaultTTL)
 	}
 
 	svc := service.NewPricingService(nil, rdb)

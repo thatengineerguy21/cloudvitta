@@ -601,3 +601,94 @@ func TestAdapter_Fetch_NetworkJob_IgnoresAuxiliaryNetworkAndComputeSKUsWithoutQu
 		t.Errorf("expected SKU-GCP-NET-FLAT, got %s", result.Observations[0].SkuID)
 	}
 }
+
+func TestAdapter_Fetch_MultiEndpoint(t *testing.T) {
+	sqlPayload := `{
+		"skus": [
+			{
+				"name": "services/9662-B51E-5089/skus/SKU-SQL-STORAGE",
+				"skuId": "SKU-SQL-STORAGE",
+				"description": "Cloud SQL for PostgreSQL: Storage PD SSD in Virginia",
+				"category": {
+					"serviceDisplayName": "Cloud SQL",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "PDSSD",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [{
+					"pricingExpression": {
+						"usageUnit": "GiBy.mo",
+						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 170000000}}]
+					}
+				}]
+			}
+		]
+	}`
+
+	alloyPayload := `{
+		"skus": [
+			{
+				"name": "services/C49F-B7F2-7416/skus/SKU-ALLOY-INSTANCE",
+				"skuId": "SKU-ALLOY-INSTANCE",
+				"description": "AlloyDB for PostgreSQL: Instance 8 vCPU, 64 GB in Virginia",
+				"category": {
+					"serviceDisplayName": "AlloyDB for PostgreSQL",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "AlloyDB",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [{
+					"pricingExpression": {
+						"usageUnit": "h",
+						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 780000000}}]
+					}
+				}]
+			}
+		]
+	}`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if strings.Contains(r.URL.Path, "alloydb") {
+			_, _ = w.Write([]byte(alloyPayload))
+		} else {
+			_, _ = w.Write([]byte(sqlPayload))
+		}
+	}))
+	defer ts.Close()
+
+	endpoint1 := ts.URL + "/services/cloudsql/skus"
+	endpoint2 := ts.URL + "/services/alloydb/skus"
+
+	client := gcp.NewClient(gcp.WithURLs(endpoint1, endpoint2), gcp.WithHTTPClient(ts.Client()))
+	memStorage := storage.NewMemoryRawStorage()
+	adapter := gcp.NewAdapter(client, memStorage, gcp.WithCategory("database_rdbms"))
+
+	res, err := adapter.Fetch(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Fetch() unexpected error: %v", err)
+	}
+
+	if len(res.Observations) != 2 {
+		t.Fatalf("expected 2 observations across multi-endpoints, got %d", len(res.Observations))
+	}
+
+	// Verify both endpoints were written to raw storage
+	files := memStorage.GetFiles()
+	hasEP0 := false
+	hasEP1 := false
+	for path := range files {
+		if strings.Contains(path, "-ep0-page0.json") {
+			hasEP0 = true
+		}
+		if strings.Contains(path, "-ep1-page0.json") {
+			hasEP1 = true
+		}
+	}
+	if !hasEP0 || !hasEP1 {
+		t.Errorf("expected storage writes for both endpoints, got files: %+v", files)
+	}
+}

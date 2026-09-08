@@ -31,9 +31,14 @@ var gcpDataModelMap = map[string]string{
 // MapGCPDataModel maps a GCP Firestore / Datastore / NoSQL model string to a canonical data model identifier.
 func MapGCPDataModel(rawModel string) (string, error) {
 	key := strings.ToLower(strings.TrimSpace(rawModel))
-	canonical, ok := gcpDataModelMap[key]
-	if !ok {
-		return "", fmt.Errorf("%w: gcp data model %q", ErrUnmappedDataModel, rawModel)
+	if canonical, ok := gcpDataModelMap[key]; ok {
+		return canonical, nil
 	}
-	return canonical, nil
+	if strings.Contains(key, "bigtable") {
+		return DataModelWideColumn, nil
+	}
+	if strings.Contains(key, "firestore") || strings.Contains(key, "datastore") {
+		return DataModelDocument, nil
+	}
+	return "", fmt.Errorf("%w: gcp data model %q", ErrUnmappedDataModel, rawModel)
 }

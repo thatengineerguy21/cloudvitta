@@ -30,11 +30,17 @@ const DefaultNetworkBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/
 // DefaultDatabaseServiceID is the well-known GCP Cloud Billing service ID for Cloud SQL.
 const DefaultDatabaseServiceID = "9662-B51E-5089"
 
+// AlloyDBServiceID is the official GCP Cloud Billing service ID for AlloyDB for PostgreSQL.
+const AlloyDBServiceID = "C49F-B7F2-7416"
+
 // DefaultDatabaseBillingCatalogURL is the base URL for the GCP Cloud SQL Billing Catalog API.
 const DefaultDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultDatabaseServiceID + "/skus"
 
 // DefaultNoSQLDatabaseServiceID is the official GCP Cloud Billing service ID for Cloud Firestore.
 const DefaultNoSQLDatabaseServiceID = "EE2C-7FAC-5E08"
+
+// BigtableServiceID is the official GCP Cloud Billing service ID for Cloud Bigtable.
+const BigtableServiceID = "C802-861C-2155"
 
 // DefaultNoSQLDatabaseBillingCatalogURL is the base URL for the GCP Cloud Firestore Billing Catalog API.
 const DefaultNoSQLDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultNoSQLDatabaseServiceID + "/skus"
@@ -48,13 +54,53 @@ const DefaultKubernetesBillingCatalogURL = "https://cloudbilling.googleapis.com/
 // DefaultServerlessServiceID is the official GCP Cloud Billing service ID for Cloud Functions / Cloud Run functions.
 const DefaultServerlessServiceID = "29E7-DA93-CA13"
 
+// CloudRunServiceID is the official GCP Cloud Billing service ID for Cloud Run container services and jobs.
+const CloudRunServiceID = "152E-C115-5142"
+
 // DefaultServerlessBillingCatalogURL is the base URL for the GCP Cloud Functions Billing Catalog API.
 const DefaultServerlessBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultServerlessServiceID + "/skus"
+
+// BuildBillingCatalogURL constructs a GCP Cloud Billing Catalog API URL for a service ID.
+func BuildBillingCatalogURL(serviceID string) string {
+	return "https://cloudbilling.googleapis.com/v1/services/" + serviceID + "/skus"
+}
+
+// CategoryServiceIDs returns the canonical GCP Billing Catalog service IDs for a category.
+func CategoryServiceIDs(category string) []string {
+	switch category {
+	case "compute":
+		return []string{DefaultComputeServiceID}
+	case "storage":
+		return []string{DefaultStorageServiceID}
+	case "network":
+		return []string{DefaultNetworkServiceID}
+	case "database_rdbms":
+		return []string{DefaultDatabaseServiceID, AlloyDBServiceID}
+	case "database_nosql":
+		return []string{DefaultNoSQLDatabaseServiceID, BigtableServiceID}
+	case "kubernetes":
+		return []string{DefaultKubernetesServiceID}
+	case "serverless":
+		return []string{DefaultServerlessServiceID, CloudRunServiceID}
+	default:
+		return []string{DefaultComputeServiceID}
+	}
+}
+
+// CategoryBillingCatalogURLs returns the base catalog endpoint URLs for a category.
+func CategoryBillingCatalogURLs(category string) []string {
+	serviceIDs := CategoryServiceIDs(category)
+	urls := make([]string, len(serviceIDs))
+	for i, sid := range serviceIDs {
+		urls[i] = BuildBillingCatalogURL(sid)
+	}
+	return urls
+}
 
 // Client is an HTTP client for fetching GCP Cloud Billing Catalog API data.
 type Client struct {
 	httpClient *http.Client
-	url        string
+	urls       []string
 	apiKey     string
 }
 
@@ -68,10 +114,17 @@ func WithHTTPClient(hc *http.Client) Option {
 	}
 }
 
-// WithURL sets a custom endpoint URL for testing.
+// WithURL sets a single endpoint URL for testing.
 func WithURL(rawURL string) Option {
 	return func(c *Client) {
-		c.url = rawURL
+		c.urls = []string{rawURL}
+	}
+}
+
+// WithURLs sets multiple endpoint URLs for multi-endpoint catalog ingestion.
+func WithURLs(rawURLs ...string) Option {
+	return func(c *Client) {
+		c.urls = rawURLs
 	}
 }
 
@@ -86,7 +139,7 @@ func WithAPIKey(key string) Option {
 func NewClient(opts ...Option) *Client {
 	c := &Client{
 		httpClient: &http.Client{},
-		url:        DefaultBillingCatalogURL,
+		urls:       []string{DefaultBillingCatalogURL},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -94,10 +147,30 @@ func NewClient(opts ...Option) *Client {
 	return c
 }
 
-// FetchPriceList fetches the raw price list JSON response stream.
+// URLs returns a slice of all configured catalog endpoint URLs.
+func (c *Client) URLs() []string {
+	if len(c.urls) == 0 {
+		return []string{DefaultBillingCatalogURL}
+	}
+	res := make([]string, len(c.urls))
+	copy(res, c.urls)
+	return res
+}
+
+// FetchPriceList fetches the raw price list JSON response stream from the primary/first configured URL.
 // The caller is responsible for closing the returned io.ReadCloser.
 func (c *Client) FetchPriceList(ctx context.Context, pageToken string) (io.ReadCloser, error) {
-	reqURL := c.url
+	primaryURL := DefaultBillingCatalogURL
+	if len(c.urls) > 0 {
+		primaryURL = c.urls[0]
+	}
+	return c.FetchPriceListURL(ctx, primaryURL, pageToken)
+}
+
+// FetchPriceListURL fetches the raw price list JSON response stream for a specific endpoint URL.
+// The caller is responsible for closing the returned io.ReadCloser.
+func (c *Client) FetchPriceListURL(ctx context.Context, targetURL, pageToken string) (io.ReadCloser, error) {
+	reqURL := targetURL
 	if pageToken != "" {
 		u, err := url.Parse(reqURL)
 		if err != nil {

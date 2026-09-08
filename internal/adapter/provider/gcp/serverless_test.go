@@ -60,6 +60,116 @@ func TestNormalize_GCPServerlessGolden(t *testing.T) {
 	}
 }
 
+func TestNormalize_GCPCloudRun(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
+	jsonInput := `{
+		"skus": [
+			{
+				"name": "services/152E-C115-5142/skus/SKU-CR-REQUESTS",
+				"skuId": "SKU-CR-REQUESTS",
+				"description": "Cloud Run: Requests",
+				"category": {
+					"serviceDisplayName": "Cloud Run",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "Requests",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-central1"],
+				"pricingInfo": [{
+					"pricingExpression": {
+						"usageUnit": "requests",
+						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 400000}}]
+					}
+				}]
+			},
+			{
+				"name": "services/152E-C115-5142/skus/SKU-CR-CPU",
+				"skuId": "SKU-CR-CPU",
+				"description": "Cloud Run: CPU Allocation Time",
+				"category": {
+					"serviceDisplayName": "Cloud Run",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "CPU",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-central1"],
+				"pricingInfo": [{
+					"pricingExpression": {
+						"usageUnit": "vcpu.s",
+						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 24000}}]
+					}
+				}]
+			},
+			{
+				"name": "services/152E-C115-5142/skus/SKU-CR-MEM",
+				"skuId": "SKU-CR-MEM",
+				"description": "Cloud Run: Memory Allocation Time",
+				"category": {
+					"serviceDisplayName": "Cloud Run",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "Memory",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-central1"],
+				"pricingInfo": [{
+					"pricingExpression": {
+						"usageUnit": "giby.s",
+						"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 2500}}]
+					}
+				}]
+			}
+		]
+	}`
+
+	res, _, err := gcp.Normalize(strings.NewReader(jsonInput), fixedTime)
+	if err != nil {
+		t.Fatalf("Normalize() unexpected error: %v", err)
+	}
+	obs := res.Observations
+	if len(obs) != 3 {
+		t.Fatalf("expected 3 observations, got %d", len(obs))
+	}
+
+	for _, o := range obs {
+		if o.Provider != "gcp" {
+			t.Errorf("expected Provider gcp, got %s", o.Provider)
+		}
+		if o.ServiceCategory != "serverless" {
+			t.Errorf("expected ServiceCategory serverless, got %s", o.ServiceCategory)
+		}
+		if o.ServerlessRateAttributes.Architecture != domain.ArchitectureX86_64 {
+			t.Errorf("expected Architecture x86_64, got %s", o.ServerlessRateAttributes.Architecture)
+		}
+	}
+
+	// Requests
+	reqObs := obs[0]
+	if reqObs.ServerlessRateAttributes.ComponentType != domain.ComponentTypeRequestFee {
+		t.Errorf("expected ComponentType request_fee, got %s", reqObs.ServerlessRateAttributes.ComponentType)
+	}
+	if reqObs.ServerlessRateAttributes.Unit != domain.UnitPerRequest {
+		t.Errorf("expected Unit per_request, got %s", reqObs.ServerlessRateAttributes.Unit)
+	}
+
+	// CPU
+	cpuObs := obs[1]
+	if cpuObs.ServerlessRateAttributes.ComponentType != domain.ComponentTypeDurationFeeCPU {
+		t.Errorf("expected ComponentType duration_fee_cpu, got %s", cpuObs.ServerlessRateAttributes.ComponentType)
+	}
+	if cpuObs.ServerlessRateAttributes.Unit != domain.UnitPerVCPUSecond {
+		t.Errorf("expected Unit per_vcpu_second, got %s", cpuObs.ServerlessRateAttributes.Unit)
+	}
+
+	// Memory
+	memObs := obs[2]
+	if memObs.ServerlessRateAttributes.ComponentType != domain.ComponentTypeDurationFeeMemory {
+		t.Errorf("expected ComponentType duration_fee_memory, got %s", memObs.ServerlessRateAttributes.ComponentType)
+	}
+	if memObs.ServerlessRateAttributes.Unit != domain.UnitPerGBSecond {
+		t.Errorf("expected Unit per_gb_second, got %s", memObs.ServerlessRateAttributes.Unit)
+	}
+}
+
 func TestNormalize_GCPServerless_UnmappedArchQuarantine(t *testing.T) {
 	fixedTime := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
 	rawJSON := `{

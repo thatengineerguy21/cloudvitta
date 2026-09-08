@@ -17,6 +17,7 @@ var gcpCatalogMap = map[string]string{
 	"AlloyDB":                  "database_rdbms",
 	"9662-B51E-5089":           "database_rdbms",
 	"AlloyDB for PostgreSQL":   "database_rdbms",
+	"C49F-B7F2-7416":           "database_rdbms",
 	"Cloud Firestore":          "database_nosql",
 	"Firestore":                "database_nosql",
 	"Cloud Datastore":          "database_nosql",
@@ -24,6 +25,9 @@ var gcpCatalogMap = map[string]string{
 	"EE2C-7FAC-5E08":           "database_nosql",
 	"E24D-7981-67BD":           "database_nosql",
 	"C237-7D12-9F12":           "database_nosql",
+	"Cloud Bigtable":           "database_nosql",
+	"Bigtable":                 "database_nosql",
+	"C802-861C-2155":           "database_nosql",
 	"Kubernetes Engine":        "kubernetes",
 	"Google Kubernetes Engine": "kubernetes",
 	"CCD8-9BF1-090E":           "kubernetes",
@@ -31,7 +35,9 @@ var gcpCatalogMap = map[string]string{
 	"44CD-3C5E-2A4B":           "kubernetes",
 	"Cloud Functions":          "serverless",
 	"Cloud Run functions":      "serverless",
+	"Cloud Run":                "serverless",
 	"29E7-DA93-CA13":           "serverless",
+	"152E-C115-5142":           "serverless",
 }
 
 // MapGCPProduct resolves a GCP service display name or service ID to a normalized service category.

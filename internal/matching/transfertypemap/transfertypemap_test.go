@@ -16,7 +16,8 @@ func TestMapAWSTransferType(t *testing.T) {
 		{"Data Transfer Internet (Out)", "internet_egress", nil},
 		{"Data Transfer Out (Inter-Region)", "inter_region", nil},
 		{"Data Transfer Out (Intra-Region)", "intra_region", nil},
-		{"Direct Connect Data Transfer Out", "internet_egress", nil},
+		{"Direct Connect Data Transfer Out", "direct_connect_egress", nil},
+		{"VPN Data Transfer Out", "vpn_egress", nil},
 		{"CloudFront Data Transfer Out", "internet_egress", nil},
 		{"UnknownTransferType", "", ErrUnmappedTransferType},
 	}
@@ -46,7 +47,8 @@ func TestMapAzureTransferType(t *testing.T) {
 		{"Rtn Preference: MGN", "internet_egress", nil},
 		{"Routing Preference: Microsoft Global Network", "internet_egress", nil},
 		{"Routing Preference: Transit / ISP", "internet_egress", nil},
-		{"ExpressRoute", "internet_egress", nil},
+		{"ExpressRoute", "direct_connect_egress", nil},
+		{"VPN Gateway", "vpn_egress", nil},
 		{"Global", "internet_egress", nil},
 		{"Inter-Region", "inter_region", nil},
 		{"Intra-Region", "intra_region", nil},
@@ -75,7 +77,8 @@ func TestMapGCPTransferType(t *testing.T) {
 	}{
 		{"Network Internet Egress", "internet_egress", nil},
 		{"Premium Tier Internet Egress", "internet_egress", nil},
-		{"Cloud Interconnect Egress", "internet_egress", nil},
+		{"Cloud Interconnect Egress", "direct_connect_egress", nil},
+		{"Cloud VPN Egress", "vpn_egress", nil},
 		{"Network Inter Region Egress", "inter_region", nil},
 		{"Network Intra Region Egress", "intra_region", nil},
 		{"UnknownTransferType", "", ErrUnmappedTransferType},
@@ -243,5 +246,30 @@ func TestMapTransferType(t *testing.T) {
 	_, err := MapTransferType("unmapped_provider", "Internet")
 	if err == nil {
 		t.Errorf("MapTransferType(unmapped_provider, Internet) expected error, got nil")
+	}
+}
+
+func TestSupportedTransferTypes(t *testing.T) {
+	types := SupportedTransferTypes()
+	if len(types) != 5 {
+		t.Fatalf("expected 5 supported transfer types, got %d", len(types))
+	}
+	expected := map[string]bool{
+		"internet_egress":       true,
+		"inter_region":          true,
+		"intra_region":          true,
+		"direct_connect_egress": true,
+		"vpn_egress":            true,
+	}
+	for _, tt := range types {
+		if !expected[tt] {
+			t.Errorf("unexpected transfer type in SupportedTransferTypes: %q", tt)
+		}
+		if !IsValidTransferType(tt) {
+			t.Errorf("IsValidTransferType(%q) = false, want true", tt)
+		}
+	}
+	if IsValidTransferType("unsupported_transfer_type") {
+		t.Errorf("IsValidTransferType(unsupported_transfer_type) = true, want false")
 	}
 }

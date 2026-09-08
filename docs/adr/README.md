@@ -53,4 +53,7 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0043-email-verification-resend-and-login-gate.md](0043-email-verification-resend-and-login-gate.md): Email Verification with Resend and Strict Login Gate
 - [0044-defense-in-depth-ingestion-category-isolation-and-zero-dollar-deduplication.md](0044-defense-in-depth-ingestion-category-isolation-and-zero-dollar-deduplication.md): Defense-in-Depth Ingestion Category Isolation and Zero-Dollar Deduplication
 - [0045-big-3-multi-region-ingestion-and-capacity-management.md](0045-big-3-multi-region-ingestion-and-capacity-management.md): Big 3 Multi-Region Ingestion and Capacity Management
+- [0046-cloud-sql-component-composition-engine.md](0046-cloud-sql-component-composition-engine.md): Cloud SQL Component Composition Engine and Instance Shape Synthesis
+- [0047-multi-endpoint-service-catalog-ingestion-for-gcp.md](0047-multi-endpoint-service-catalog-ingestion-for-gcp.md): Multi-Endpoint Service Catalog Ingestion for Google Cloud Platform
+- [0048-network-transfer-taxonomy-extension-and-isolation.md](0048-network-transfer-taxonomy-extension-and-isolation.md): Network Transfer Taxonomy Extension and Dedicated Link Scoring Isolation
 
