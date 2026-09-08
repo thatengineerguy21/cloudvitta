@@ -253,3 +253,189 @@ func TestNormalize_GCPAlloyDB(t *testing.T) {
 		t.Errorf("ComponentType = %q, want instance", obs.DatabaseRDBMSAttributes.ComponentType)
 	}
 }
+
+func TestGCPNormalize_Database_OutOfScopeIgnoredWithoutQuarantine(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
+
+	outOfScopeSamples := []struct {
+		name        string
+		description string
+		group       string
+	}{
+		{
+			name:        "extended support vCPU",
+			description: "Cloud SQL for PostgreSQL: Zonal - Enterprise Plus Extended support vCPU v13 in Northern Virginia",
+			group:       "CPU",
+		},
+		{
+			name:        "extended support combined",
+			description: "Cloud SQL for MySQL: Zonal - Extended support 16 vCPU + 104GB RAM v56 in Delhi",
+			group:       "MySQL",
+		},
+		{
+			name:        "storage hyperdisk balanced IOPS",
+			description: "Cloud SQL for SQL Server: Zonal - Enterprise Storage Hyperdisk Balanced IOPS in Netherlands",
+			group:       "PDSSD",
+		},
+		{
+			name:        "backup storage",
+			description: "Backup storage in asia-southeast4 region",
+			group:       "PDStandard",
+		},
+		{
+			name:        "point in time recovery",
+			description: "Cloud SQL for PostgreSQL: Point-in-time recovery in us-east4",
+			group:       "PITR",
+		},
+		{
+			name:        "IP address reservation",
+			description: "Cloud SQL for PostgreSQL: Regional - IP address reservation in Salt Lake City",
+			group:       "Network",
+		},
+		{
+			name:        "network data transfer egress",
+			description: "Network Internet Data Transfer Out from EMEA to Seoul",
+			group:       "PremiumInternetEgress",
+		},
+		{
+			name:        "read replica promotional",
+			description: "Cloud SQL for MySQL: Read Replica (free with promotional discount until September 2021) - Standard storage in Stockholm",
+			group:       "PDSSD",
+		},
+		{
+			name:        "FDC trial",
+			description: "FDC Trial in Cloud SQL for PostgreSQL: Regional - vCPU in Phoenix",
+			group:       "CPU",
+		},
+		{
+			name:        "legacy generation g1-small",
+			description: "Cloud SQL for PostgreSQL: Regional - Extended support g1-small v11 in Belgium",
+			group:       "PostgreSQL",
+		},
+		{
+			name:        "legacy generation f1-micro",
+			description: "Cloud SQL for MySQL: db-f1-micro shared-core in Iowa",
+			group:       "MySQL",
+		},
+	}
+
+	for _, tc := range outOfScopeSamples {
+		t.Run(tc.name, func(t *testing.T) {
+			jsonBody := `{
+				"skus": [
+					{
+						"skuId": "SKU-OUT-OF-SCOPE",
+						"description": "` + tc.description + `",
+						"category": {
+							"serviceDisplayName": "Cloud SQL",
+							"resourceFamily": "ApplicationServices",
+							"resourceGroup": "` + tc.group + `",
+							"usageType": "OnDemand"
+						},
+						"serviceRegions": ["us-east4"],
+						"pricingInfo": [
+							{
+								"pricingExpression": {
+									"usageUnit": "h",
+									"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "0", "nanos": 100000000}}]
+								}
+							}
+						]
+					}
+				]
+			}`
+
+			memSink := quarantine.NewMemorySink()
+			res, _, err := Normalize(strings.NewReader(jsonBody), fixedTime, memSink)
+			if err != nil {
+				t.Fatalf("Normalize() error = %v", err)
+			}
+
+			if len(res.Observations) != 0 {
+				t.Errorf("expected 0 observations for out-of-scope line item, got %d", len(res.Observations))
+			}
+			if res.IgnoredCount != 1 {
+				t.Errorf("expected 1 ignored count, got %d", res.IgnoredCount)
+			}
+			if memSink.Count() != 0 {
+				t.Errorf("expected 0 quarantine items, got %d: %+v", memSink.Count(), memSink.Items())
+			}
+		})
+	}
+}
+
+func TestGCPNormalize_Database_GenuinelyNovelSKUQuarantined(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
+
+	// A genuinely novel/unrecognized database SKU that is NOT out of scope must still quarantine loudly
+	jsonBody := `{
+		"skus": [
+			{
+				"skuId": "SKU-GCP-NOVEL-SHAPE",
+				"description": "Cloud SQL for PostgreSQL: Quantum Compute Acceleration Unit in Virginia",
+				"category": {
+					"serviceDisplayName": "Cloud SQL",
+					"resourceFamily": "ApplicationServices",
+					"resourceGroup": "Quantum",
+					"usageType": "OnDemand"
+				},
+				"serviceRegions": ["us-east4"],
+				"pricingInfo": [
+					{
+						"pricingExpression": {
+							"usageUnit": "h",
+							"tieredRates": [{"unitPrice": {"currencyCode": "USD", "units": "5", "nanos": 0}}]
+						}
+					}
+				]
+			}
+		]
+	}`
+
+	memSink := quarantine.NewMemorySink()
+	res, _, err := Normalize(strings.NewReader(jsonBody), fixedTime, memSink)
+	if err != nil {
+		t.Fatalf("Normalize() error = %v", err)
+	}
+
+	if len(res.Observations) != 0 {
+		t.Errorf("expected 0 observations for novel unmapped SKU, got %d", len(res.Observations))
+	}
+	if res.IgnoredCount != 0 {
+		t.Errorf("expected 0 ignored items for novel SKU, got %d", res.IgnoredCount)
+	}
+	if memSink.Count() != 1 {
+		t.Fatalf("expected 1 quarantine sink item for novel SKU, got %d", memSink.Count())
+	}
+	item := memSink.Items()[0]
+	if item.Kind != "database_attributes" || item.SkuID != "SKU-GCP-NOVEL-SHAPE" {
+		t.Errorf("unexpected quarantine item: %+v", item)
+	}
+}
+
+func TestGCPNormalize_Database_RealisticMixUnderThreshold(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
+
+	f, err := os.Open("../../../../testdata/golden/gcp/database.json")
+	if err != nil {
+		t.Fatalf("failed to open database golden file: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	memSink := quarantine.NewMemorySink()
+	res, _, err := Normalize(f, fixedTime, memSink)
+	if err != nil {
+		t.Fatalf("Normalize() error = %v", err)
+	}
+
+	inScopeTotal := memSink.Count() + len(res.Observations)
+	if inScopeTotal == 0 {
+		t.Fatalf("expected in-scope total > 0")
+	}
+
+	unmappedRatio := float64(memSink.Count()) / float64(inScopeTotal)
+	if unmappedRatio > 0.05 {
+		t.Errorf("unmapped item ratio %.2f%% exceeds 5.00%% threshold (%d unmapped / %d in-scope, %d ignored)",
+			unmappedRatio*100, memSink.Count(), inScopeTotal, res.IgnoredCount)
+	}
+}

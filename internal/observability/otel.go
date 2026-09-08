@@ -70,6 +70,7 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 		}
 		traceOpts := []otlptracehttp.Option{
 			otlptracehttp.WithEndpointURL(traceEndpoint),
+			otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
 		}
 		if len(headers) > 0 {
 			traceOpts = append(traceOpts, otlptracehttp.WithHeaders(headers))
@@ -79,7 +80,11 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 			return nil, fmt.Errorf("observability: create OTLP trace exporter: %w", err)
 		}
 		tp = sdktrace.NewTracerProvider(
-			sdktrace.WithBatcher(traceExporter),
+			sdktrace.WithBatcher(
+				traceExporter,
+				sdktrace.WithMaxExportBatchSize(512),
+				sdktrace.WithMaxQueueSize(2048),
+			),
 			sdktrace.WithResource(res),
 		)
 	} else {
@@ -100,6 +105,7 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 		}
 		metricOpts := []otlpmetrichttp.Option{
 			otlpmetrichttp.WithEndpointURL(metricEndpoint),
+			otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression),
 		}
 		if len(headers) > 0 {
 			metricOpts = append(metricOpts, otlpmetrichttp.WithHeaders(headers))
@@ -127,6 +133,7 @@ func InitOTel(ctx context.Context, cfg Config) (*Providers, error) {
 		}
 		logOpts := []otlploghttp.Option{
 			otlploghttp.WithEndpointURL(logEndpoint),
+			otlploghttp.WithCompression(otlploghttp.GzipCompression),
 		}
 		if len(headers) > 0 {
 			logOpts = append(logOpts, otlploghttp.WithHeaders(headers))

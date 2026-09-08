@@ -16,8 +16,25 @@ import (
 	"github.com/thatengineerguy21/CloudVitta/internal/quarantine"
 )
 
+// isOutOfScopeServerlessSKU checks whether a SKU is an auxiliary service (network transfer,
+// storage, build minutes) that falls outside serverless compute, memory, and invocation pricing.
+func isOutOfScopeServerlessSKU(sku gcpSKU) bool {
+	descLower := strings.ToLower(sku.Description)
+	groupLower := strings.ToLower(sku.Category.ResourceGroup)
+	return strings.Contains(descLower, "network") ||
+		strings.Contains(descLower, "data transfer") ||
+		strings.Contains(descLower, "egress") ||
+		strings.Contains(descLower, "ingress") ||
+		strings.Contains(groupLower, "network") ||
+		strings.Contains(groupLower, "egress")
+}
+
 // normalizeServerlessSKU normalizes a Google Cloud Functions / Cloud Run functions pricing SKU.
 func normalizeServerlessSKU(sku gcpSKU, category string, fetchedAt time.Time, sink quarantine.Sink) ([]domain.PriceObservation, error) {
+	if isOutOfScopeServerlessSKU(sku) {
+		return nil, nil
+	}
+
 	if len(sku.PricingInfo) == 0 || len(sku.PricingInfo[0].PricingExpression.TieredRates) == 0 {
 		return nil, nil
 	}
@@ -46,14 +63,17 @@ func normalizeServerlessSKU(sku gcpSKU, category string, fetchedAt time.Time, si
 
 	var componentType string
 	switch {
-	case strings.Contains(descLower, "invocation") || strings.Contains(resGroupLower, "invocation") || strings.Contains(descLower, "request"):
-		componentType = domain.ComponentTypeRequestFee
 	case strings.Contains(descLower, "cpu time") || strings.Contains(descLower, "cpu") || strings.Contains(resGroupLower, "cpu") ||
 		strings.Contains(descLower, "ghz") || strings.Contains(descLower, "vcpu"):
 		componentType = domain.ComponentTypeDurationFeeCPU
 	case strings.Contains(descLower, "memory time") || strings.Contains(descLower, "memory") || strings.Contains(resGroupLower, "memory") ||
 		strings.Contains(descLower, "gb-second") || strings.Contains(descLower, "gib-second") || strings.Contains(descLower, "giby.s") || strings.Contains(descLower, "gb.s"):
 		componentType = domain.ComponentTypeDurationFeeMemory
+	case strings.Contains(descLower, "invocation") || strings.Contains(resGroupLower, "invocation") ||
+		strings.Contains(descLower, "request count") ||
+		(strings.Contains(descLower, "request") && !strings.Contains(descLower, "request-based")) ||
+		(strings.Contains(resGroupLower, "request") && !strings.Contains(resGroupLower, "request-based")):
+		componentType = domain.ComponentTypeRequestFee
 	case strings.Contains(descLower, "execution time") || strings.Contains(descLower, "time") || strings.Contains(resGroupLower, "time"):
 		// Generic time meter fallback: if memory is mentioned, treat as memory duration; otherwise CPU duration
 		if strings.Contains(descLower, "memory") {

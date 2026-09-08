@@ -40,7 +40,7 @@ const DefaultDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1
 const DefaultNoSQLDatabaseServiceID = "EE2C-7FAC-5E08"
 
 // BigtableServiceID is the official GCP Cloud Billing service ID for Cloud Bigtable.
-const BigtableServiceID = "C802-861C-2155"
+const BigtableServiceID = "C3BE-24A5-0975"
 
 // DefaultNoSQLDatabaseBillingCatalogURL is the base URL for the GCP Cloud Firestore Billing Catalog API.
 const DefaultNoSQLDatabaseBillingCatalogURL = "https://cloudbilling.googleapis.com/v1/services/" + DefaultNoSQLDatabaseServiceID + "/skus"

@@ -382,6 +382,10 @@ func NormalizeForCategoryWithState(r io.Reader, fetchedAt time.Time, targetCateg
 					skuObs, err = normalizeNetworkSKU(sku, category, fetchedAt, sink)
 				case "database_rdbms":
 					if isDatabaseProduct(sku) {
+						if isOutOfScopeDatabaseSKU(sku) {
+							ignoredCount++
+							continue
+						}
 						if isDatabaseComponent(sku) {
 							if state != nil {
 								state.mu.Lock()
@@ -401,6 +405,10 @@ func NormalizeForCategoryWithState(r io.Reader, fetchedAt time.Time, targetCateg
 						skuObs, err = normalizeKubernetesSKU(sku, category, fetchedAt, sink)
 					}
 				case "serverless":
+					if isOutOfScopeServerlessSKU(sku) {
+						ignoredCount++
+						continue
+					}
 					skuObs, err = normalizeServerlessSKU(sku, category, fetchedAt, sink)
 				}
 				if err != nil {
@@ -998,7 +1006,70 @@ func composeMachineTypePricing(components map[gcpComponentKey]*gcpComponentSpec,
 	return observations, nil
 }
 
+// isOutOfScopeDatabaseSKU identifies known auxiliary Cloud SQL and AlloyDB line items
+// (backups, PITR, provisioned IOPS/throughput, IP address reservations, network egress,
+// extended support surcharges, legacy shared-core shapes, trials, and replica fees)
+// that should be classified as out-of-scope (ignored) rather than routed to quarantine.
+func isOutOfScopeDatabaseSKU(sku gcpSKU) bool {
+	desc := sku.Description
+	descLower := strings.ToLower(desc)
+	group := sku.Category.ResourceGroup
+	groupLower := strings.ToLower(group)
+
+	// 1. Extended Support surcharges
+	if strings.Contains(descLower, "extended support") || strings.Contains(groupLower, "extended support") {
+		return true
+	}
+
+	// 2. IOPS and Throughput provisioning (e.g. "Hyperdisk Balanced IOPS", "Balanced IOPS", "Custom Storage IOPS")
+	if strings.Contains(desc, "IOPS") || strings.Contains(group, "IOPS") ||
+		strings.Contains(descLower, "balanced iops") || strings.Contains(descLower, "hyperdisk") ||
+		(strings.Contains(descLower, "throughput") && !strings.Contains(descLower, "network")) {
+		return true
+	}
+
+	// 3. Backup storage and Point-In-Time Recovery (PITR)
+	if strings.Contains(descLower, "backup") || strings.Contains(groupLower, "backup") ||
+		strings.Contains(descLower, "point in time recovery") || strings.Contains(descLower, "point-in-time recovery") ||
+		strings.Contains(desc, "PITR") || strings.Contains(group, "PITR") {
+		return true
+	}
+
+	// 4. IP address reservations and network egress/interconnect
+	if strings.Contains(descLower, "ip address") || strings.Contains(descLower, "static ip") ||
+		strings.Contains(descLower, "data transfer") || strings.Contains(descLower, "inter region") ||
+		strings.Contains(descLower, "inter-region") || strings.Contains(descLower, "internet") ||
+		strings.Contains(descLower, "egress") || strings.Contains(groupLower, "egress") {
+		return true
+	}
+
+	// 5. Standby, read replica surcharges, and failover
+	if strings.Contains(descLower, "read replica") || strings.Contains(descLower, "failover replica") ||
+		strings.Contains(descLower, "standby") {
+		return true
+	}
+
+	// 6. Trials, promotional discounts, commitments, licenses
+	if strings.Contains(descLower, "trial") || strings.Contains(descLower, "fdc trial") ||
+		strings.Contains(descLower, "discount") || strings.Contains(descLower, "promotional") ||
+		strings.Contains(descLower, "commitment") || strings.Contains(descLower, "license") {
+		return true
+	}
+
+	// 7. Legacy generation / shared-core instances (e.g. "g1-small", "f1-micro", "db-n1-", "n1-standard-", "n1-highmem-")
+	if strings.Contains(descLower, "g1-small") || strings.Contains(descLower, "f1-micro") ||
+		strings.Contains(descLower, "db-n1-") || strings.Contains(descLower, "n1-standard-") ||
+		strings.Contains(descLower, "n1-highmem-") {
+		return true
+	}
+
+	return false
+}
+
 func isStorageDatabaseSKU(sku gcpSKU) bool {
+	if isOutOfScopeDatabaseSKU(sku) {
+		return false
+	}
 	if len(sku.PricingInfo) > 0 {
 		expr := sku.PricingInfo[0].PricingExpression
 		if strings.Contains(expr.UsageUnitDescription, "month") || strings.Contains(expr.UsageUnit, "mo") {
@@ -1020,16 +1091,13 @@ func isDatabaseComponent(sku gcpSKU) bool {
 	if sku.Category.UsageType != "OnDemand" {
 		return false
 	}
+	if isOutOfScopeDatabaseSKU(sku) {
+		return false
+	}
 	if isStorageDatabaseSKU(sku) {
 		return false
 	}
 	desc := sku.Description
-	if strings.Contains(desc, "Extended support") || strings.Contains(desc, "Extended Support") {
-		return false
-	}
-	if strings.Contains(desc, "Commitment") || strings.Contains(desc, "Discount") || strings.Contains(desc, "License") {
-		return false
-	}
 	// Bundled monolithic instance SKUs (e.g. AlloyDB) are not components
 	if _, _, _, ok := parseGCPDatabaseAttributes(desc, sku.Name); ok {
 		return false
@@ -1299,6 +1367,11 @@ func normalizeDatabaseSKU(sku gcpSKU, category string, fetchedAt time.Time, sink
 		return nil, nil
 	}
 
+	// 3-way triage: known out-of-scope line items are ignored without calling quarantine sink
+	if isOutOfScopeDatabaseSKU(sku) {
+		return nil, nil
+	}
+
 	isStorage := isStorageDatabaseSKU(sku)
 
 	var vcpu, ram float64
@@ -1465,7 +1538,7 @@ func parseGCPDatabaseEngine(sku gcpSKU) (string, error) {
 }
 
 var gcpDBCustomRegex = regexp.MustCompile(`(?i)db-custom-(\d+)-(\d+)`)
-var gcpDBVCPURegex = regexp.MustCompile(`(?i)(\d+)\s*vCPU[,\s]+(\d+)\s*GB`)
+var gcpDBVCPURegex = regexp.MustCompile(`(?i)(\d+)\s*vCPU[,\s\+]+(\d+)\s*GB`)
 
 func parseGCPDatabaseAttributes(description, name string) (float64, float64, string, bool) {
 	tier := "standard"

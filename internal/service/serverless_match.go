@@ -686,7 +686,7 @@ func buildGCPServerlessCandidates(obsList []domain.PriceObservation, target Matc
 
 	cand := baseObs
 	cand.SkuID = "GCP-CLOUD-FUNCTIONS"
-	cand.DisplayName = "Cloud Functions"
+	cand.DisplayName = "Cloud Run Functions"
 	cand.Unit = "month"
 	cand.PriceAmount = monthlyCost
 	cand.ServerlessRateAttributes = domain.ServerlessRateAttributes{

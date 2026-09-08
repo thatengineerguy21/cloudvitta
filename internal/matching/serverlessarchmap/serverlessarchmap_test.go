@@ -88,8 +88,18 @@ func TestMapGCPArchitecture(t *testing.T) {
 		{"Invocations", domain.ArchitectureX86_64, nil},
 		{"Execution Time", domain.ArchitectureX86_64, nil},
 		{"GB-Seconds", domain.ArchitectureX86_64, nil},
+		{"Services CPU (Instance-based billing)", domain.ArchitectureX86_64, nil},
+		{"Services Memory (Instance-based billing)", domain.ArchitectureX86_64, nil},
+		{"Cloud Run functions CPU (Request-based billing)", domain.ArchitectureX86_64, nil},
+		{"Cloud Run functions Memory (Request-based billing)", domain.ArchitectureX86_64, nil},
+		{"Worker Pools CPU (Request-based billing)", domain.ArchitectureX86_64, nil},
+		{"Worker Pools Memory (Request-based billing)", domain.ArchitectureX86_64, nil},
+		{"Instances CPU (Request-based billing)", domain.ArchitectureX86_64, nil},
+		{"CPU Allocation Time", domain.ArchitectureX86_64, nil},
+		{"Memory Allocation Time", domain.ArchitectureX86_64, nil},
 		{"arm64", "", ErrUnmappedArchitecture},
 		{"arm", "", ErrUnmappedArchitecture},
+		{"Cloud Functions ARM Invocations", "", ErrUnmappedArchitecture},
 		{"unknown_arch", "", ErrUnmappedArchitecture},
 	}
 

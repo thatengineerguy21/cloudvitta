@@ -75,9 +75,9 @@ func TestGCPClient_DefaultEndpoints(t *testing.T) {
 		{
 			name:          "Bigtable endpoint",
 			serviceID:     gcp.BigtableServiceID,
-			wantServiceID: "C802-861C-2155",
+			wantServiceID: "C3BE-24A5-0975",
 			catalogURL:    gcp.BuildBillingCatalogURL(gcp.BigtableServiceID),
-			wantURL:       "https://cloudbilling.googleapis.com/v1/services/C802-861C-2155/skus",
+			wantURL:       "https://cloudbilling.googleapis.com/v1/services/C3BE-24A5-0975/skus",
 		},
 		{
 			name:          "Cloud Run endpoint",
@@ -119,7 +119,7 @@ func TestGCPClient_CategoryServiceIDs(t *testing.T) {
 		wantIDs  []string
 	}{
 		{"database_rdbms", []string{"9662-B51E-5089", "C49F-B7F2-7416"}},
-		{"database_nosql", []string{"EE2C-7FAC-5E08", "C802-861C-2155"}},
+		{"database_nosql", []string{"EE2C-7FAC-5E08", "C3BE-24A5-0975"}},
 		{"serverless", []string{"29E7-DA93-CA13", "152E-C115-5142"}},
 		{"compute", []string{"6F81-5844-456A"}},
 		{"storage", []string{"95FF-2EF5-5EA1"}},

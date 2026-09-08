@@ -56,4 +56,5 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 - [0046-cloud-sql-component-composition-engine.md](0046-cloud-sql-component-composition-engine.md): Cloud SQL Component Composition Engine and Instance Shape Synthesis
 - [0047-multi-endpoint-service-catalog-ingestion-for-gcp.md](0047-multi-endpoint-service-catalog-ingestion-for-gcp.md): Multi-Endpoint Service Catalog Ingestion for Google Cloud Platform
 - [0048-network-transfer-taxonomy-extension-and-isolation.md](0048-network-transfer-taxonomy-extension-and-isolation.md): Network Transfer Taxonomy Extension and Dedicated Link Scoring Isolation
+- [0049-gcp-ingestion-3-way-triage-and-trace-compression.md](0049-gcp-ingestion-3-way-triage-and-trace-compression.md): GCP Ingestion 3-Way Triage Classification and OTLP Trace Compression
 

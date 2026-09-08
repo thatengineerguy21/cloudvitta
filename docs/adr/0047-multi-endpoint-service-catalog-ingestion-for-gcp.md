@@ -4,8 +4,8 @@
 Google Cloud Platform (GCP) does not publish all database and compute products under single service catalog endpoints.
 In the Google Cloud Billing Catalog API, related products publish under distinct service identifiers:
 - Relational databases publish under both Cloud SQL (`9662-B51E-5089`) and AlloyDB for PostgreSQL (`C49F-B7F2-7416`).
-- NoSQL databases publish under both Cloud Firestore (`EE2C-7FAC-5E08`) and Cloud Bigtable (`C802-861C-2155`).
-- Serverless compute products publish under both Cloud Functions (`29E7-DA93-CA13`) and Cloud Run container services (`152E-C115-5142`).
+- NoSQL databases publish under both Cloud Firestore (`EE2C-7FAC-5E08`) and Cloud Bigtable (`C3BE-24A5-0975`).
+- Serverless compute products publish under both Cloud Run Functions (`29E7-DA93-CA13`) and Cloud Run container services (`152E-C115-5142`).
 
 Before this change, the GCP client configured only one single URL per category.
 Consequently, AlloyDB, Cloud Bigtable, and container-based Cloud Run services were absent from ingestion.

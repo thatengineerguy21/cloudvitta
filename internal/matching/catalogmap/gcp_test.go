@@ -128,8 +128,14 @@ func TestMapGCPProduct(t *testing.T) {
 		},
 		{
 			name:         "valid Cloud Bigtable service ID",
-			serviceName:  "C802-861C-2155",
+			serviceName:  "C3BE-24A5-0975",
 			wantCategory: "database_nosql",
+			wantErr:      nil,
+		},
+		{
+			name:         "valid Cloud Run Functions display name",
+			serviceName:  "Cloud Run Functions",
+			wantCategory: "serverless",
 			wantErr:      nil,
 		},
 		{

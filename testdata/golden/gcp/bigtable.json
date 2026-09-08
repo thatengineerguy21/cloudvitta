@@ -1,7 +1,7 @@
 {
   "skus": [
     {
-      "name": "services/C802-861C-2155/skus/SKU-BIGTABLE-NODE",
+      "name": "services/C3BE-24A5-0975/skus/SKU-BIGTABLE-NODE",
       "skuId": "SKU-BIGTABLE-NODE",
       "description": "Cloud Bigtable: Node in Virginia",
       "category": {
@@ -29,7 +29,7 @@
       ]
     },
     {
-      "name": "services/C802-861C-2155/skus/SKU-BIGTABLE-SSD",
+      "name": "services/C3BE-24A5-0975/skus/SKU-BIGTABLE-SSD",
       "skuId": "SKU-BIGTABLE-SSD",
       "description": "Cloud Bigtable: SSD Storage in Virginia",
       "category": {
@@ -57,7 +57,7 @@
       ]
     },
     {
-      "name": "services/C802-861C-2155/skus/SKU-BIGTABLE-HDD",
+      "name": "services/C3BE-24A5-0975/skus/SKU-BIGTABLE-HDD",
       "skuId": "SKU-BIGTABLE-HDD",
       "description": "Cloud Bigtable: HDD Storage in Virginia",
       "category": {

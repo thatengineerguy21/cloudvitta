@@ -128,14 +128,14 @@ To prevent Cartesian explosion in the database, multi-meter services are ingeste
 2. **NoSQL Databases (`database_nosql` - ADR 0033)**:
    - Operational throughput: `component_type = "throughput"` (provisioned RCU/WCU/RU, Bigtable provisioned nodes, or on-demand operations).
    - Storage capacity: `component_type = "storage"` (monthly rate per GB, joined at query time).
-   - Ingestion Endpoints (GCP): Multi-endpoint fetch combining Cloud Firestore (`EE2C-7FAC-5E08`) and Cloud Bigtable (`C802-861C-2155`).
+   - Ingestion Endpoints (GCP): Multi-endpoint fetch combining Cloud Firestore (`EE2C-7FAC-5E08`) and Cloud Bigtable (`C3BE-24A5-0975`).
 3. **Serverless Compute (`serverless`)**:
    - Request fees: `rate_component = "request_fee"` (rate per 1M requests or per request).
    - Duration fees: `rate_component = "duration_fee"` (rate per GB-second) or split `duration_fee_cpu` and `duration_fee_memory` (GCP).
    - Ingestion Endpoints:
      - AWS: AWS Price List API for AWS Lambda (`DefaultLambdaPriceListURL`).
      - Azure: Azure Retail Prices API for Azure Functions (`DefaultFunctionsRetailPricesURL`).
-     - GCP: Multi-endpoint fetch combining Cloud Functions (`29E7-DA93-CA13`) and Cloud Run container services (`152E-C115-5142`).
+     - GCP: Multi-endpoint fetch combining Cloud Run Functions (`29E7-DA93-CA13`) and Cloud Run container services (`152E-C115-5142`).
    - Registration Parity: Factory constructor registers all seven declared categories for AWS, Azure, and GCP. Automated parity tests verify that declared categories match factory jobs.
 
 ---
@@ -161,6 +161,24 @@ ratio = unmapped_count / in_scope_total
 GCP publishes Compute Engine virtual machines, RAM/CPU components, and Network services under one service catalog ID (`6F81-5844-456A`). To prevent cross-category contamination and false quarantine alerts:
 1. **Target Category Isolation**: The GCP normalizer evaluates the active ingestion job category (`compute` or `network`). When the job category is `compute`, network SKUs are ignored without quarantine. When the job category is `network`, compute SKUs and machine component compositions are ignored without quarantine.
 2. **Auxiliary Network Line Classification**: Auxiliary networking infrastructure items (such as Cloud Load Balancing, Cloud NAT, Cloud Armor, Firewalls, and Cloud Interconnect port charges) do not represent data transfer egress volume. The normalizer classifies these auxiliary lines as out-of-scope (`ItemClassificationIgnored`). This prevents unmapped transfer type errors and keeps the unmapped ratio below the 5% quarantine threshold.
+
+### GCP Database 3-Way Triage Classification (ADR 0049)
+Cloud SQL feeds contain operational line items that do not represent compute instance or storage volume rates:
+1. **In-Scope Synthesis**: Instance and storage SKUs synthesize into valid PostgreSQL/MySQL/SQL Server pricing observations.
+2. **Known Out-of-Scope Bypass**: Auxiliary items (extended support fees, provisioned IOPS/throughput, point-in-time recovery, backups, reserved static IP addresses, network egress, standby/replica high-availability overhead, promotional discounts, and legacy shared tiers `g1-small`/`f1-micro`) are filtered by `isOutOfScopeDatabaseSKU` directly into `IgnoredCount` without entering quarantine.
+3. **Novel Shape Quarantine**: Truly novel, malformed, or unmapped instance shapes route directly to `quarantine.Sink`.
+
+### GCP Serverless Rate-Component Matching & Triage (ADR 0049)
+Cloud Run and Cloud Run Functions feeds combine compute, memory, invocations, and network transfers:
+1. **Precedence-Based Rate Matching**: CPU meters (`vcpu`, `ghz`, `cpu`) and Memory meters (`memory`, `giby.s`, `gb-second`) evaluate prior to request fee checks. This prevents line items with `(Request-based billing)` qualifiers from colliding with request unit meters.
+2. **Auxiliary Transfer Bypass**: Data transfer and network egress items bypass to `IgnoredCount` via `isOutOfScopeServerlessSKU`.
+3. **Architecture Mapping**: Positive matching tokens (`allocation`, `cpu`, `memory`, `gib-second`, `vcpu-second`, `instance`, `job`, `worker pool`) map to canonical `x86_64`, while unsupported architectures (such as ARM serverless) quarantine loudly.
+
+### OTLP Trace Compression and Bounded Batch Sizing (ADR 0049)
+To prevent `413 Request Entity Too Large` rejections from Grafana Cloud OTLP HTTP gateways:
+- All OTLP HTTP exporters (`otlptracehttp`, `otlpmetrichttp`, `otlploghttp`) use Gzip compression via `WithCompression(GzipCompression)`.
+- The trace batch processor enforces explicit batch bounds via `sdktrace.WithMaxExportBatchSize(512)` and `sdktrace.WithMaxQueueSize(2048)`.
+- Spans follow a strict span-per-stage granularity with zero per-item tracing spans in normalization loops.
 
 ---
 
