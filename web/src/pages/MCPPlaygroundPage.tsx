@@ -337,7 +337,9 @@ export const MCPPlaygroundPage: React.FC = () => {
   return (
     <div className="space-y-6 relative" data-testid="mcp-playground-page">
       {/* Ambient background blur */}
-      <div className="absolute -top-10 left-1/3 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10" aria-hidden="true">
+        <div className="absolute -top-10 left-1/3 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl" />
+      </div>
 
       {/* Page Title & Status Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-default pb-6">

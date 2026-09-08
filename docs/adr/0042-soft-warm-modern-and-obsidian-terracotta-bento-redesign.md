@@ -56,6 +56,12 @@ CloudVitta requires a refined user experience that provides soft visual warmth, 
    - **Partial Workload Indication**: Workloads with missing components retain dashed borders and explicit partial estimate warnings.
    - **Anomaly Flagging**: Observations with pending review status display warning badges.
 
+6. **Ergonomic Scrollbar and Viewport Stability**:
+   - **Explicit Theme Color Scheme**: Declare `color-scheme: light` on `:root` and `color-scheme: dark` on `.dark` to enforce native browser engine consistency across light and obsidian palettes.
+   - **Thin Rounded Pill Thumb**: Configure 8px width with `border-radius: 9999px` and a 2px transparent inset border (`background-clip: padding-box`). This prevents raw operating system scrollbars from clashing with the soft bento geometry.
+   - **Adaptive Surface Contrast**: Apply translucent warm neutral thumbs (`rgba(28, 25, 23, 0.22)`) for light mode and subtle ivory thumbs (`rgba(245, 242, 235, 0.2)`) for dark mode with transparent tracks.
+   - **Layout Stability and Viewport Guard**: Enforce `scrollbar-gutter: stable` to remove layout shift and confine ambient background glow elements within `overflow-hidden` containers to prevent horizontal scrollbars.
+
 ## Consequences
 
 ### Positive

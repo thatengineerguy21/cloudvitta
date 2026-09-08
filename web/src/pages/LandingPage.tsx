@@ -94,8 +94,10 @@ export const LandingPage: React.FC = () => {
   return (
     <div className="space-y-6 relative" data-testid="landing-page">
       {/* Ambient Warm Glow Orbs (Soft Warm Modern / Obsidian Terracotta) */}
-      <div className="absolute -top-10 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute top-20 right-1/4 w-80 h-80 bg-status-matchExact/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10" aria-hidden="true">
+        <div className="absolute -top-10 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-20 right-1/4 w-80 h-80 bg-status-matchExact/10 rounded-full blur-3xl" />
+      </div>
 
       {/* Hero Section */}
       <BentoCard colSpan={12} className="relative overflow-hidden">
